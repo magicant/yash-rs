@@ -185,13 +185,9 @@ impl OptionSpec<'_> {
     ///
     /// An option marked as an extension does not exist in the POSIX
     /// specification of the built-in it belongs to, regardless of whether it
-    /// is given a short or long name. When
-    /// [`Mode::non_portable_option_names`] is `false`, an
-    /// extension option is rejected even when spelled as a short option.
-    /// This is unlike a long option name, which is always rejected under the
-    /// same condition regardless of whether its underlying option is marked
-    /// as an extension, because POSIX does not define long option names at
-    /// all.
+    /// is given a short or long name. When [`Mode::extension_options`] is
+    /// `false`, an extension option is rejected regardless of whether it is
+    /// spelled as a short or long option.
     pub const fn is_extension(&self) -> bool {
         self.extension
     }
@@ -259,7 +255,8 @@ impl OptionSpec<'_> {
 /// ```
 /// # use yash_builtin::common::syntax::Mode;
 /// let mode = Mode::default();
-/// assert!(!mode.non_portable_option_names);
+/// assert!(!mode.long_option_names);
+/// assert!(!mode.extension_options);
 /// assert!(!mode.option_arguments_in_same_field);
 /// # // TODO other properties
 /// ```
@@ -270,25 +267,35 @@ impl OptionSpec<'_> {
 /// ```
 /// # use yash_builtin::common::syntax::Mode;
 /// let mode = Mode::with_extensions();
-/// assert!(mode.non_portable_option_names);
+/// assert!(mode.long_option_names);
+/// assert!(mode.extension_options);
 /// assert!(mode.option_arguments_in_same_field);
 /// # // TODO other properties
 /// ```
 #[derive(Clone, Copy, Default, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub struct Mode {
-    /// Whether the parser accepts non-portable option names or not
+    /// Whether the parser accepts long option names or not
     ///
-    /// This governs two kinds of options:
-    ///
-    /// - Any long option name (like `--foo`), which is itself a non-portable
-    ///   extension to the POSIX Utility Syntax Guidelines regardless of the
-    ///   underlying option.
-    /// - Any short option whose [`OptionSpec`] is marked as an extension
-    ///   (see [`OptionSpec::is_extension`]), because such an option does not
-    ///   exist in POSIX at all.
+    /// A long option name (like `--foo`) is itself a non-portable extension to
+    /// the POSIX Utility Syntax Guidelines, regardless of whether the
+    /// underlying option is defined in POSIX. While this field is `false`, a
+    /// long option name is rejected with [`ParseError::NonPortableLongOption`].
     ///
     /// The default value is `false`.
-    pub non_portable_option_names: bool,
+    pub long_option_names: bool,
+
+    /// Whether the parser accepts options marked as extensions or not
+    ///
+    /// An option whose [`OptionSpec`] is marked as an extension (see
+    /// [`OptionSpec::is_extension`]) does not exist in the POSIX specification
+    /// of the built-in it belongs to. While this field is `false`, such an
+    /// option is rejected with [`ParseError::NonPortableShortOption`] or
+    /// [`ParseError::NonPortableLongOption`], depending on whether it is
+    /// spelled as a short or long option.
+    ///
+    /// The default value is `false`.
+    pub extension_options: bool,
 
     /// Whether an option argument may occur in the same field as a short option
     ///
@@ -305,7 +312,8 @@ impl Mode {
     /// Returns a new `Mode` with non-portable extensions enabled.
     pub const fn with_extensions() -> Self {
         Mode {
-            non_portable_option_names: true,
+            long_option_names: true,
+            extension_options: true,
             option_arguments_in_same_field: true,
         }
     }
@@ -358,13 +366,15 @@ pub enum ParseError<'a> {
 
     /// Short option whose spec is marked as a [non-portable extension](`OptionSpec::is_extension`)
     ///
-    /// This error occurs only when [`Mode::non_portable_option_names`] is `false`.
+    /// This error occurs only when [`Mode::extension_options`] is `false`.
     #[error("non-portable option {0:?}")]
     NonPortableShortOption(char, Field, &'a OptionSpec<'a>),
 
     /// Long option that is defined in an option spec but disabled
     ///
-    /// This error occurs only when [`Mode::non_portable_option_names`] is `false`.
+    /// This error occurs when [`Mode::long_option_names`] is `false`, and also
+    /// when the option is marked as an [extension](OptionSpec::is_extension)
+    /// while [`Mode::extension_options`] is `false`.
     #[error("non-portable option {:?}", .0.value)]
     NonPortableLongOption(Field, &'a OptionSpec<'a>),
 
@@ -490,7 +500,7 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
             None => return Err(ParseError::UnknownShortOption(c, field)),
             Some(spec) => spec,
         };
-        if spec.is_extension() && !mode.non_portable_option_names {
+        if spec.is_extension() && !mode.extension_options {
             return Err(ParseError::NonPortableShortOption(c, field, spec));
         }
         match spec.get_argument() {
@@ -587,7 +597,9 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
     };
 
     let spec = match long_match(option_specs, name) {
-        Ok(spec) if mode.non_portable_option_names => spec,
+        Ok(spec) if mode.long_option_names && (mode.extension_options || !spec.is_extension()) => {
+            spec
+        }
         Ok(spec) => return Err(ParseError::NonPortableLongOption(field, spec)),
         Err(matched_specs) => {
             return Err(if matched_specs.is_empty() {
@@ -1028,7 +1040,7 @@ mod tests {
     }
 
     #[test]
-    fn argument_taking_option_adjacent_to_another_option() {
+    fn argument_taking_short_option_after_other_short_options_in_cluster() {
         let specs = &[
             OptionSpec::new()
                 .short('a')
@@ -1302,13 +1314,6 @@ mod tests {
         let specs = &[OptionSpec::new().short('a')];
 
         let arguments = Field::dummies(["-x"]);
-        let error = parse_arguments(&[], Mode::default(), arguments).unwrap_err();
-        assert_matches!(&error, ParseError::UnknownShortOption('x', field) => {
-            assert_eq!(field.value, "-x");
-        });
-        assert_eq!(error.to_string(), "unknown option 'x'");
-
-        let arguments = Field::dummies(["-x"]);
         let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
         assert_matches!(&error, ParseError::UnknownShortOption('x', field) => {
             assert_eq!(field.value, "-x");
@@ -1350,7 +1355,7 @@ mod tests {
     }
 
     #[test]
-    fn non_portable_short_option() {
+    fn extension_short_option_rejected_without_extension_option() {
         let specs = &[OptionSpec::new().short('f').extension(true)];
 
         let arguments = Field::dummies(["-f"]);
@@ -1364,7 +1369,7 @@ mod tests {
     }
 
     #[test]
-    fn non_portable_short_option_within_cluster() {
+    fn extension_short_option_within_cluster_rejected_without_extension_option() {
         let specs = &[
             OptionSpec::new().short('a'),
             OptionSpec::new().short('f').extension(true),
@@ -1380,22 +1385,73 @@ mod tests {
     }
 
     #[test]
-    fn extension_short_option_allowed_with_extensions() {
-        let specs = &[OptionSpec::new().short('f').extension(true)];
+    fn extension_short_option_allowed_with_extension_option() {
+        let specs = &[OptionSpec::new().short('f').long("force").extension(true)];
+        let mode = Mode {
+            extension_options: true,
+            ..Mode::default()
+        };
 
         let arguments = Field::dummies(["-f"]);
-        let (options, operands) =
-            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
+        let (options, operands) = parse_arguments(specs, mode, arguments).unwrap();
         assert_eq!(options.len(), 1, "options = {options:?}");
         assert_eq!(options[0].spec.get_short(), Some('f'));
         assert_eq!(operands, []);
     }
 
     #[test]
+    fn extension_long_option_rejected_without_extension_option() {
+        let specs = &[OptionSpec::new().short('f').long("force").extension(true)];
+        let mode = Mode {
+            long_option_names: true,
+            ..Mode::default()
+        };
+
+        let arguments = Field::dummies(["--force"]);
+        let error = parse_arguments(specs, mode, arguments).unwrap_err();
+        assert_matches!(&error, ParseError::NonPortableLongOption(field, spec) => {
+            assert_eq!(field.value, "--force");
+            assert_eq!(*spec, &specs[0]);
+        });
+    }
+
+    #[test]
+    fn non_extension_long_option_allowed_with_long_option_names() {
+        let specs = &[OptionSpec::new().short('f').long("force")];
+        let mode = Mode {
+            long_option_names: true,
+            ..Mode::default()
+        };
+
+        let arguments = Field::dummies(["--force"]);
+        let (options, operands) = parse_arguments(specs, mode, arguments).unwrap();
+        assert_eq!(options.len(), 1, "options = {options:?}");
+        assert_eq!(options[0].spec.get_long(), Some("force"));
+        assert_eq!(operands, []);
+    }
+
+    #[test]
+    fn non_extension_long_option_rejected_without_long_option_names() {
+        let specs = &[OptionSpec::new().short('f').long("force")];
+        let mode = Mode {
+            extension_options: true,
+            ..Mode::default()
+        };
+
+        let arguments = Field::dummies(["--force"]);
+        let error = parse_arguments(specs, mode, arguments).unwrap_err();
+        assert_matches!(&error, ParseError::NonPortableLongOption(field, spec) => {
+            assert_eq!(field.value, "--force");
+            assert_eq!(*spec, &specs[0]);
+        });
+    }
+
+    #[test]
     fn mode_with_env_enables_extensions_by_default() {
         let env = yash_env::Env::new_virtual();
         let mode = Mode::with_env(&env);
-        assert!(mode.non_portable_option_names);
+        assert!(mode.long_option_names);
+        assert!(mode.extension_options);
         assert!(mode.option_arguments_in_same_field);
     }
 
@@ -1405,7 +1461,8 @@ mod tests {
         let mut env = yash_env::Env::new_virtual();
         env.options.set(Portable, On);
         let mode = Mode::with_env(&env);
-        assert!(!mode.non_portable_option_names);
+        assert!(!mode.long_option_names);
+        assert!(!mode.extension_options);
         assert!(!mode.option_arguments_in_same_field);
     }
 

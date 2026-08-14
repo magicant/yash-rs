@@ -160,7 +160,7 @@ pub enum ParseError {
     /// Long option used while POSIX portability is required
     ///
     /// POSIX does not specify long options at all, so any `--name` or `++name`
-    /// form is rejected while [`Mode::non_portable_option_names`] is `false`.
+    /// form is rejected while [`Mode::long_option_names`] is `false`.
     /// This error applies to the `--` and `++` prefixes only; the `--`
     /// separator and short options remain acceptable. An option that cannot be
     /// canceled is still reported as
@@ -297,9 +297,7 @@ fn try_parse_long<'a, I: Iterator<Item = Field>>(
         Some(spec) if negate && spec.attr.is_none() => {
             Err(ParseError::UncancelableLongOption(field))
         }
-        Some(_spec) if !mode.non_portable_option_names => {
-            Err(ParseError::NonPortableLongOption(field))
-        }
+        Some(_spec) if !mode.long_option_names => Err(ParseError::NonPortableLongOption(field)),
         Some(spec) => Ok(Some(OptionOccurrence {
             spec,
             state: if negate { State::Off } else { State::On },
@@ -314,12 +312,13 @@ fn try_parse_long<'a, I: Iterator<Item = Field>>(
 /// recognized by the parser.
 ///
 /// The second argument selects the syntax this parser accepts. This parser
-/// honors only [`Mode::non_portable_option_names`], which governs whether long
+/// honors only [`Mode::long_option_names`], which governs whether long
 /// options are accepted; while it is `false`, a long option is rejected with
 /// [`ParseError::NonPortableLongOption`]. The other fields of [`Mode`] describe
-/// syntax this parser cannot produce: no option of the typeset built-in family
-/// takes an argument, and its operands are never numbers. A future version is
-/// expected to honor `options_after_operands` as well.
+/// syntax this parser cannot produce for now: the typeset built-in family has
+/// its own [`OptionSpec`] type that cannot mark an option as an extension, no
+/// option of the family takes an argument, and its operands are never numbers.
+/// A future version is expected to honor `options_after_operands` as well.
 ///
 /// The third argument is a list of command line arguments to be parsed.
 ///
@@ -602,12 +601,11 @@ mod tests {
 
     #[test]
     fn parse_long_print_option_without_operands() {
-        let result = parse(
-            ALL_OPTIONS,
-            Mode::with_extensions(),
-            Field::dummies(["--print"]),
-        )
-        .unwrap();
+        let mode = Mode {
+            long_option_names: true,
+            ..Mode::default()
+        };
+        let result = parse(ALL_OPTIONS, mode, Field::dummies(["--print"])).unwrap();
         assert_matches!(&result.0[..], [option] => {
             assert_eq!(option.spec, &PRINT_OPTION);
             assert_eq!(option.state, State::On);
