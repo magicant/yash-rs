@@ -386,6 +386,47 @@ __IN__
 foo
 __OUT__
 
+test_O -d -e 2 'command -v rejects more than one operand under the portable option' -o portable
+command -v cat cat
+__IN__
+
+test_O -d -e 2 'command -V rejects more than one operand under the portable option' -o portable
+command -V cat cat
+__IN__
+
+test_oE 'command surplus operand error message names the operand' -o portable
+(command -v cat dog) 2>result
+grep -Fq dog result && echo shown
+__IN__
+shown
+__OUT__
+
+test_oE 'command surplus operand error message mentions the portable option' -o portable
+(command -v cat dog) 2>result
+grep -Fq portable result && echo shown
+__IN__
+shown
+__OUT__
+
+test_oE -e 0 'command -v accepts one operand under the portable option' -o portable
+command -v :
+__IN__
+:
+__OUT__
+
+test_oE -e 0 'command accepts arguments after the command name under the portable option' -o portable
+command echo foo bar
+__IN__
+foo bar
+__OUT__
+
+test_oE -e 0 'command -v accepts more than one operand without the portable option'
+command -v : bg
+__IN__
+:
+bg
+__OUT__
+
 (
 posix="true"
 
@@ -395,14 +436,5 @@ echo reached
 __IN__
 reached
 __OUT__
-
-# TODO Should error out because of too many operands
-test_O -d -e n -f 'more than one operand (with -v, POSIX)'
-command -v foo bar
-__IN__
-
-test_O -d -e n 'more than one operand (with -V, POSIX)'
-command -V foo bar
-__IN__
 
 )

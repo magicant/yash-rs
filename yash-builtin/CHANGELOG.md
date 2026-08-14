@@ -61,6 +61,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `command::syntax::Error::MissingCommandName`, returned by
   `command::syntax::interpret` for an invocation of the `command` or `type`
   built-in that has no operands while the `portable` shell option is on.
+- `command::syntax::Error::TooManyCommandNames`, returned by
+  `command::syntax::parse` for an invocation of the `command` built-in that
+  has more than one operand with the `-v` or `-V` option while the `portable`
+  shell option is on.
 
 ### Changed
 
@@ -123,6 +127,13 @@ A _private dependency_ is used internally and not visible to downstream users.
   reject an invocation that has no operands when the `portable` shell option
   is on. POSIX requires the command name operand in every form of these
   built-ins.
+- The `command` built-in (`command::syntax::parse`) now rejects an invocation
+  that has more than one operand with the `-v` or `-V` option when the
+  `portable` shell option is on. POSIX specifies the syntax as
+  `command [-p][-v|-V] command_name`, which identifies one command at a time.
+  The `type` built-in is unaffected, since it does not depend on
+  `command::syntax::parse` for its syntax and POSIX allows multiple command
+  names.
 - `typeset::syntax::parse` now takes a `common::syntax::Mode` as a second
   parameter, allowing the caller to control whether non-portable option syntax
   is accepted.

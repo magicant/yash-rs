@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - With `portable` enabled, the `export` and `readonly` built-ins now reject an invocation that has neither operands nor the `-p` option (for example, `export`), as well as one that has both (for example, `export -p FOO`). POSIX specifies only the `export name…` and `export -p` forms.
 - With `portable` enabled, the `unset` built-in now rejects an invocation without operands (for example, `unset` or `unset -v`). POSIX specifies the syntax as `unset [-fv] name…`, which requires at least one operand.
 - With `portable` enabled, the `command` and `type` built-ins now reject an invocation without operands (for example, `command -v` or `type`). POSIX requires the *name* operand in every form of these built-ins.
+- With `portable` enabled, the `command` built-in now rejects more than one operand given with the `-v` or `-V` option (for example, `command -v ls cat`). POSIX specifies the syntax as `command [-p][-v|-V] command_name`, which identifies one command at a time. The `type` built-in still accepts more than one operand, since POSIX spells its operands `name…`.
 
 ## [3.3.4] - 2026-07-31
 

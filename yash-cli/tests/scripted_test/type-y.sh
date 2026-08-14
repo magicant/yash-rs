@@ -248,12 +248,9 @@ __IN__
 if: keyword
 __OUT__
 
-(
-posix="true"
-
-# TODO Should error out because of too many operands
-test_O -d -e 2 -f 'more than one operand (POSIX)'
-type foo bar
+test_oE -e 0 'type accepts more than one operand under the portable option' -o portable
+type if then
 __IN__
-
-)
+if: keyword
+then: keyword
+__OUT__
