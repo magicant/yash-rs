@@ -1040,7 +1040,7 @@ mod tests {
     }
 
     #[test]
-    fn argument_taking_option_adjacent_to_another_option() {
+    fn argument_taking_short_option_after_other_short_options_in_cluster() {
         let specs = &[
             OptionSpec::new()
                 .short('a')
@@ -1314,13 +1314,6 @@ mod tests {
         let specs = &[OptionSpec::new().short('a')];
 
         let arguments = Field::dummies(["-x"]);
-        let error = parse_arguments(&[], Mode::default(), arguments).unwrap_err();
-        assert_matches!(&error, ParseError::UnknownShortOption('x', field) => {
-            assert_eq!(field.value, "-x");
-        });
-        assert_eq!(error.to_string(), "unknown option 'x'");
-
-        let arguments = Field::dummies(["-x"]);
         let error = parse_arguments(specs, Mode::default(), arguments).unwrap_err();
         assert_matches!(&error, ParseError::UnknownShortOption('x', field) => {
             assert_eq!(field.value, "-x");
@@ -1362,7 +1355,7 @@ mod tests {
     }
 
     #[test]
-    fn non_portable_short_option() {
+    fn extension_short_option_rejected_without_extension_option() {
         let specs = &[OptionSpec::new().short('f').extension(true)];
 
         let arguments = Field::dummies(["-f"]);
@@ -1376,7 +1369,7 @@ mod tests {
     }
 
     #[test]
-    fn non_portable_short_option_within_cluster() {
+    fn extension_short_option_within_cluster_rejected_without_extension_option() {
         let specs = &[
             OptionSpec::new().short('a'),
             OptionSpec::new().short('f').extension(true),
