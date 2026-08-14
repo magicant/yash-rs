@@ -29,6 +29,7 @@ use crate::common::syntax::OptionOccurrence;
 use crate::common::syntax::OptionSpec;
 use crate::common::syntax::parse_arguments;
 use yash_env::Env;
+use yash_env::option::Option::Portable;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
 use yash_env::system::concurrency::WriteAll;
@@ -54,7 +55,7 @@ fn parse<S>(env: &mut Env<S>, args: Vec<Field>) -> Result<Identify, crate::comma
         argument: None,
     });
 
-    interpret(options, operands).map(|command| match command {
+    interpret(options, operands, env.options.get(Portable)).map(|command| match command {
         Command::Identify(identify) => identify,
         // With the added `-V` option, other variants are unreachable.
         Command::Invoke(_) => unreachable!(),

@@ -27,8 +27,13 @@ use crate::common::syntax::ParseError;
 use crate::common::syntax::parse_arguments;
 use thiserror::Error;
 use yash_env::Env;
+use yash_env::option::Option::Portable;
+use yash_env::option::State;
 use yash_env::semantics::Field;
+use yash_env::source::pretty::Footnote;
+use yash_env::source::pretty::FootnoteType;
 use yash_env::source::pretty::Report;
+use yash_env::source::pretty::ReportType;
 
 /// Error in parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -37,7 +42,10 @@ pub enum Error {
     /// An error occurred in the common parser.
     #[error(transparent)]
     CommonError(#[from] ParseError<'static>),
-    // TODO MissingCommandName
+
+    /// No command name operand is given while POSIX portability is required.
+    #[error("missing command name operand")]
+    MissingCommandName,
     // TODO TooManyCommandNames
     // TODO UninvokableCategory
 }
@@ -48,6 +56,20 @@ impl Error {
     pub fn to_report(&self) -> Report<'_> {
         match self {
             Self::CommonError(e) => e.to_report(),
+
+            Self::MissingCommandName => {
+                // There is no operand to annotate, so the report has no snippet
+                // of its own. The built-in name is annotated by the caller.
+                let mut report = Report::new();
+                report.r#type = ReportType::Error;
+                report.title = self.to_string().into();
+                report.footnotes.push(Footnote {
+                    r#type: FootnoteType::Note,
+                    label: "this error is reported because the `portable` shell option is enabled"
+                        .into(),
+                });
+                report
+            }
         }
     }
 }
@@ -68,10 +90,21 @@ const OPTION_SPECS: &[OptionSpec] = &[
 /// Interprets the parsed command line arguments
 ///
 /// This function converts the result of [`parse_arguments`] into a `Command`.
+///
+/// `portable` should be the state of the `Portable` shell option. While it is
+/// `On`, the command line must have at least one operand, as POSIX requires
+/// the command name operand in every form of the command and type built-ins;
+/// an invocation without operands is rejected with
+/// [`Error::MissingCommandName`].
 pub fn interpret(
     options: Vec<OptionOccurrence<'_>>,
     operands: Vec<Field>,
+    portable: State,
 ) -> Result<Command, Error> {
+    if operands.is_empty() && portable == State::On {
+        return Err(Error::MissingCommandName);
+    }
+
     // Interpret options
     let mut standard_path = false;
     let mut verbose_identify = None;
@@ -106,7 +139,7 @@ pub fn interpret(
 /// Parses command line arguments of the `command` built-in
 pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
     let (options, operands) = parse_arguments(OPTION_SPECS, Mode::with_env(env), args)?;
-    interpret(options, operands)
+    interpret(options, operands, env.options.get(Portable))
 }
 
 #[cfg(test)]
@@ -201,6 +234,64 @@ mod tests {
                 }
             );
             assert!(identify.verbose);
+        });
+    }
+
+    #[test]
+    fn no_operands_without_portable() {
+        let env = Env::new_virtual();
+        let result = parse(&env, vec![]);
+
+        assert_matches!(result, Ok(Command::Invoke(invoke)) => {
+            assert_eq!(invoke.fields, []);
+        });
+    }
+
+    #[test]
+    fn no_operands_portable() {
+        // With the portable option on, the built-in requires an operand.
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, vec![]);
+        assert_eq!(result, Err(Error::MissingCommandName));
+    }
+
+    #[test]
+    fn no_operands_with_option_portable() {
+        // The operand is required regardless of the -v and -V options.
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, Field::dummies(["-v"]));
+        assert_eq!(result, Err(Error::MissingCommandName));
+
+        let result = parse(&env, Field::dummies(["-V"]));
+        assert_eq!(result, Err(Error::MissingCommandName));
+
+        let result = parse(&env, Field::dummies(["-p"]));
+        assert_eq!(result, Err(Error::MissingCommandName));
+    }
+
+    #[test]
+    fn operands_portable() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, Field::dummies(["foo"]));
+
+        assert_matches!(result, Ok(Command::Invoke(invoke)) => {
+            assert_eq!(invoke.fields, Field::dummies(["foo"]));
+        });
+    }
+
+    #[test]
+    fn missing_command_name_report_mentions_portable_option() {
+        let report = Error::MissingCommandName.to_report();
+        assert_matches!(&report.footnotes[..], [footnote] => {
+            assert_eq!(footnote.r#type, FootnoteType::Note);
+            assert!(
+                footnote.label.contains("portable"),
+                "footnote label should contain `portable`: {:?}",
+                footnote.label,
+            );
         });
     }
 

@@ -231,13 +231,25 @@ test_OE -e 0 'missing operand (non-POSIX)'
 type
 __IN__
 
-(
-posix="true"
-
-# TODO Should error out because of the missing operand
-test_O -d -e 2 -f 'missing operand (POSIX)'
+test_O -d -e 2 'type rejects missing operand under the portable option' -o portable
 type
 __IN__
+
+test_oE 'type missing operand error message mentions the portable option' -o portable
+(type) 2>result
+grep -Fq portable result && echo shown
+__IN__
+shown
+__OUT__
+
+test_oE -e 0 'type accepts an operand under the portable option' -o portable
+type if
+__IN__
+if: keyword
+__OUT__
+
+(
+posix="true"
 
 # TODO Should error out because of too many operands
 test_O -d -e 2 -f 'more than one operand (POSIX)'

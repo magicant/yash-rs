@@ -58,6 +58,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `unset::syntax::Error::MissingOperand`, returned by `unset::syntax::parse`
   for an invocation of the `unset` built-in that has no operands while the
   `portable` shell option is on.
+- `command::syntax::Error::MissingCommandName`, returned by
+  `command::syntax::interpret` for an invocation of the `command` or `type`
+  built-in that has no operands while the `portable` shell option is on.
 
 ### Changed
 
@@ -113,6 +116,13 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `unset` built-in (`unset::syntax::parse`) now rejects an invocation that
   has no operands when the `portable` shell option is on. POSIX specifies the
   syntax as `unset [-fv] name…`, which requires at least one operand.
+- `command::syntax::interpret` now takes the state of the `Portable` shell
+  option as a third parameter. While it is on, the command line must have at
+  least one operand.
+- The `command` and `type` built-ins (`command::main` and `r#type::main`) now
+  reject an invocation that has no operands when the `portable` shell option
+  is on. POSIX requires the command name operand in every form of these
+  built-ins.
 - `typeset::syntax::parse` now takes a `common::syntax::Mode` as a second
   parameter, allowing the caller to control whether non-portable option syntax
   is accepted.

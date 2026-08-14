@@ -53,5 +53,6 @@ When the `portable` option is set, the shell rejects or ignores the following no
 - (Since 3.3.5) An argument to `-o` or `+o` written in the same argument as the option itself on the [command line](startup.md) (for example, `yash3 -oerrexit`). Write `yash3 -o errexit` instead.
 - (Since 3.3.5) Invoking the [`export` built-in](builtins/export.md) or the [`readonly` built-in](builtins/readonly.md) without operands and without the `-p` option (for example, `export`), or with the `-p` option and one or more operands (for example, `export -p FOO`). POSIX specifies only the `export name…` and `export -p` forms, so use `export -p` to print all exported variables and omit `-p` when naming variables.
 - (Since 3.3.5) Invoking the [`unset` built-in](builtins/unset.md) without operands (for example, `unset` or `unset -v`). POSIX specifies the syntax as `unset [-fv] name…`, which requires at least one operand.
+- (Since 3.3.5) Invoking the [`command` built-in](builtins/command.md) or the [`type` built-in](builtins/type.md) without operands (for example, `command -v`). POSIX requires the *name* operand in every form of these built-ins.
 
 The `portable` option is still under development, so this list will be expanded as more checks are implemented.
