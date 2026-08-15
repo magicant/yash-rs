@@ -30,6 +30,8 @@ the book buildable.
 
 Follow these project-specific conventions when writing or editing pages. Match the style of
 the surrounding pages — read a nearby page first if unsure.
+[docs/README.md](../../../docs/README.md) is the canonical statement of the writing rules;
+the sections below summarize it and add conventions not recorded there.
 
 ### Linking
 
@@ -75,6 +77,24 @@ Common mistakes to avoid:
   this). Index-worthy names include **built-in utilities** and **shell options**, but **not**
   the individual options supported by a built-in utility.
 
+### Describing the `portable` option
+
+Follow the rules in [docs/README.md](../../../docs/README.md) for pages whose utility behaves
+differently under the `portable` shell option (mostly pages under
+[docs/src/builtins](../../../docs/src/builtins/)):
+
+- Every section other than Compatibility describes only the behavior with the option off, and
+  does not mention the option at all.
+- The Compatibility section states what the option rejects and the POSIX requirement behind it.
+- The Errors section of such a page ends with this sentence, so that readers do not take the
+  list above it as exhaustive:
+
+    ```markdown
+    The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
+    ```
+
+- Never link from Compatibility back to Errors.
+
 ### Code blocks: `shell` vs `sh`
 
 Choose the fence language deliberately, because `docs/doctest.sh` treats them differently:
@@ -98,7 +118,8 @@ For `shell` blocks that should not be run as-is, attach attributes after the lan
 
 1. Identify the affected page(s) under `docs/src`. For a new page, add it to `SUMMARY.md`.
 2. Edit the Markdown, applying the conventions above (linking, `(Since x.y.z)` tags, bold
-   keyword introductions, `topic_index.md` entries, and the right code-block language/flags).
+   keyword introductions, `topic_index.md` entries, `portable` option placement, and the
+   right code-block language/flags).
 3. Run `./check-docs.sh` from the repository root and confirm it finishes with **no errors
    and no warnings**. This builds the book with mdBook, runs `docs/doctest.sh` on the
    examples, and verifies the index sort order.

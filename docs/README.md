@@ -29,3 +29,17 @@ To link to other sections of the documentation, use relative links in Markdown f
 
 - In the `src/SUMMARY.md` file, all files are referred to by their true pathnames. Pathnames ending with `/README.md` are converted to `index.html` in their respective directories.
 - In other Markdown files, to link to a file named `README.md`, use the relative path ending with `/index.html` because the pathnames are not converted to `index.html` in the rendered HTML due to <https://github.com/rust-lang/mdBook/issues/984>.
+
+## Describing the `portable` option
+
+Many pages in `src/builtins` describe utilities whose behavior depends on the [`portable` shell option](src/environment/options.md#portable). Keep the description of the option confined to the Compatibility section so that readers who do not use the option are not distracted by it:
+
+- Sections other than Compatibility describe only the behavior with the option off. Do not mention the option or its effects there.
+- The Compatibility section describes what the option rejects, together with the POSIX requirement that motivates the rejection.
+- If the option changes the behavior of the utility, end the Errors section with this sentence so that readers of that section are not misled into thinking the list is exhaustive:
+
+    ```markdown
+    The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
+    ```
+
+- Do not link from the Compatibility section back to the Errors section.
