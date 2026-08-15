@@ -65,6 +65,9 @@ A _private dependency_ is used internally and not visible to downstream users.
   `command::syntax::parse` for an invocation of the `command` built-in that
   has more than one operand with the `-v` or `-V` option while the `portable`
   shell option is on.
+- `source::syntax::Error::NonPortableOperand`, returned by
+  `source::syntax::parse` for an invocation of the `.` built-in that has an
+  operand after the file operand while the `portable` shell option is on.
 
 ### Changed
 
@@ -134,6 +137,9 @@ A _private dependency_ is used internally and not visible to downstream users.
   The `type` built-in is unaffected, since it does not depend on
   `command::syntax::parse` for its syntax and POSIX allows multiple command
   names.
+- The `.` built-in (`source::syntax::parse`) now rejects an operand after the
+  file operand when the `portable` shell option is on. POSIX specifies the
+  syntax as `. file`, so such an operand is an extension.
 - `typeset::syntax::parse` now takes a `common::syntax::Mode` as a second
   parameter, allowing the caller to control whether non-portable option syntax
   is accepted.

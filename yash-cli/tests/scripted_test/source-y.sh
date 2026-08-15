@@ -24,3 +24,28 @@ grep -Fq 'portable' result && echo shown
 __IN__
 shown
 __OUT__
+
+test_O -d -e 2 'the dot built-in rejects a surplus operand under the portable option' -o portable
+. /dev/null foo
+__IN__
+
+test_oE 'dot surplus operand error message names the operand' -o portable
+(. /dev/null foo) 2>result
+grep -Fq foo result && echo shown
+__IN__
+shown
+__OUT__
+
+test_oE 'dot surplus operand error message mentions the portable option' -o portable
+(. /dev/null foo) 2>result
+grep -Fq portable result && echo shown
+__IN__
+shown
+__OUT__
+
+test_oE -e 0 'the dot built-in accepts a surplus operand without the portable option'
+. /dev/null foo
+echo reached
+__IN__
+reached
+__OUT__

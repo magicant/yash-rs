@@ -55,5 +55,6 @@ When the `portable` option is set, the shell rejects or ignores the following no
 - (Since 3.3.5) Invoking the [`unset` built-in](builtins/unset.md) without operands (for example, `unset` or `unset -v`). POSIX specifies the syntax as `unset [-fv] name…`, which requires at least one operand.
 - (Since 3.3.5) Invoking the [`command` built-in](builtins/command.md) or the [`type` built-in](builtins/type.md) without operands (for example, `command -v`). POSIX requires the *name* operand in every form of these built-ins.
 - (Since 3.3.5) Giving more than one operand to the [`command` built-in](builtins/command.md) with the `-v` or `-V` option (for example, `command -v ls cat`). POSIX specifies the syntax as `command [-p][-v|-V] command_name`, which identifies one command at a time. The [`type` built-in](builtins/type.md) is unaffected, since POSIX spells its operands `name…`.
+- (Since 3.3.5) Giving an operand after the *file* operand to the [`.` built-in](builtins/source.md) (for example, `. ./script.sh foo`).
 
 The `portable` option is still under development, so this list will be expanded as more checks are implemented.
