@@ -51,8 +51,9 @@ This built-in fails if:
 - The delimiter is not a single-byte character.
 - The delimiter is not a nul byte and the input contains a nul byte.
 - A variable name is not valid.
-- (Since 3.3.3) The [`portable` option](../environment/options.md#portable) is set and a variable name contains a character other than ASCII letters, digits, and underscores, is empty, or starts with a digit.
 - A variable to be assigned is [read-only](../language/parameters/variables.md#read-only-variables).
+
+The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
 
 ## Exit status
 
@@ -153,6 +154,6 @@ When a backslash is specified as the delimiter, no escape sequences are recogniz
 
 In this implementation, the value of the `PS2` variable is subject to [parameter expansion](../language/words/parameters.md), [command substitution](../language/words/command_substitution.md), and [arithmetic expansion](../language/words/arithmetic.md). Other implementations may not perform these expansions.
 
-The current implementation considers variable names containing a `=` as invalid names. However, more names may be considered invalid in the future. For best forward-compatibility and portability, only use portable name characters (ASCII alphanumerics and underscore).
+The current implementation considers variable names containing a `=` as invalid names. However, more names may be considered invalid in the future. For best forward-compatibility and portability, only use portable name characters (ASCII alphanumerics and underscore). (Since 3.3.3) When the `portable` option is set, it is an error if a variable name contains a character other than ASCII letters, digits, and underscores, is empty, or starts with a digit.
 
 In yash-rs and many other implementations, the `read` built-in does not read more than needed to find a delimiter, so that a next command can read the remaining input without loss. POSIX.1-2024 requires this behavior only when the built-in is reading from a seekable input.

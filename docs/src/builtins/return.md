@@ -34,6 +34,9 @@ it is a syntax error.
 This implementation treats an *exit_status* value greater than 2147483647 as
 a syntax error.
 
+The [`portable` option](../environment/options.md#portable) causes additional
+errors; see [Compatibility](#compatibility).
+
 ## Exit status
 
 The *exit_status* operand will be the exit status of the built-in.

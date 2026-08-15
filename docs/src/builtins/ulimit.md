@@ -130,6 +130,8 @@ The built-in fails if:
 - Both `-S` and `-H` are specified without a *limit* operand.
 - More than one resource option is specified.
 
+The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
+
 ## Exit status
 
 Zero if successful; non-zero if an error occurs.

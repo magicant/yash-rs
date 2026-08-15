@@ -57,11 +57,9 @@ Nothing is printed if the utility is not found.
 
 It is an error if the specified utility is not found or cannot be executed.
 
-(Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, it is an error to invoke the built-in without the *name* operand. POSIX requires the operand in every form of the built-in.
-
-(Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, it is an error to give more than one operand with the `-v` or `-V` option. POSIX allows only one *name* to be identified at a time.
-
 With the `-v` option, no error message is printed for the utility not found.
+
+The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
 
 ## Exit status
 
@@ -86,12 +84,12 @@ POSIX requires that the *name* operand be specified, but many
 implementations allow it to be omitted, in which case the built-in does
 nothing. This implementation does so by default. (Since 3.3.5) The
 [`portable` option](../environment/options.md#portable) rejects the omission
-with an error (see [Errors](#errors)).
+with an error.
 
 POSIX allows only one *name* operand with the `-v` or `-V` option, but this
 implementation identifies every operand given. (Since 3.3.5) The
 [`portable` option](../environment/options.md#portable) rejects a surplus
-operand with an error (see [Errors](#errors)). Note that the
+operand with an error. Note that the
 [`type` built-in](type.md), for which POSIX specifies `type name…`, accepts
 more than one operand regardless of the option.
 

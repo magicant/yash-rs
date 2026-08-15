@@ -30,7 +30,7 @@ The command descriptions are printed to the standard output.
 
 It is an error if the *name* is not found.
 
-(Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, it is an error to invoke the built-in without operands. POSIX requires at least one *name* operand.
+The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
 
 ## Exit status
 
@@ -58,6 +58,6 @@ POSIX defines no options for the `type` built-in, but previous versions of yash 
 
 In dash, the [`--` separator](index.html#separators) is treated as an operand.
 
-POSIX requires that the *name* operand be specified, but many implementations allow it to be omitted, in which case the built-in does nothing. This implementation does so by default. (Since 3.3.5) The [`portable` option](../environment/options.md#portable) rejects the omission with an error (see [Errors](#errors)).
+POSIX requires that the *name* operand be specified, but many implementations allow it to be omitted, in which case the built-in does nothing. This implementation does so by default. (Since 3.3.5) The [`portable` option](../environment/options.md#portable) rejects the omission with an error.
 
 The format of the output is unspecified by POSIX. In this implementation, the `type` built-in is equivalent to the [`command` built-in](command.md) with the `-V` option.

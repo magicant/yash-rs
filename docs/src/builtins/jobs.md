@@ -62,6 +62,8 @@ job to report. If no operands are given, the built-in prints all jobs.
 
 If an operand does not specify a valid job, the built-in prints an error message to the standard error and returns a non-zero exit status. An ambiguous job ID (matching multiple jobs) is also an error.
 
+The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
+
 ## Exit status
 
 Zero if successful, non-zero if an error occurred.

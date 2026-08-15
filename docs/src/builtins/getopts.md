@@ -78,12 +78,13 @@ The following conditions are considered errors of the built-in:
 
 - The built-in is invoked with less than two operands.
 - The second operand is not a valid variable name.
-- (Since 3.3.3) The [`portable` option](../environment/options.md#portable) is set and the second operand contains a character other than ASCII letters, digits, and underscores, is empty, or starts with a digit.
 - `OPTIND`, `OPTARG`, or the specified variable is read-only.
 - The built-in is re-invoked with different arguments or a different value
   of `OPTIND` than the previous invocation (except when `OPTIND` is reset
   to `1`).
 - The value of `OPTIND` is not `1` on the first invocation.
+
+The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
 
 ## Exit status
 
@@ -142,7 +143,10 @@ any characters but `:`.
 The current implementation considers variable names containing a `=` as
 invalid names. However, more names many be considered invalid in the future.
 For best forward-compatibility and portability, only use portable name
-characters (ASCII alphanumerics and underscore).
+characters (ASCII alphanumerics and underscore). (Since 3.3.3) When the
+[`portable` option](../environment/options.md#portable) is set, it is an
+error if the second operand contains a character other than ASCII letters,
+digits, and underscores, is empty, or starts with a digit.
 
 Although POSIX requires the built-in to support the [Utility Syntax Guidelines](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_02) 3 to 10, some implementations do not support the `--` separator placed before operands to the built-in itself, that is, between the built-in name `getopts` and the first operand *option_spec*.
 

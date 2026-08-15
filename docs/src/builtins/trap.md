@@ -58,6 +58,8 @@ Invalid *condition*s are reported with a non-zero exit status, but it is not a [
 
 If a non-interactive shell inherits a signal disposition that ignores a signal, it does not permit modifying the trap for that signal. In yash-rs, this restriction is enforced silently and does not affect the exit status of the built-in.
 
+The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
+
 ## Exit status
 
 Zero if successful, non-zero if an error is reported.

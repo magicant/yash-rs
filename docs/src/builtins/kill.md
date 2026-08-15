@@ -75,6 +75,9 @@ It is an error if:
 - An operand specified with the `-l` or `-v` option does not identify a
   supported signal.
 
+The [`portable` option](../environment/options.md#portable) causes additional
+errors; see [Compatibility](#compatibility).
+
 ## Exit status
 
 The exit status is zero unless an error occurs. The exit status is zero if

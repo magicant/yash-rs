@@ -26,7 +26,7 @@ Each operand must be of the form `name=value` or `name`. The first form defines 
 
 It is an error if an operand without `=` refers to an alias that does not exist.
 
-(Since 3.3.1) With the [`portable` option](../environment/options.md#portable) on, it is an error to define an alias whose name contains a character other than ASCII letters, digits, `!`, `%`, `,`, `-`, `@`, or `_`. The alias is not defined in that case.
+The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
 
 ## Exit status
 
@@ -39,5 +39,7 @@ See [Aliases](../language/aliases.md).
 ## Compatibility
 
 The `alias` built-in is specified by POSIX.1-2024.
+
+POSIX only requires alias names consisting of ASCII letters, digits, `!`, `%`, `,`, `-`, `@`, and `_` to be supported. By default, yash-rs allows other characters as well. (Since 3.3.1) When the [`portable` option](../environment/options.md#portable) is set, it is an error to define an alias whose name contains a character other than the above. The alias is not defined in that case.
 
 Some shells have predefined aliases that are printed even if you have not defined any explicitly.

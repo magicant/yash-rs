@@ -124,12 +124,7 @@ When making a variable read-only with a value, it is an error if the variable is
 
 When printing variables<!-- TODO: or functions -->, it is an error if an operand names a non-existing variable<!-- TODO: or function -->.
 
-When the [`portable` option](../environment/options.md#portable) is set, these are errors as well:
-
-- (Since 3.3.3) Making the `PWD`, `OLDPWD`, `OPTIND`, `OPTARG`, or `LINENO` [variable][variables] read-only, since POSIX requires the shell to be able to update these variables.
-- (Since 3.3.3) Making a variable read-only if its name contains a character other than ASCII letters, digits, and underscores, or starts with a digit.
-- (Since 3.3.5) Invoking the built-in without operands and without the `-p` option, or with the `-p` option and one or more operands. POSIX specifies only the `readonly name…` and `readonly -p` forms.
-- (Since 3.3.5) Using the `--print` option, spelled out in full or abbreviated. Use `-p` instead.
+The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
 
 ## Exit status
 
@@ -158,6 +153,13 @@ error: error assigning to variable
 
 ## Compatibility
 
-This built-in is part of the POSIX standard. Printing variables is portable only when the `-p` option is used without operands, and the long option name `--print` is a non-standard extension; the [`portable` option](../environment/options.md#portable) rejects both departures (see [Errors](#errors)). <!-- TODO: Operations on functions with the `-f` option are non-portable extensions. -->
+This built-in is part of the POSIX standard. Printing variables is portable only when the `-p` option is used without operands, and the long option name `--print` is a non-standard extension. <!-- TODO: Operations on functions with the `-f` option are non-portable extensions. -->
+
+When the [`portable` option](../environment/options.md#portable) is set, these are errors:
+
+- (Since 3.3.3) Making the `PWD`, `OLDPWD`, `OPTIND`, `OPTARG`, or `LINENO` [variable][variables] read-only, since POSIX requires the shell to be able to update these variables.
+- (Since 3.3.3) Making a variable read-only if its name contains a character other than ASCII letters, digits, and underscores, or starts with a digit.
+- (Since 3.3.5) Invoking the built-in without operands and without the `-p` option, or with the `-p` option and one or more operands. POSIX specifies only the `readonly name…` and `readonly -p` forms.
+- (Since 3.3.5) Using the `--print` option, spelled out in full or abbreviated. Use `-p` instead.
 
 [variables]: ../language/parameters/variables.md

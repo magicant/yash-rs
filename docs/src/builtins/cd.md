@@ -103,6 +103,8 @@ The built-in may also fail if `PWD` or `OLDPWD` is [read-only]. In this case, th
 
 If the new working directory name cannot be printed to the standard output, the built-in prints a warning message to the standard error, but this does not affect the working directory change or the exit status.
 
+The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
+
 ## Exit Status
 
 - If the working directory is changed successfully, the exit status is zero, except in the following cases where the exit status is one:

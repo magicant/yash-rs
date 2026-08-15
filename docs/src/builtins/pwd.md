@@ -32,6 +32,8 @@ This built-in may fail for various reasons. For example:
 - You lack permission to access one or more ancestor directories required to determine the working directory’s path.
 - The standard output is not writable.
 
+The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
+
 ## Exit Status
 
 Zero if the path was successfully printed; non-zero otherwise.

@@ -197,11 +197,11 @@ See [Showing function definitions](../language/functions.md#showing-function-def
 
 The read-only attribute cannot be removed from a variable or function. If a variable is already read-only, you cannot assign a value to it.
 
-(Since 3.3.3) When the [`portable` option](../environment/options.md#portable) is set, it is an error to create or update a variable whose name contains a character other than ASCII letters, digits, and underscores, or starts with a digit.
-
 It is an error to modify a non-existent function.
 
 When printing variables or functions, it is an error if an operand names a non-existent variable or function.
+
+The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
 
 ## Exit status
 
@@ -216,6 +216,8 @@ The `-g` (`--global`) option has no effect if the built-in is used outside a fun
 ## Compatibility
 
 The `typeset` built-in is not specified by POSIX, and many shells implement it differently. This implementation is based on common characteristics found in other shells, but it is not fully compatible with any of them.
+
+POSIX only specifies variable names consisting of ASCII letters, digits, and underscores that do not start with a digit. (Since 3.3.3) When the [`portable` option](../environment/options.md#portable) is set, it is an error to create or update a variable whose name contains any other character or starts with a digit.
 
 Some implementations allow operating on variables and functions at the same time. This implementation does not.
 

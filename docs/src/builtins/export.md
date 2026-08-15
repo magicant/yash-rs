@@ -37,11 +37,7 @@ When exporting a variable with a value, it is an error if the variable is [read-
 
 When printing variables, it is an error if an operand names a non-existing variable.
 
-When the [`portable` option](../environment/options.md#portable) is set, these are errors as well:
-
-- (Since 3.3.3) Exporting a variable whose name contains a character other than ASCII letters, digits, and underscores, or starts with a digit.
-- (Since 3.3.5) Invoking the built-in without operands and without the `-p` option, or with the `-p` option and one or more operands. POSIX specifies only the `export name…` and `export -p` forms.
-- (Since 3.3.5) Using the `--print` option, spelled out in full or abbreviated. Use `-p` instead.
+The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
 
 ## Exit status
 
@@ -55,9 +51,13 @@ See [Environment variables](../language/parameters/variables.md#environment-vari
 
 This built-in is part of the POSIX standard. Printing variables is portable
 only when the `-p` option is used without operands, and the long option name
-`--print` is a non-standard extension; the [`portable`
-option](../environment/options.md#portable) rejects both departures (see
-[Errors](#errors)).
+`--print` is a non-standard extension.
+
+When the [`portable` option](../environment/options.md#portable) is set, these are errors:
+
+- (Since 3.3.3) Exporting a variable whose name contains a character other than ASCII letters, digits, and underscores, or starts with a digit.
+- (Since 3.3.5) Invoking the built-in without operands and without the `-p` option, or with the `-p` option and one or more operands. POSIX specifies only the `export name…` and `export -p` forms.
+- (Since 3.3.5) Using the `--print` option, spelled out in full or abbreviated. Use `-p` instead.
 
 Previous versions of yash supported the non-standard `-r` and `-X` options, but these are not yet supported in yash-rs.
 

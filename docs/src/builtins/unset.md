@@ -30,10 +30,10 @@ Operands are the names of variables or functions to unset.
 
 Unsetting a read-only variable or function is an error.
 
-(Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, it is an error to invoke the built-in without operands. POSIX requires at least one operand.
-
 It is not an error to unset a variable or function that is not set.
 The built-in ignores such operands.
+
+The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
 
 ## Exit status
 
@@ -58,7 +58,6 @@ If neither `-f` nor `-v` is specified and the variable named by an operand is no
 POSIX requires that at least one operand be specified. By default, yash-rs
 allows the built-in to be called without any operands, in which case it does
 nothing. (Since 3.3.5) The [`portable`
-option](../environment/options.md#portable) rejects this form with an error
-(see [Errors](#errors)).
+option](../environment/options.md#portable) rejects this form with an error.
 
 When a global variable is hidden by a local variable, the current implementation unsets the both. This is not portable. Old versions of yash used to unset the local variable only.

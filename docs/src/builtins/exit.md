@@ -44,6 +44,9 @@ If there are suspended jobs in an interactive shell and `-f` is not given,
 the built-in prints a warning to standard error and returns exit status 1
 without exiting.
 
+The [`portable` option](../environment/options.md#portable) causes additional
+errors; see [Compatibility](#compatibility).
+
 ## Exit status
 
 The *exit_status* operand specifies the exit status of the exiting shell.
