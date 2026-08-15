@@ -55,6 +55,19 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `typeset::syntax::ParseError::NonPortableLongOption`, returned by
   `typeset::syntax::parse` for a valid long option given to the `typeset`,
   `export`, or `readonly` built-in while the `portable` shell option is on.
+- `unset::syntax::Error::MissingOperand`, returned by `unset::syntax::parse`
+  for an invocation of the `unset` built-in that has no operands while the
+  `portable` shell option is on.
+- `command::syntax::Error::MissingCommandName`, returned by
+  `command::syntax::interpret` for an invocation of the `command` or `type`
+  built-in that has no operands while the `portable` shell option is on.
+- `command::syntax::Error::TooManyCommandNames`, returned by
+  `command::syntax::parse` for an invocation of the `command` built-in that
+  has more than one operand with the `-v` or `-V` option while the `portable`
+  shell option is on.
+- `source::syntax::Error::NonPortableOperand`, returned by
+  `source::syntax::parse` for an invocation of the `.` built-in that has an
+  operand after the file operand while the `portable` shell option is on.
 
 ### Changed
 
@@ -107,6 +120,26 @@ A _private dependency_ is used internally and not visible to downstream users.
   one that has the `-p` option and one or more operands, when the `portable`
   shell option is on. POSIX specifies only the `name…` and `-p` forms for these
   built-ins.
+- The `unset` built-in (`unset::syntax::parse`) now rejects an invocation that
+  has no operands when the `portable` shell option is on. POSIX specifies the
+  syntax as `unset [-fv] name…`, which requires at least one operand.
+- `command::syntax::interpret` now takes the state of the `Portable` shell
+  option as a third parameter. While it is on, the command line must have at
+  least one operand.
+- The `command` and `type` built-ins (`command::main` and `r#type::main`) now
+  reject an invocation that has no operands when the `portable` shell option
+  is on. POSIX requires the command name operand in every form of these
+  built-ins.
+- The `command` built-in (`command::syntax::parse`) now rejects an invocation
+  that has more than one operand with the `-v` or `-V` option when the
+  `portable` shell option is on. POSIX specifies the syntax as
+  `command [-p][-v|-V] command_name`, which identifies one command at a time.
+  The `type` built-in is unaffected, since it does not depend on
+  `command::syntax::parse` for its syntax and POSIX allows multiple command
+  names.
+- The `.` built-in (`source::syntax::parse`) now rejects an operand after the
+  file operand when the `portable` shell option is on. POSIX specifies the
+  syntax as `. file`, so such an operand is an extension.
 - `typeset::syntax::parse` now takes a `common::syntax::Mode` as a second
   parameter, allowing the caller to control whether non-portable option syntax
   is accepted.

@@ -46,6 +46,8 @@ Any additional ***arguments*** are currently ignored. Future versions may suppor
 It is an error if the file cannot be found or read.
 During parsing and execution, any syntax error or runtime error may occur.
 
+(Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, it is an error to give more than one operand.
+
 ## Exit status
 
 The exit status of the built-in is the exit status of the last command executed in the file. If there is no command in the file, the exit status is zero.
@@ -66,6 +68,8 @@ POSIX defines no options for the `.` built-in, but previous versions of yash sup
 If the pathname of the file does not contain a slash and the file is not found in the command search, some shells may fall back to the file in the current working directory. This is a non-portable extension that is not specified in POSIX. The portable way to specify a file in the current working directory is to prefix the filename with `./` as in `. ./foo.sh`.
 
 Setting the positional parameters with additional operands is a non-standard extension that is supported by some other shells. The behavior about the local variable context may differ in other shells.
+
+(Since 3.3.5) The [`portable` option](../environment/options.md#portable) rejects a surplus operand with an error (see [Errors](#errors)).
 
 Other implementations may return a different non-zero exit status for an error.
 

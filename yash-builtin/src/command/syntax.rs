@@ -27,8 +27,18 @@ use crate::common::syntax::ParseError;
 use crate::common::syntax::parse_arguments;
 use thiserror::Error;
 use yash_env::Env;
+use yash_env::option::Option::Portable;
+use yash_env::option::State;
 use yash_env::semantics::Field;
+use yash_env::source::Location;
+use yash_env::source::pretty::Footnote;
+use yash_env::source::pretty::FootnoteType;
 use yash_env::source::pretty::Report;
+use yash_env::source::pretty::ReportType;
+use yash_env::source::pretty::Snippet;
+use yash_env::source::pretty::Span;
+use yash_env::source::pretty::SpanRole;
+use yash_env::source::pretty::add_span;
 
 /// Error in parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -37,8 +47,22 @@ pub enum Error {
     /// An error occurred in the common parser.
     #[error(transparent)]
     CommonError(#[from] ParseError<'static>),
-    // TODO MissingCommandName
-    // TODO TooManyCommandNames
+
+    /// No command name operand is given while POSIX portability is required.
+    #[error("missing command name operand")]
+    MissingCommandName,
+
+    /// More than one operand is given with the `-v` or `-V` option while POSIX
+    /// portability is required.
+    #[error("too many command name operands")]
+    TooManyCommandNames {
+        /// Location of the field containing the `-v` or `-V` option
+        identify: Location,
+        /// Operands that follow the command name operand
+        ///
+        /// This vector is never empty.
+        operands: Vec<Field>,
+    },
     // TODO UninvokableCategory
 }
 
@@ -48,6 +72,39 @@ impl Error {
     pub fn to_report(&self) -> Report<'_> {
         match self {
             Self::CommonError(e) => e.to_report(),
+
+            Self::MissingCommandName | Self::TooManyCommandNames { .. } => {
+                let mut report = Report::new();
+                report.r#type = ReportType::Error;
+                report.title = self.to_string().into();
+
+                if let Self::TooManyCommandNames { identify, operands } = self {
+                    report.snippets = Snippet::with_primary_span(
+                        &operands[0].origin,
+                        format!("{}: unexpected operand", operands[0].value).into(),
+                    );
+                    add_span(
+                        &identify.code,
+                        Span {
+                            range: identify.byte_range(),
+                            role: SpanRole::Supplementary {
+                                label: "this option expects exactly one operand".into(),
+                            },
+                        },
+                        &mut report.snippets,
+                    );
+                }
+                // For `MissingCommandName`, there is no operand to annotate, so
+                // the report has no snippet of its own. The built-in name is
+                // annotated by the caller.
+
+                report.footnotes.push(Footnote {
+                    r#type: FootnoteType::Note,
+                    label: "this error is reported because the `portable` shell option is enabled"
+                        .into(),
+                });
+                report
+            }
         }
     }
 }
@@ -68,10 +125,21 @@ const OPTION_SPECS: &[OptionSpec] = &[
 /// Interprets the parsed command line arguments
 ///
 /// This function converts the result of [`parse_arguments`] into a `Command`.
+///
+/// `portable` should be the state of the `Portable` shell option. While it is
+/// `On`, the command line must have at least one operand, as POSIX requires
+/// the command name operand in every form of the command and type built-ins;
+/// an invocation without operands is rejected with
+/// [`Error::MissingCommandName`].
 pub fn interpret(
     options: Vec<OptionOccurrence<'_>>,
     operands: Vec<Field>,
+    portable: State,
 ) -> Result<Command, Error> {
+    if operands.is_empty() && portable == State::On {
+        return Err(Error::MissingCommandName);
+    }
+
     // Interpret options
     let mut standard_path = false;
     let mut verbose_identify = None;
@@ -104,9 +172,30 @@ pub fn interpret(
 }
 
 /// Parses command line arguments of the `command` built-in
+///
+/// While the `Portable` shell option is on, the `-v` and `-V` options accept
+/// exactly one operand, as POSIX specifies the syntax as
+/// `command [-p][-v|-V] command_name`; a surplus operand is rejected with
+/// [`Error::TooManyCommandNames`]. This check is not shared with the type
+/// built-in, whose operands POSIX spells `name…`.
 pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
-    let (options, operands) = parse_arguments(OPTION_SPECS, Mode::with_env(env), args)?;
-    interpret(options, operands)
+    let (mut options, mut operands) = parse_arguments(OPTION_SPECS, Mode::with_env(env), args)?;
+    let portable = env.options.get(Portable);
+
+    if portable == State::On && operands.len() > 1 {
+        // If both -v and -V are specified, the last one wins, so that is the
+        // option the error should point at.
+        let identify = options
+            .iter()
+            .rposition(|o| matches!(o.spec.get_short(), Some('v' | 'V')));
+        if let Some(index) = identify {
+            let identify = options.swap_remove(index).location;
+            let operands = operands.split_off(1);
+            return Err(Error::TooManyCommandNames { identify, operands });
+        }
+    }
+
+    interpret(options, operands, portable)
 }
 
 #[cfg(test)]
@@ -201,6 +290,163 @@ mod tests {
                 }
             );
             assert!(identify.verbose);
+        });
+    }
+
+    #[test]
+    fn no_operands_without_portable() {
+        let env = Env::new_virtual();
+        let result = parse(&env, vec![]);
+
+        assert_matches!(result, Ok(Command::Invoke(invoke)) => {
+            assert_eq!(invoke.fields, []);
+        });
+    }
+
+    #[test]
+    fn no_operands_portable() {
+        // With the portable option on, the built-in requires an operand.
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, vec![]);
+        assert_eq!(result, Err(Error::MissingCommandName));
+    }
+
+    #[test]
+    fn no_operands_with_option_portable() {
+        // The operand is required regardless of the -v and -V options.
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, Field::dummies(["-v"]));
+        assert_eq!(result, Err(Error::MissingCommandName));
+
+        let result = parse(&env, Field::dummies(["-V"]));
+        assert_eq!(result, Err(Error::MissingCommandName));
+
+        let result = parse(&env, Field::dummies(["-p"]));
+        assert_eq!(result, Err(Error::MissingCommandName));
+    }
+
+    #[test]
+    fn operands_portable() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, Field::dummies(["foo"]));
+
+        assert_matches!(result, Ok(Command::Invoke(invoke)) => {
+            assert_eq!(invoke.fields, Field::dummies(["foo"]));
+        });
+    }
+
+    #[test]
+    fn many_operands_with_identify_option_portable() {
+        // With the portable option on, -v and -V accept only one operand.
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let args = Field::dummies(["-v", "foo", "bar", "baz"]);
+        let result = parse(&env, args);
+        assert_matches!(result, Err(Error::TooManyCommandNames { identify, operands }) => {
+            assert_eq!(identify.code.value.borrow().as_str(), "-v");
+            assert_eq!(operands, Field::dummies(["bar", "baz"]));
+        });
+
+        let args = Field::dummies(["-V", "foo", "bar"]);
+        let result = parse(&env, args);
+        assert_matches!(result, Err(Error::TooManyCommandNames { identify, operands }) => {
+            assert_eq!(identify.code.value.borrow().as_str(), "-V");
+            assert_eq!(operands, Field::dummies(["bar"]));
+        });
+    }
+
+    #[test]
+    #[allow(non_snake_case, reason = "for concise naming")]
+    fn many_operands_with_both_v_and_V_portable() {
+        // The error points at the option that decides the verbosity, which is
+        // the last one specified.
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let args = Field::dummies(["-V", "-v", "foo", "bar"]);
+        let result = parse(&env, args);
+        assert_matches!(result, Err(Error::TooManyCommandNames { identify, .. }) => {
+            assert_eq!(identify.code.value.borrow().as_str(), "-v");
+        });
+    }
+
+    #[test]
+    fn one_operand_with_identify_option_portable() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, Field::dummies(["-v", "foo"]));
+
+        assert_matches!(result, Ok(Command::Identify(identify)) => {
+            assert_eq!(identify.names, Field::dummies(["foo"]));
+        });
+    }
+
+    #[test]
+    fn many_operands_without_identify_option_portable() {
+        // Without -v or -V, the operands after the first are the arguments to
+        // the utility, so they are not rejected.
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let args = Field::dummies(["foo", "bar", "baz"]);
+        let result = parse(&env, args.clone());
+
+        assert_matches!(result, Ok(Command::Invoke(invoke)) => {
+            assert_eq!(invoke.fields, args);
+        });
+    }
+
+    #[test]
+    fn many_operands_with_identify_option_without_portable() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["-v", "foo", "bar"]));
+
+        assert_matches!(result, Ok(Command::Identify(identify)) => {
+            assert_eq!(identify.names, Field::dummies(["foo", "bar"]));
+        });
+    }
+
+    #[test]
+    fn too_many_command_names_report_annotates_first_surplus_operand() {
+        let operands = Field::dummies(["bar", "baz"]);
+        let error = Error::TooManyCommandNames {
+            identify: Location::dummy("-v"),
+            operands,
+        };
+        let report = error.to_report();
+        assert_matches!(&report.snippets[..], [operand_snippet, option_snippet] => {
+            assert_matches!(
+                &operand_snippet.spans[..],
+                [Span { role: SpanRole::Primary { label }, .. }] => {
+                    assert_eq!(label, "bar: unexpected operand");
+                }
+            );
+            assert_eq!(option_snippet.code_string(), "-v");
+            assert_matches!(
+                &option_snippet.spans[..],
+                [Span { role: SpanRole::Supplementary { .. }, .. }]
+            );
+        });
+        assert_matches!(&report.footnotes[..], [footnote] => {
+            assert!(
+                footnote.label.contains("portable"),
+                "footnote label should contain `portable`: {:?}",
+                footnote.label,
+            );
+        });
+    }
+
+    #[test]
+    fn missing_command_name_report_mentions_portable_option() {
+        let report = Error::MissingCommandName.to_report();
+        assert_matches!(&report.footnotes[..], [footnote] => {
+            assert_eq!(footnote.r#type, FootnoteType::Note);
+            assert!(
+                footnote.label.contains("portable"),
+                "footnote label should contain `portable`: {:?}",
+                footnote.label,
+            );
         });
     }
 

@@ -21,8 +21,13 @@ use crate::common::syntax::OptionSpec;
 use crate::common::syntax::parse_arguments;
 use thiserror::Error;
 use yash_env::Env;
+use yash_env::option::Option::Portable;
+use yash_env::option::State;
 use yash_env::semantics::Field;
+use yash_env::source::pretty::Footnote;
+use yash_env::source::pretty::FootnoteType;
 use yash_env::source::pretty::Report;
+use yash_env::source::pretty::ReportType;
 
 use super::Command;
 use super::Mode;
@@ -38,7 +43,10 @@ pub enum Error {
     /// The `-f` and `-v` options are used together.
     #[error(transparent)]
     ConflictingOption(#[from] ConflictingOptionError<'static>),
-    // TODO MissingOperand
+
+    /// No operand is given while POSIX portability is required.
+    #[error("missing operand")]
+    MissingOperand,
 }
 
 impl Error {
@@ -47,6 +55,20 @@ impl Error {
         match self {
             Error::CommonError(inner) => inner.to_report(),
             Error::ConflictingOption(inner) => inner.to_report(),
+
+            Error::MissingOperand => {
+                // There is no operand to annotate, so the report has no snippet of
+                // its own. The built-in name is annotated by the caller.
+                let mut report = Report::new();
+                report.r#type = ReportType::Error;
+                report.title = self.to_string().into();
+                report.footnotes.push(Footnote {
+                    r#type: FootnoteType::Note,
+                    label: "this error is reported because the `portable` shell option is enabled"
+                        .into(),
+                });
+                report
+            }
         }
     }
 }
@@ -67,6 +89,10 @@ const OPTION_SPECS: &[OptionSpec] = &[
 ];
 
 /// Parses command line arguments for the unset built-in.
+///
+/// While the [`Portable`] shell option is on, the built-in requires at least
+/// one operand, as POSIX specifies the syntax as `unset [-fv] name…`. An
+/// invocation without operands is rejected with [`Error::MissingOperand`].
 pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
     let parser_mode = crate::common::syntax::Mode::with_env(env);
     let (options, operands) = parse_arguments(OPTION_SPECS, parser_mode, args)?;
@@ -84,6 +110,10 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
     };
 
     let names = operands;
+    if names.is_empty() && env.options.get(Portable) == State::On {
+        return Err(Error::MissingOperand);
+    }
+
     Ok(Command { mode, names })
 }
 
@@ -93,7 +123,7 @@ mod tests {
     use assert_matches::assert_matches;
 
     #[test]
-    fn no_arguments_non_posix() {
+    fn no_arguments_without_portable() {
         let env = Env::new_virtual();
         let result = parse(&env, vec![]);
         assert_eq!(
@@ -105,8 +135,62 @@ mod tests {
         );
     }
 
-    // TODO no_arguments_posix: In the POSIXly-correct mode, the built-in
-    // requires at least one operand.
+    #[test]
+    fn no_arguments_portable() {
+        // With the portable option on, the built-in requires an operand.
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, vec![]);
+        assert_eq!(result, Err(Error::MissingOperand));
+    }
+
+    #[test]
+    fn no_operands_with_option_portable() {
+        // The operand is required regardless of the -f and -v options.
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, Field::dummies(["-v"]));
+        assert_eq!(result, Err(Error::MissingOperand));
+
+        let result = parse(&env, Field::dummies(["-f"]));
+        assert_eq!(result, Err(Error::MissingOperand));
+    }
+
+    #[test]
+    fn operands_portable() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let args = Field::dummies(["foo"]);
+        let result = parse(&env, args.clone());
+        assert_eq!(
+            result,
+            Ok(Command {
+                mode: Mode::Variables,
+                names: args,
+            })
+        );
+    }
+
+    #[test]
+    fn conflicting_options_take_precedence_over_missing_operand() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, Field::dummies(["-f", "-v"]));
+        assert_matches!(result, Err(Error::ConflictingOption(_)));
+    }
+
+    #[test]
+    fn missing_operand_report_mentions_portable_option() {
+        let report = Error::MissingOperand.to_report();
+        assert_matches!(&report.footnotes[..], [footnote] => {
+            assert_eq!(footnote.r#type, FootnoteType::Note);
+            assert!(
+                footnote.label.contains("portable"),
+                "footnote label should contain `portable`: {:?}",
+                footnote.label,
+            );
+        });
+    }
 
     #[test]
     fn v_option() {
