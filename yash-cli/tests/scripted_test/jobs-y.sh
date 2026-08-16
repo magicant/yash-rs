@@ -11,3 +11,11 @@ __IN__
 test_OE -e 0 'short option name still accepted under the portable option' -o portable
 jobs -l
 __IN__
+
+test_O -d -e 2 'jobs rejects -lp in one argument'
+jobs -lp
+__IN__
+
+test_OE -e 0 'jobs accepts a repeated -l option'
+jobs -l -l
+__IN__

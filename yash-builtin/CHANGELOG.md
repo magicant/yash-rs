@@ -145,6 +145,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   on. POSIX writes the options as `-v|-V`, allowing only one of them. Without
   the option, the last one specified still takes effect, and repeating the
   same option is accepted either way.
+- The `jobs` built-in (`jobs::main`) now rejects an invocation that has both
+  the `-l` and `-p` options.
 - The `.` built-in (`source::syntax::parse`) now rejects an operand after the
   file operand when the `portable` shell option is on. POSIX specifies the
   syntax as `. file`, so such an operand is an extension.
