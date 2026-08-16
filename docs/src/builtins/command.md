@@ -86,6 +86,8 @@ nothing. This implementation does so by default. (Since 3.3.5) The
 [`portable` option](../environment/options.md#portable) rejects the omission
 with an error.
 
+POSIX specifies the `-v` and `-V` options as mutually exclusive, but many implementations allow both to be specified, with varying behavior. By default, yash honors the last one specified. (Since 3.3.5) The [`portable` option](../environment/options.md#portable) rejects the combination with an error.
+
 POSIX allows only one *name* operand with the `-v` or `-V` option, but this
 implementation identifies every operand given. (Since 3.3.5) The
 [`portable` option](../environment/options.md#portable) rejects a surplus
