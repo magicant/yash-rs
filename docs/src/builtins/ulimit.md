@@ -195,7 +195,7 @@ The long option names (such as `--hard` and `--soft`) are a non-standard extensi
 
 Some shells do not allow combining options (e.g., `ulimit -fH`). For portability, specify options separately (e.g., `ulimit -f -H`).
 
-Shells differ in behavior when both `-H` and `-S` are given. Yash-rs sets or displays both limits; older versions of yash only honored the last one.
+Shells differ in behavior when both `-H` and `-S` are given. Yash-rs sets both limits when a *limit* operand is given, but treats the combination as an error when displaying a limit; older versions of yash only honored the last one.
 
 Specifying multiple resource options is an error in yash-rs, but some shells allow operating on multiple resources at once.
 
