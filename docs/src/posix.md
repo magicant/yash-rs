@@ -23,38 +23,64 @@ Even when yash-rs conforms to POSIX, it also implements extensions that POSIX do
 
 Unlike [`posixlycorrect`](environment/options.md#posixlycorrect), which changes how the shell behaves to maximize POSIX conformance, `portable` does not alter the behavior of POSIX-conformant constructs. It only restricts the shell to features that are portable across POSIX-conforming shells, reporting an error or ignoring a feature when a non-portable construct is used. The two options are independent and can be combined.
 
-When the `portable` option is set, the shell rejects or ignores the following non-portable features:
+When the `portable` option is set, the shell rejects or ignores the following non-portable features. Each item links to the page that documents the feature in full, including the POSIX requirement behind the restriction and how to write the same thing portably.
 
-- (Since 3.3.0) The `;;&` and `;|` terminators in [case commands](language/commands/case.md).
-- (Since 3.3.0) The non-portable [redirection](language/redirections/index.html) operators `>>|` and `<<<`.
-- (Since 3.3.0) A number or `{...}` token immediately followed by `<` or `>` used as a redirection operand (for example, the `1` in `< 1>file`). Separate it with a space or quote it instead.
-- (Since 3.3.0) A reserved word that immediately follows a subshell or a redirection without a separator (see [where reserved words are recognized](language/words/keywords.md#where-are-reserved-words-recognized)). POSIX recognizes a reserved word only when it begins a command or follows another reserved word; a subshell ends with `)` and a redirection ends with a word, so a clause-delimiting reserved word right after one is not recognized. Insert `;` or a newline before it. This affects `}`, `done`, `fi`, `then`, `elif`, `else`, `esac`, and `do` (for example, write `{ ( foo ); }` instead of `{ ( foo ) }`, and `for i in 1; do ( foo ); done` instead of `for i in 1; do ( foo ) done`).
+<!--
+Rules for writing the list below. Ask the maintainer when a case is unclear.
+
+- State only what the option rejects or ignores. Do not restate the POSIX
+  requirement behind it; that is just the same thing said twice.
+- Add an example only when the description does not already show the construct
+  itself as a literal (its symbols, spelling, or syntactic form). A description
+  that only states a property or condition, leaving the reader to work out what
+  the construct looks like, needs one.
+- When an example is needed: list every construct if they are finitely many,
+  will not grow, and fit on one line; otherwise give one representative example.
+  Show the syntactic form instead when that is shorter and more precise than an
+  instance of it.
+- At most one example per condition. An item that states two independent
+  conditions may have one example for each.
+- Put each example in parentheses right after the part it illustrates. How the
+  parentheses read is up to the item.
+- Do not explain how to write the construct portably, and do not spell out the
+  options or operands of each built-in here. Those belong on the linked page.
+- The two items that cover the options and the operands of several built-ins are
+  exempt from the example rules above: any example there would name a specific
+  option or operand, which the rule just above keeps out of this page.
+- Mention a case the option does not reject only when readers would otherwise
+  think it is rejected.
+- Keep the `(Since x.y.z)` tag at the head of each item. For an item covering
+  several built-ins, use the version in which the item itself first appeared.
+- Order the items by where their linked page appears in SUMMARY.md. The linked
+  page is the one that documents the item in full, including the portable
+  alternative.
+-->
+
 - (Since 3.3.0) A non-portable escape sequence in a [dollar-single-quoted string](language/words/quoting.md#dollar-single-quotes) (`$'…'`): the `\E`, `\?`, `\u`, and `\U` escapes, the `\c@` control escape, and `\x` followed by more than two hexadecimal digits.
-- (Since 3.3.0) A `((` or `!(` at the beginning of a command. Other shells parse `((…))` as an arithmetic command and `!(…)` as an extended glob, neither of which yash-rs supports. Insert a space (`( (` to nest [subshells](language/commands/grouping.md#subshells), or `! (` to negate one).
-- (Since 3.3.0) A command name ending with a `:` (for example, `foo:`). POSIX [reserves words](language/words/keywords.md) whose final character is a `:` for possible future use, so using one where a reserved word would be recognized produces unspecified results. The lone `:` ([colon built-in](builtins/colon.md)) is not affected.
-- (Since 3.3.0) A [`for` loop](language/commands/loops.md#for-loops) [variable name](language/parameters/variables.md#variable-names) that is quoted, contains an expansion, or starts with a digit. POSIX requires the name to be an unquoted word consisting solely of underscores, digits, and alphabetics from the portable character set, not starting with a digit.
-- (Since 3.3.0) A [function](language/functions.md) name that is quoted, contains an expansion, or starts with a digit. POSIX requires the name to be an unquoted word consisting solely of underscores, digits, and alphabetics from the portable character set, not starting with a digit.
-- (Since 3.3.0) A [function](language/functions.md) name that is the same as a [special built-in](builtins/index.html#special-built-ins) utility name (for example, `break` or `export`). POSIX does not allow a function to have the same name as a special built-in. This does not apply to other built-ins, such as `cd`, or to `source`, which is not a POSIX-mandated special built-in.
-- (Since 3.3.3) At shell startup, inherited [environment variables](language/parameters/variables.md#environment-variables) whose names start with a digit or contain a character other than ASCII letters, digits, and underscores.
-- (Since 3.3.0) An [assignment](language/commands/simple.md#syntax) name that contains a character other than underscores, digits, and alphabetics from the portable character set, or that starts with a digit.
-- (Since 3.3.3) An operand of the [`export` built-in](builtins/export.md), the [`readonly` built-in](builtins/readonly.md), the [`typeset` built-in](builtins/typeset.md), the [`read` built-in](builtins/read.md), or the [`getopts` built-in](builtins/getopts.md) specifying a [variable name](language/parameters/variables.md#variable-names) that contains a character other than underscores, digits, and alphabetics from the portable character set, or that starts with a digit.
-- (Since 3.3.1) An [array assignment](language/parameters/variables.md#arrays) (`name=(...)`). Array assignment is a yash extension that POSIX does not specify.
-- (Since 3.3.0) A [parameter expansion](language/words/parameters.md) that uses a length or switch modifier with special parameter `*` or `@` (for example, `${#*}` or `${@:+word}`), or a trim modifier with special parameter `#`, `*`, or `@` (for example, `${#%word}` or `${*#word}`). POSIX leaves the results of these combinations unspecified.
-- (Since 3.3.2) The increment and decrement operators (`++` and `--`) in an [arithmetic expansion](language/words/arithmetic.md). POSIX does not require these operators.
-- (Since 3.3.1) Defining an [alias](language/aliases.md) with the [`alias` built-in](builtins/alias.md) with a name that contains a character other than ASCII letters, digits, `!`, `%`, `,`, `-`, `@`, or `_`.
-- (Since 3.3.3) Making the `PWD`, `OLDPWD`, `OPTIND`, `OPTARG`, or `LINENO` [variable](language/parameters/variables.md#reserved-variable-names) [read-only](language/parameters/variables.md#read-only-variables) with the [`readonly` built-in](builtins/readonly.md) or the [`typeset` built-in](builtins/typeset.md)'s `-r` option. POSIX requires the shell to be able to update these variables.
-- (Since 3.3.4) Executing an [elective or extension built-in](builtins/index.html#elective-built-ins) (for example, [`typeset`](builtins/typeset.md)). Such a built-in is still found in [command search](language/commands/simple.md#command-search) rather than being replaced by an external utility of the same name, but running it is rejected with an error. This applies to the [`command` built-in](builtins/command.md) as well: it refuses to execute such a built-in, its `-v` option produces no output for it, and its `-V` option reports why it cannot be used instead of describing it.
-- (Since 3.3.4) Executing the [`.` built-in](builtins/source.md) under the name `source`. `source` is a non-standard alias for the special built-in `.`; it is still found in command search (so it is not replaced by a function or external utility named `source`), but running it under this name is rejected with an error, the same way as an elective or extension built-in above. Use `.` instead. This applies to the `command` built-in as well.
-- (Since 3.3.5) A [long option](builtins/index.html#options) (for example, `--physical` for the [`cd` built-in](builtins/cd.md)) passed to a built-in that supports one. Use the corresponding short option instead.
-- (Since 3.3.5) An option that does not exist in the POSIX specification of the built-in it belongs to (for example, `-f` for the [`exit` built-in](builtins/exit.md)), even when it is spelled as a short option. See each built-in's Compatibility section for which options this applies to.
-- (Since 3.3.5) An [option argument](builtins/index.html#option-arguments) written in the same argument as the option name (for example, `read -d:` for the [`read` built-in](builtins/read.md), `set -oerrexit` for the [`set` built-in](builtins/set.md), or `kill -sINT` for the [`kill` built-in](builtins/kill.md)). [POSIX Utility Argument Syntax](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_01) requires a conforming application to write an option argument as a separate argument, so pass it separately instead (for example, `read -d :`, `set -o errexit`, or `kill -s INT`). This applies to every built-in that takes an option argument.
-- (Since 3.3.5) A non-portable way of specifying a signal or listing signals with the [`kill` built-in](builtins/kill.md) (for example, `kill -s 9`, `kill -l TERM`, or a signal name with the `SIG` prefix). See its [Compatibility](builtins/kill.md#compatibility) section for details.
-- (Since 3.3.5) A [shell option](environment/options.md) given to the [`set` built-in](builtins/set.md) or on the [command line](startup.md) in a spelling POSIX does not specify. Only the short options POSIX defines and the `-o`/`+o` names it defines, spelled out in full in lower case, are accepted; the `--name` and `++name` forms, abbreviated names, and `no`-prefixed names are not. Note that POSIX names some options in their disabled state, so you must write `set -o noclobber` rather than `set +o clobber`. See [Compatibility](environment/options.md#compatibility) for the full list of names POSIX specifies. The command-line options `-V`, `--help`, `--version`, `--profile`, `--rcfile`, `--noprofile`, and `--norcfile` are rejected too, since POSIX does not define them. As an exception, `set -o portable` and `set +o portable` are always accepted, so that the option can be turned off again.
-- (Since 3.3.5) An argument to `-o` or `+o` written in the same argument as the option itself on the [command line](startup.md) (for example, `yash3 -oerrexit`). Write `yash3 -o errexit` instead.
-- (Since 3.3.5) Invoking the [`export` built-in](builtins/export.md) or the [`readonly` built-in](builtins/readonly.md) without operands and without the `-p` option (for example, `export`), or with the `-p` option and one or more operands (for example, `export -p FOO`). POSIX specifies only the `export name…` and `export -p` forms, so use `export -p` to print all exported variables and omit `-p` when naming variables.
-- (Since 3.3.5) Invoking the [`unset` built-in](builtins/unset.md) without operands (for example, `unset` or `unset -v`). POSIX specifies the syntax as `unset [-fv] name…`, which requires at least one operand.
-- (Since 3.3.5) Invoking the [`command` built-in](builtins/command.md) or the [`type` built-in](builtins/type.md) without operands (for example, `command -v`). POSIX requires the *name* operand in every form of these built-ins.
-- (Since 3.3.5) Giving more than one operand to the [`command` built-in](builtins/command.md) with the `-v` or `-V` option (for example, `command -v ls cat`). POSIX specifies the syntax as `command [-p][-v|-V] command_name`, which identifies one command at a time. The [`type` built-in](builtins/type.md) is unaffected, since POSIX spells its operands `name…`.
-- (Since 3.3.5) Giving an operand after the *file* operand to the [`.` built-in](builtins/source.md) (for example, `. ./script.sh foo`).
+- (Since 3.3.0) A [reserved word](language/words/keywords.md#where-are-reserved-words-recognized) that immediately follows a subshell or a redirection without a separator (for example, the `}` in `{ ( foo ) }`).
+- (Since 3.3.0) A command name ending with a `:` (for example, `foo:`), in a position where a [reserved word](language/words/keywords.md#where-are-reserved-words-recognized) would be recognized. The lone `:` ([colon built-in](builtins/colon.md)) is not affected.
+- (Since 3.3.0) A [parameter expansion](language/words/parameters.md) that uses a length or switch modifier with special parameter `*` or `@` (for example, `${#*}`), or a trim modifier with special parameter `#`, `*`, or `@` (for example, `${*#word}`).
+- (Since 3.3.0) An [assignment](language/commands/simple.md#syntax) whose [variable name](language/parameters/variables.md#variable-names) starts with a digit or contains a character other than ASCII letters, digits, and underscores (for example, `1st=foo`).
+- (Since 3.3.3) An operand naming a [variable](language/parameters/variables.md#variable-names) whose name starts with a digit or contains a character other than ASCII letters, digits, and underscores (for example, `1st`), given to the [`export`](builtins/export.md), [`getopts`](builtins/getopts.md), [`read`](builtins/read.md), [`readonly`](builtins/readonly.md), or [`typeset`](builtins/typeset.md) built-in.
+- (Since 3.3.1) An [array assignment](language/parameters/variables.md#arrays) (`name=(...)`).
+- (Since 3.3.0) A `!` immediately followed by a `(` at the beginning of a [pipeline](language/commands/pipelines.md#negation).
+- (Since 3.3.0) A `((` at the beginning of a command, where the first `(` opens a [subshell](language/commands/grouping.md#subshells).
+- (Since 3.3.0) The `;;&` and `;|` terminators in [case commands](language/commands/case.md).
+- (Since 3.3.0) A [`for` loop](language/commands/loops.md#for-loops) variable name that is quoted, contains an expansion, starts with a digit, or contains a character other than ASCII letters, digits, and underscores (for example, `for "i"`).
+- (Since 3.3.0) A [function](language/functions.md) name that is quoted, contains an expansion, starts with a digit, or contains a character other than ASCII letters, digits, and underscores (for example, `"foo"() { :; }`).
+- (Since 3.3.0) A [function](language/functions.md) name that is the same as a [special built-in](builtins/index.html#special-built-ins) utility name (for example, `export`). Other built-in names, such as `cd` and `source`, are not affected.
+- (Since 3.3.1) Defining an [alias](language/aliases.md#alias-names) with a name that contains a character other than ASCII letters, digits, `!`, `%`, `,`, `-`, `@`, or `_`.
+- (Since 3.3.0) The [redirection](language/redirections/index.html) operators `>>|` and `<<<`.
+- (Since 3.3.0) A word that would be recognized as a file descriptor specification, used as the target of a [redirection](language/redirections/index.html) (for example, the `1` in `< 1>file`).
+- (Since 3.3.5) A [shell option](environment/options.md#compatibility) given to the [`set` built-in](builtins/set.md) or on the [command line](startup.md) in a spelling POSIX does not specify (for example, `set --errexit`). The `portable` option itself is always accepted, so that it can be turned off again.
+- (Since 3.3.5) An argument to `-o` or `+o` written in the same argument as the option itself on the [command line](startup.md#compatibility) (for example, `yash3 -oerrexit`).
+- (Since 3.3.3) An [environment variable](language/parameters/variables.md#environment-variables) inherited at [shell startup](startup.md#compatibility) whose name starts with a digit or contains a character other than ASCII letters, digits, and underscores.
+- (Since 3.3.4) Executing an [elective or extension built-in](builtins/index.html#elective-built-ins) (for example, [`typeset`](builtins/typeset.md)).
+- (Since 3.3.5) An option that POSIX does not specify, a [long option](builtins/index.html#options), or an [option argument](builtins/index.html#option-arguments) written in the same argument as the option name, given to the [`cd`](builtins/cd.md), [`command`](builtins/command.md), [`exit`](builtins/exit.md), [`export`](builtins/export.md), [`jobs`](builtins/jobs.md), [`pwd`](builtins/pwd.md), [`read`](builtins/read.md), [`readonly`](builtins/readonly.md), [`return`](builtins/return.md), [`trap`](builtins/trap.md), [`ulimit`](builtins/ulimit.md), or [`unset`](builtins/unset.md) built-in.
+- (Since 3.3.5) A number of operands that POSIX does not allow with the accompanying options, given to the [`.`](builtins/source.md), [`command`](builtins/command.md), [`export`](builtins/export.md), [`readonly`](builtins/readonly.md), [`type`](builtins/type.md), or [`unset`](builtins/unset.md) built-in.
+- (Since 3.3.5) A non-portable way of specifying a signal or listing signals with the [`kill` built-in](builtins/kill.md).
+- (Since 3.3.3) Making the `PWD`, `OLDPWD`, `OPTIND`, `OPTARG`, or `LINENO` [variable](language/parameters/variables.md#reserved-variable-names) read-only with the [`readonly` built-in](builtins/readonly.md).
+- (Since 3.3.4) Executing the [`.` built-in](builtins/source.md) under the name `source`.
+- (Since 3.3.2) The increment and decrement operators (`++` and `--`) in an [arithmetic expression](arithmetic.md).
 
 The `portable` option is still under development, so this list will be expanded as more checks are implemented.

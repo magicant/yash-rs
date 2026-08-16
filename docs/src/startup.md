@@ -90,6 +90,10 @@ yash3 --rcfile myrc -o portable myscript   # accepted
 yash3 -o portable --rcfile myrc myscript   # rejected
 ```
 
+(Since 3.3.5) The [POSIX Utility Argument Syntax](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_01) requires a conforming application to write an option argument as a separate argument. When the `portable` option is enabled on the command line, the shell rejects the argument to `-o` or `+o` written in the same argument as the option itself, as in `yash3 -oerrexit`. Write `yash3 -o errexit` instead.
+
+(Since 3.3.3) POSIX only requires the shell to support [environment variable]s whose names consist of ASCII letters, digits, and underscores and do not start with a digit. When the `portable` option is enabled on the command line, the shell ignores inherited environment variables with other names instead of importing them, so that a script cannot rely on them.
+
 POSIX.1-2024 does not specify login shells or profile files. The behavior described here is specific to yash-rs and may differ from other shells.
 
 Using the `ENV` [environment variable] for initialization files is POSIX-specified. In the future, yash-rs may support a different default rcfile location depending on the command name and shell options.

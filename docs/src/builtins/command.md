@@ -93,6 +93,13 @@ operand with an error. Note that the
 [`type` built-in](type.md), for which POSIX specifies `type name…`, accepts
 more than one operand regardless of the option.
 
+(Since 3.3.4) When the [`portable` option](../environment/options.md#portable)
+is set, the built-in refuses to execute an
+[elective or extension built-in](index.html#elective-built-ins), as well as the
+[`.` built-in](source.md) invoked under the name `source`. For such a built-in,
+the `-v` option produces no output and the `-V` option reports why it cannot be
+used instead of describing it.
+
 When the utility is not found with the `-v` or `-V` option, some
 implementations return a non-zero exit status other than 1, especially 127.
 

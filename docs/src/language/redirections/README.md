@@ -259,3 +259,9 @@ $ cat /nonexistent/file > /dev/null 2>&1
 $ cat /nonexistent/file 2>&1 > /dev/null
 cat: /nonexistent/file: No such file or directory
 ```
+
+## Compatibility
+
+POSIX.1-2024 does not specify the `>>|` and `<<<` operators, and neither is implemented in yash-rs yet. (Since 3.3.0) The [`portable` option](../../environment/options.md#portable) rejects both while parsing. Where `<<<` would supply a string as input, use a [here-document](here_documents.md) instead.
+
+A word consisting of digits, or of a [variable](../parameters/variables.md) name in braces, is recognized as a file descriptor specification when `<` or `>` immediately follows it. Shells therefore disagree on how to parse such a word where the target of a redirection is expected, as in `< 1>file`. (Since 3.3.0) The `portable` option rejects such a target. Separate the word from the operator that follows it with a space, as in `< 1 >file`, or quote the word, as in `< '1'>file`.

@@ -161,6 +161,10 @@ Inner loop: 1, a
 Breaking outer loop at 1, b
 ```
 
+## Compatibility
+
+POSIX.1-2024 requires the loop [variable] name of a `for` loop to be an unquoted word made up of ASCII letters, digits, and underscores, and not to start with a digit. As an extension, yash-rs accepts any word and [expands](../words/index.html#word-expansion) it to obtain the name. (Since 3.3.0) The [`portable` option](../../environment/options.md#portable) rejects a name that is quoted, contains an expansion, starts with a digit, or contains any other character. Write the name literally using those characters instead.
+
 [exit status]: exit_status.md
 [reserved word]: ../words/keywords.md
 [variable]: ../parameters/variables.md

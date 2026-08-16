@@ -189,6 +189,12 @@ $ ls
 Documents  Downloads  Music  Pictures  Videos
 ```
 
+## Compatibility
+
+(Since 3.3.0) The [`portable` option](../environment/options.md#portable) rejects a function name that is quoted, contains an expansion, starts with a digit, or contains a character other than ASCII letters, digits, and underscores. Write the name literally using those characters instead.
+
+POSIX.1-2024 does not allow a function to have the same name as a [special built-in](../builtins/index.html#special-built-ins). (Since 3.3.0) The `portable` option rejects such a definition. Choose a name that is not a special built-in name instead. Other built-in names, such as `cd`, are fine, as is `source`, which POSIX does not define as a special built-in name.
+
 ## Related topics
 
 See [Local variables](parameters/variables.md#local-variables) for temporary variables that are removed when the function returns.
