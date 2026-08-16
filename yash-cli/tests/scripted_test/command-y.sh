@@ -420,6 +420,31 @@ __IN__
 foo bar
 __OUT__
 
+test_OE -e 0 'command accepts -v and -V together without the portable option'
+command -v -V : >/dev/null
+__IN__
+
+test_O -d -e 2 'command rejects -v and -V together under the portable option' -o portable
+command -v -V :
+__IN__
+
+test_O -d -e 2 'command rejects -V and -v together under the portable option' -o portable
+command -V -v :
+__IN__
+
+test_oE 'command conflicting option error message mentions the portable option' -o portable
+(command -v -V :) 2>result
+grep -Fq portable result && echo shown
+__IN__
+shown
+__OUT__
+
+test_oE -e 0 'command accepts a repeated -v under the portable option' -o portable
+command -v -v :
+__IN__
+:
+__OUT__
+
 test_oE -e 0 'command -v accepts more than one operand without the portable option'
 command -v : bg
 __IN__

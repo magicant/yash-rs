@@ -20,6 +20,7 @@ use super::Command;
 use super::Identify;
 use super::Invoke;
 use super::Search;
+use crate::common::syntax::ConflictingOptionError;
 use crate::common::syntax::Mode;
 use crate::common::syntax::OptionOccurrence;
 use crate::common::syntax::OptionSpec;
@@ -48,6 +49,11 @@ pub enum Error {
     #[error(transparent)]
     CommonError(#[from] ParseError<'static>),
 
+    /// The `-v` and `-V` options are used together while POSIX portability is
+    /// required.
+    #[error(transparent)]
+    ConflictingOption(#[from] ConflictingOptionError<'static>),
+
     /// No command name operand is given while POSIX portability is required.
     #[error("missing command name operand")]
     MissingCommandName,
@@ -70,8 +76,23 @@ impl Error {
     /// Converts this error to a [`Report`].
     #[must_use]
     pub fn to_report(&self) -> Report<'_> {
+        /// Footnote attributing the error to the `portable` shell option
+        fn portable_footnote() -> Footnote<'static> {
+            Footnote {
+                r#type: FootnoteType::Note,
+                label: "this error is reported because the `portable` shell option is enabled"
+                    .into(),
+            }
+        }
+
         match self {
             Self::CommonError(e) => e.to_report(),
+
+            Self::ConflictingOption(e) => {
+                let mut report = e.to_report();
+                report.footnotes.push(portable_footnote());
+                report
+            }
 
             Self::MissingCommandName | Self::TooManyCommandNames { .. } => {
                 let mut report = Report::new();
@@ -98,11 +119,7 @@ impl Error {
                 // the report has no snippet of its own. The built-in name is
                 // annotated by the caller.
 
-                report.footnotes.push(Footnote {
-                    r#type: FootnoteType::Note,
-                    label: "this error is reported because the `portable` shell option is enabled"
-                        .into(),
-                });
+                report.footnotes.push(portable_footnote());
                 report
             }
         }
@@ -173,18 +190,30 @@ pub fn interpret(
 
 /// Parses command line arguments of the `command` built-in
 ///
-/// While the `Portable` shell option is on, the `-v` and `-V` options accept
-/// exactly one operand, as POSIX specifies the syntax as
-/// `command [-p][-v|-V] command_name`; a surplus operand is rejected with
-/// [`Error::TooManyCommandNames`]. This check is not shared with the type
-/// built-in, whose operands POSIX spells `name…`.
+/// While the `Portable` shell option is on, the `-v` and `-V` options cannot be
+/// used together and accept exactly one operand, as POSIX specifies the syntax
+/// as `command [-p][-v|-V] command_name`; the combination is rejected with
+/// [`Error::ConflictingOption`] and a surplus operand with
+/// [`Error::TooManyCommandNames`]. These checks are not shared with the type
+/// built-in, which has neither option and whose operands POSIX spells `name…`.
 pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
     let (mut options, mut operands) = parse_arguments(OPTION_SPECS, Mode::with_env(env), args)?;
     let portable = env.options.get(Portable);
 
+    if portable == State::On {
+        // POSIX writes the two options as `-v|-V`, so only one may be used.
+        // Repeating the same option is not a conflict.
+        let v = options.iter().position(|o| o.spec.get_short() == Some('v'));
+        let upper_v = options.iter().position(|o| o.spec.get_short() == Some('V'));
+        if let (Some(v), Some(upper_v)) = (v, upper_v) {
+            return Err(ConflictingOptionError::pick_from_indexes(options, [v, upper_v]).into());
+        }
+    }
+
     if portable == State::On && operands.len() > 1 {
-        // If both -v and -V are specified, the last one wins, so that is the
-        // option the error should point at.
+        // The check above has left at most one of -v and -V, but either may
+        // occur more than once. Point at the last occurrence, which is the one
+        // closest to the operands.
         let identify = options
             .iter()
             .rposition(|o| matches!(o.spec.get_short(), Some('v' | 'V')));
@@ -361,14 +390,24 @@ mod tests {
     #[test]
     #[allow(non_snake_case, reason = "for concise naming")]
     fn many_operands_with_both_v_and_V_portable() {
-        // The error points at the option that decides the verbosity, which is
-        // the last one specified.
+        // The conflicting options are reported rather than the surplus operand.
         let mut env = Env::new_virtual();
         env.options.set(Portable, State::On);
         let args = Field::dummies(["-V", "-v", "foo", "bar"]);
         let result = parse(&env, args);
-        assert_matches!(result, Err(Error::TooManyCommandNames { identify, .. }) => {
+        assert_matches!(result, Err(Error::ConflictingOption(_)));
+    }
+
+    #[test]
+    fn many_operands_with_repeated_identify_option_portable() {
+        // The error points at the last occurrence of the option.
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let args = Field::dummies(["-v", "-v", "foo", "bar"]);
+        let result = parse(&env, args);
+        assert_matches!(result, Err(Error::TooManyCommandNames { identify, operands }) => {
             assert_eq!(identify.code.value.borrow().as_str(), "-v");
+            assert_eq!(operands, Field::dummies(["bar"]));
         });
     }
 
@@ -440,6 +479,76 @@ mod tests {
     #[test]
     fn missing_command_name_report_mentions_portable_option() {
         let report = Error::MissingCommandName.to_report();
+        assert_matches!(&report.footnotes[..], [footnote] => {
+            assert_eq!(footnote.r#type, FootnoteType::Note);
+            assert!(
+                footnote.label.contains("portable"),
+                "footnote label should contain `portable`: {:?}",
+                footnote.label,
+            );
+        });
+    }
+
+    #[test]
+    #[allow(non_snake_case, reason = "for concise naming")]
+    fn conflicting_v_and_V_options_portable() {
+        // With the portable option on, -v and -V cannot be used together.
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+
+        let result = parse(&env, Field::dummies(["-v", "-V", "foo"]));
+        assert_matches!(result, Err(Error::ConflictingOption(error)) => {
+            let options = error.options();
+            assert_eq!(options.len(), 2, "{options:?}");
+            assert_eq!(options[0].location.code.value.borrow().as_str(), "-v");
+            assert_eq!(options[1].location.code.value.borrow().as_str(), "-V");
+        });
+
+        let result = parse(&env, Field::dummies(["-V", "-v", "foo"]));
+        assert_matches!(result, Err(Error::ConflictingOption(error)) => {
+            let options = error.options();
+            assert_eq!(options.len(), 2, "{options:?}");
+            assert_eq!(options[0].location.code.value.borrow().as_str(), "-V");
+            assert_eq!(options[1].location.code.value.borrow().as_str(), "-v");
+        });
+    }
+
+    #[test]
+    #[allow(non_snake_case, reason = "for concise naming")]
+    fn repeated_v_or_V_option_portable() {
+        // Repeating the same option is not a conflict.
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+
+        let result = parse(&env, Field::dummies(["-v", "-v", "foo"]));
+        assert_matches!(result, Ok(Command::Identify(identify)) => {
+            assert!(!identify.verbose);
+        });
+
+        let result = parse(&env, Field::dummies(["-V", "-V", "foo"]));
+        assert_matches!(result, Ok(Command::Identify(identify)) => {
+            assert!(identify.verbose);
+        });
+    }
+
+    #[test]
+    #[allow(non_snake_case, reason = "for concise naming")]
+    fn conflicting_v_and_V_options_without_operands_portable() {
+        // The conflict is reported before the missing operand.
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, Field::dummies(["-v", "-V"]));
+        assert_matches!(result, Err(Error::ConflictingOption(_)));
+    }
+
+    #[test]
+    #[allow(non_snake_case, reason = "for concise naming")]
+    fn conflicting_option_report_mentions_portable_option() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, Field::dummies(["-v", "-V", "foo"]));
+        let error = result.unwrap_err();
+        let report = error.to_report();
         assert_matches!(&report.footnotes[..], [footnote] => {
             assert_eq!(footnote.r#type, FootnoteType::Note);
             assert!(
