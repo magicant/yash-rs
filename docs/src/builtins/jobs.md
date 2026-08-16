@@ -47,6 +47,8 @@ You can use two options to change the output.
 
 The **`-l`** (**`--verbose`**) option displays additional details by inserting the process ID before each job state. The **`-p`** (**`--pgid-only`**) option outputs only the process ID of each job. In both cases, the process ID shown is that of the main process in the job, which is also the process group ID if the job is under job control.
 
+The two options are mutually exclusive. (Since 3.3.5) Specifying both is an error.
+
 <!--
 ### Filtering
 
@@ -61,6 +63,8 @@ job to report. If no operands are given, the built-in prints all jobs.
 ## Errors
 
 If an operand does not specify a valid job, the built-in prints an error message to the standard error and returns a non-zero exit status. An ambiguous job ID (matching multiple jobs) is also an error.
+
+(Since 3.3.5) Specifying both the `-l` and `-p` options is an error.
 
 The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
 
@@ -119,6 +123,6 @@ When the built-in is used in a [subshell](../environment/index.html#subshells), 
 
 The POSIX standard only defines the `-l` and `-p` options. <!-- TODO: Other options are non-portable extensions. --> Previous versions of yash supported additional options, which are not yet implemented in yash-rs.
 
-POSIX does not define the behavior when both `-l` and `-p` options are used together. In most other shells, the option specified last takes effect. In yash-rs, the `-p` option takes precedence over `-l`, but this may change in future versions. Later releases of yash-rs might instead reject conflicting options.
+POSIX specifies the options as `-l|-p` and does not define the behavior when both are used together. Other shells accept the combination, but what they do with it varies from shell to shell. (Since 3.3.5) yash-rs has no reason to prefer either option over the other, so it rejects the combination with an error, whichever order or spelling it is written in.
 
 A portable job ID must start with a `%`. If an operand does not have a leading `%`, the built-in assumes one silently, which is not portable.
