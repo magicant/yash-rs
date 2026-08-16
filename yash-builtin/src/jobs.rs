@@ -23,6 +23,7 @@
 use crate::common::output;
 use crate::common::report::report_error;
 use crate::common::report::report_failure;
+use crate::common::syntax::ConflictingOptionError;
 use crate::common::syntax::Mode;
 use crate::common::syntax::OptionSpec;
 use crate::common::syntax::parse_arguments;
@@ -32,7 +33,11 @@ use yash_env::job::fmt::Accumulator;
 use yash_env::job::id::FindError;
 use yash_env::job::id::parse;
 use yash_env::job::id::parse_tail;
+use yash_env::option::Option::Portable;
+use yash_env::option::State;
 use yash_env::semantics::Field;
+use yash_env::source::pretty::Footnote;
+use yash_env::source::pretty::FootnoteType;
 use yash_env::source::pretty::Report;
 use yash_env::source::pretty::ReportType;
 use yash_env::source::pretty::Snippet;
@@ -59,6 +64,10 @@ fn find_error_report(error: FindError, operand: &Field) -> Report<'_> {
 }
 
 /// Entry point for executing the `jobs` built-in
+///
+/// While the [`Portable`] shell option is on, the `-l` and `-p` options cannot
+/// be used together, as POSIX specifies the syntax as
+/// `jobs [-l|-p] [job_id…]`; the combination is rejected with an error.
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
     S: Isatty + Signals + WriteAll,
@@ -67,6 +76,23 @@ where
         Ok(result) => result,
         Err(error) => return report_error(env, &error).await,
     };
+
+    if env.options.get(Portable) == State::On {
+        // POSIX writes the two options as `-l|-p`, so only one may be used.
+        // Repeating the same option is not a conflict.
+        let l = options.iter().position(|o| o.spec.get_short() == Some('l'));
+        let p = options.iter().position(|o| o.spec.get_short() == Some('p'));
+        if let (Some(l), Some(p)) = (l, p) {
+            let error = ConflictingOptionError::pick_from_indexes(options, [l, p]);
+            let mut report = error.to_report();
+            report.footnotes.push(Footnote {
+                r#type: FootnoteType::Note,
+                label: "this error is reported because the `portable` shell option is enabled"
+                    .into(),
+            });
+            return report_error(env, report).await;
+        }
+    }
 
     let mut accumulator = Accumulator {
         current_job_index: env.jobs.current_job(),
@@ -510,6 +536,52 @@ mod tests {
         let result = main(&mut env, args).now_or_never().unwrap();
         assert_eq!(result, Result::new(ExitStatus::SUCCESS));
         assert_stdout(&state, |stdout| assert_eq!(stdout, "42\n72\n"));
+    }
+
+    #[test]
+    fn conflicting_l_and_p_options_portable() {
+        // With the portable option on, -l and -p cannot be used together.
+        for args in [
+            Field::dummies(["-l", "-p"]),
+            Field::dummies(["-p", "-l"]),
+            Field::dummies(["-lp"]),
+        ] {
+            let system = VirtualSystem::new();
+            let state = Rc::clone(&system.state);
+            let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+            env.options.set(Portable, State::On);
+            env.jobs.insert(Job::new(Pid(42)));
+
+            let mut env = env.push_frame(Frame::Builtin(Builtin {
+                name: Field::dummy("jobs"),
+                is_special: false,
+            }));
+            let result = main(&mut env, args.clone()).now_or_never().unwrap();
+            assert_eq!(result, Result::new(ExitStatus::ERROR), "{args:?}");
+            assert_stdout(&state, |stdout| assert_eq!(stdout, "", "{args:?}"));
+            assert_stderr(&state, |stderr| {
+                assert!(stderr.contains("portable"), "{args:?}: stderr = {stderr:?}")
+            });
+        }
+    }
+
+    #[test]
+    fn repeated_l_or_p_option_portable() {
+        // Repeating the same option is not a conflict.
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.options.set(Portable, State::On);
+        let mut job = Job::new(Pid(42));
+        job.name = "echo first".to_string();
+        env.jobs.insert(job);
+
+        let args = Field::dummies(["-l", "-l"]);
+        let result = main(&mut env, args).now_or_never().unwrap();
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
+        assert_stdout(&state, |stdout| {
+            assert_eq!(stdout, "[1] +    42 Running              echo first\n")
+        });
     }
 
     #[test]

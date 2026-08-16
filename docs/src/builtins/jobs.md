@@ -119,6 +119,6 @@ When the built-in is used in a [subshell](../environment/index.html#subshells), 
 
 The POSIX standard only defines the `-l` and `-p` options. <!-- TODO: Other options are non-portable extensions. --> Previous versions of yash supported additional options, which are not yet implemented in yash-rs.
 
-POSIX does not define the behavior when both `-l` and `-p` options are used together. In most other shells, the option specified last takes effect. In yash-rs, the `-p` option takes precedence over `-l`, but this may change in future versions. Later releases of yash-rs might instead reject conflicting options.
+POSIX specifies the options as `-l|-p`, allowing only one of them, and does not define the behavior when both are used together. In most other shells, the option specified last takes effect. In yash-rs, the `-p` option takes precedence over `-l`, but this may change in future versions. (Since 3.3.5) The [`portable` option](../environment/options.md#portable) rejects the combination with an error. Repeating the same option is not a conflict and is accepted either way.
 
 A portable job ID must start with a `%`. If an operand does not have a leading `%`, the built-in assumes one silently, which is not portable.
