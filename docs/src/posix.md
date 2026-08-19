@@ -23,13 +23,16 @@ Even when yash-rs conforms to POSIX, it also implements extensions that POSIX do
 
 Unlike [`posixlycorrect`](environment/options.md#posixlycorrect), which changes how the shell behaves to maximize POSIX conformance, `portable` does not alter the behavior of POSIX-conformant constructs. It only restricts the shell to features that are portable across POSIX-conforming shells, reporting an error or ignoring a feature when a non-portable construct is used. The two options are independent and can be combined.
 
-When the `portable` option is set, the shell rejects or ignores the following non-portable features. Each item links to the page that documents the feature in full, including the POSIX requirement behind the restriction and how to write the same thing portably.
+When the `portable` option is set, the shell reacts to non-portable features in one of the ways described below. Each item links to the page that documents the feature in full, including the POSIX requirement behind the restriction and how to write the same thing portably.
 
 <!--
-Rules for writing the list below. Ask the maintainer when a case is unclear.
+Rules for writing the lists below. Ask the maintainer when a case is unclear.
 
-- State only what the option rejects or ignores. Do not restate the POSIX
-  requirement behind it; that is just the same thing said twice.
+- Put each item in the list that matches how the shell reacts to the construct:
+  an error, silent ignoring, or a warning. An item never appears in two lists.
+- State only what the option rejects, ignores, or warns about. Do not restate
+  the POSIX requirement behind it; that is just the same thing said twice. Do
+  not restate the reaction either; the heading above the list already gives it.
 - Add an example only when the description does not already show the construct
   itself as a literal (its symbols, spelling, or syntactic form). A description
   that only states a property or condition, leaving the reader to work out what
@@ -51,10 +54,16 @@ Rules for writing the list below. Ask the maintainer when a case is unclear.
   think it is rejected.
 - Keep the `(Since x.y.z)` tag at the head of each item. For an item covering
   several built-ins, use the version in which the item itself first appeared.
-- Order the items by where their linked page appears in SUMMARY.md. The linked
-  page is the one that documents the item in full, including the portable
-  alternative.
+- Order the items within each list by where their linked page appears in
+  SUMMARY.md. The linked page is the one that documents the item in full,
+  including the portable alternative.
+- When a list has no items yet, leave the list out entirely rather than writing
+  an empty one.
 -->
+
+### Features that cause an error
+
+The shell reports an error and does not run the construct:
 
 - (Since 3.3.0) A non-portable escape sequence in a [dollar-single-quoted string](language/words/quoting.md#dollar-single-quotes) (`$'…'`): the `\E`, `\?`, `\u`, and `\U` escapes, the `\c@` control escape, and `\x` followed by more than two hexadecimal digits.
 - (Since 3.3.0) A [reserved word](language/words/keywords.md#where-are-reserved-words-recognized) that immediately follows a subshell or a redirection without a separator (for example, the `}` in `{ ( foo ) }`).
@@ -74,7 +83,6 @@ Rules for writing the list below. Ask the maintainer when a case is unclear.
 - (Since 3.3.0) A word that would be recognized as a file descriptor specification, used as the target of a [redirection](language/redirections/index.html) (for example, the `1` in `< 1>file`).
 - (Since 3.3.5) A [shell option](environment/options.md#compatibility) given to the [`set` built-in](builtins/set.md) or on the [command line](startup.md) in a spelling POSIX does not specify (for example, `set --errexit`). The `portable` option itself is always accepted, so that it can be turned off again.
 - (Since 3.3.5) An argument to `-o` or `+o` written in the same argument as the option itself on the [command line](startup.md#compatibility) (for example, `yash3 -oerrexit`).
-- (Since 3.3.3) An [environment variable](language/parameters/variables.md#environment-variables) inherited at [shell startup](startup.md#compatibility) whose name starts with a digit or contains a character other than ASCII letters, digits, and underscores.
 - (Since 3.3.4) Executing an [elective or extension built-in](builtins/index.html#elective-built-ins) (for example, [`typeset`](builtins/typeset.md)).
 - (Since 3.3.5) An option that POSIX does not specify, a [long option](builtins/index.html#options), an [option argument](builtins/index.html#option-arguments) written in the same argument as the option name, or a combination of options POSIX does not allow, given to the [`cd`](builtins/cd.md), [`command`](builtins/command.md), [`exit`](builtins/exit.md), [`export`](builtins/export.md), [`jobs`](builtins/jobs.md), [`pwd`](builtins/pwd.md), [`read`](builtins/read.md), [`readonly`](builtins/readonly.md), [`return`](builtins/return.md), [`trap`](builtins/trap.md), [`ulimit`](builtins/ulimit.md), or [`unset`](builtins/unset.md) built-in.
 - (Since 3.3.5) A number of operands that POSIX does not allow with the accompanying options, given to the [`.`](builtins/source.md), [`command`](builtins/command.md), [`export`](builtins/export.md), [`readonly`](builtins/readonly.md), [`type`](builtins/type.md), or [`unset`](builtins/unset.md) built-in.
@@ -83,4 +91,10 @@ Rules for writing the list below. Ask the maintainer when a case is unclear.
 - (Since 3.3.4) Executing the [`.` built-in](builtins/source.md) under the name `source`.
 - (Since 3.3.2) The increment and decrement operators (`++` and `--`) in an [arithmetic expression](arithmetic.md).
 
-The `portable` option is still under development, so this list will be expanded as more checks are implemented.
+### Features that are ignored
+
+The shell silently proceeds as if the construct were absent:
+
+- (Since 3.3.3) An [environment variable](language/parameters/variables.md#environment-variables) inherited at [shell startup](startup.md#compatibility) whose name starts with a digit or contains a character other than ASCII letters, digits, and underscores.
+
+The `portable` option is still under development, so these lists will be expanded as more checks are implemented.
