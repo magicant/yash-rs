@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - With `portable` enabled, the `command` built-in now rejects more than one operand given with the `-v` or `-V` option (for example, `command -v ls cat`). POSIX specifies the syntax as `command [-p][-v|-V] command_name`, which identifies one command at a time. The `type` built-in still accepts more than one operand, since POSIX spells its operands `name…`.
 - With `portable` enabled, the `command` built-in now rejects an invocation that has both the `-v` and `-V` options (for example, `command -v -V ls`). POSIX writes the options as `-v|-V`, allowing only one of them. Repeating the same option (for example, `command -v -v ls`) is still accepted.
 - With `portable` enabled, the `.` built-in now rejects an operand after the *file* operand (for example, `. ./script.sh foo`).
+- With `portable` enabled, the `true` and `false` built-ins now print a warning if they are given any argument, including a lone `--` (for example, `true foo` or `false --`). POSIX lists both the OPTIONS and OPERANDS sections of these utilities as "None.", so a conforming implementation need not support any argument. The warning goes to the standard error and does not affect the exit status; the arguments are still ignored.
 - The `jobs` built-in now rejects an invocation that has both the `-l` and `-p` options. Previously `-p` took precedence over `-l`, which was not necessarily intuitive.
 
 ## [3.3.4] - 2026-07-31

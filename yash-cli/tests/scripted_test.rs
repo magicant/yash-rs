@@ -267,6 +267,11 @@ fn false_builtin() {
 }
 
 #[test]
+fn false_builtin_ex() {
+    run("false-y.sh")
+}
+
+#[test]
 fn fg_builtin() {
     run_with_pty("fg-p.sh")
 }
@@ -551,6 +556,11 @@ fn trap_ex_2() {
 #[test]
 fn true_builtin() {
     run("true-p.sh")
+}
+
+#[test]
+fn true_builtin_ex() {
+    run("true-y.sh")
 }
 
 #[test]
