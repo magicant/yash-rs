@@ -153,6 +153,12 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `typeset::syntax::parse` now takes a `common::syntax::Mode` as a second
   parameter, allowing the caller to control whether non-portable option syntax
   is accepted.
+- `r#true::main` and `r#false::main` now require the system type parameter to
+  implement `Isatty` and `WriteAll`. While the `portable` shell option is on,
+  they print a warning to the standard error if they are given any argument,
+  since POSIX lists both the OPTIONS and OPERANDS sections of the `true` and
+  `false` utilities as "None.". The warning does not affect the exit status,
+  and the arguments are still ignored.
 - Public dependency versions:
     - yash-env 0.16.0 → 0.16.1
 

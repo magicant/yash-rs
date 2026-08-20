@@ -39,3 +39,5 @@ See [And-or lists](../language/commands/exit_status.md#and-or-lists) for example
 The `true` utility is specified by POSIX.1-2024.
 
 Most implementations ignore any arguments, but some implementations respond to them. For example, the GNU coreutils implementation accepts the `--help` and `--version` options. For maximum portability, avoid passing arguments to `true`. To pass and ignore arguments, use the [`:` (colon) built-in](colon.md) instead.
+
+POSIX lists both the OPTIONS and OPERANDS sections of `true` as "None.", which means a conforming implementation need not support any option or operand. (Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, the built-in prints a warning if it is given any argument, including a lone `--`. The warning does not affect the exit status, and the argument is still ignored.

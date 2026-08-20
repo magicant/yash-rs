@@ -42,3 +42,5 @@ The `false` utility is specified by POSIX.1-2024.
 POSIX allows `false` to return any non-zero exit status, but most implementations return 1.
 
 Most implementations ignore any arguments, but some implementations may respond to them. For example, the GNU coreutils implementation accepts the `--help` and `--version` options. For maximum portability, avoid passing arguments to `false`.
+
+POSIX lists both the OPTIONS and OPERANDS sections of `false` as "None.", which means a conforming implementation need not support any option or operand. (Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, the built-in prints a warning if it is given any argument, including a lone `--`. The warning does not affect the exit status, and the argument is still ignored.

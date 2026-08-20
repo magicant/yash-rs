@@ -57,8 +57,6 @@ Rules for writing the lists below. Ask the maintainer when a case is unclear.
 - Order the items within each list by where their linked page appears in
   SUMMARY.md. The linked page is the one that documents the item in full,
   including the portable alternative.
-- When a list has no items yet, leave the list out entirely rather than writing
-  an empty one.
 -->
 
 ### Features that cause an error
@@ -90,6 +88,12 @@ The shell reports an error and does not run the construct:
 - (Since 3.3.3) Making the `PWD`, `OLDPWD`, `OPTIND`, `OPTARG`, or `LINENO` [variable](language/parameters/variables.md#reserved-variable-names) read-only with the [`readonly` built-in](builtins/readonly.md).
 - (Since 3.3.4) Executing the [`.` built-in](builtins/source.md) under the name `source`.
 - (Since 3.3.2) The increment and decrement operators (`++` and `--`) in an [arithmetic expression](arithmetic.md).
+
+### Features that trigger a warning
+
+The shell prints a warning to the standard error and runs the construct anyway:
+
+- (Since 3.3.5) An argument, including a lone `--`, given to the [`false`](builtins/false.md) or [`true`](builtins/true.md) built-in.
 
 ### Features that are ignored
 

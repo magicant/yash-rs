@@ -24,6 +24,7 @@ use yash_env::io::Fd;
 use yash_env::system::Isatty;
 use yash_env::system::concurrency::WriteAll;
 
+pub(crate) mod no_arg;
 pub mod report;
 pub mod syntax;
 
