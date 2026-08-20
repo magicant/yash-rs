@@ -17,14 +17,20 @@
 //! Command-line argument parser for the `ulimit` built-in
 
 use super::{Command, ResourceExt as _, SetLimitType, SetLimitValue, ShowLimitType};
-use crate::common::syntax::{Mode, OptionSpec, ParseError, parse_arguments};
+use crate::common::syntax::{
+    ConflictingOptionError, Mode, OptionOccurrence, OptionSpec, ParseError, parse_arguments,
+};
 use std::num::ParseIntError;
 use std::str::FromStr;
 use thiserror::Error;
 use yash_env::Env;
+use yash_env::option::Option::Portable;
+use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_env::source::Location;
-use yash_env::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
+use yash_env::source::pretty::{
+    Footnote, FootnoteType, Report, ReportType, Snippet, Span, SpanRole, add_span,
+};
 use yash_env::system::resource::Resource;
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -33,6 +39,27 @@ pub enum Error {
     /// An error occurred in the common syntax parser.
     #[error(transparent)]
     CommonError(#[from] ParseError<'static>),
+
+    /// Option letters are grouped in a single argument while POSIX portability
+    /// is required.
+    ///
+    /// The location is that of the argument containing the grouped options.
+    #[error("cannot group option letters in a single argument")]
+    GroupedOptions(Location),
+
+    /// The `-H` and `-S` options are given together while POSIX portability is
+    /// required.
+    #[error(transparent)]
+    ConflictingOption(#[from] ConflictingOptionError<'static>),
+
+    /// An option other than `-H` and `-S` is repeated while POSIX portability
+    /// is required.
+    #[error("cannot specify the -{option} option more than once")]
+    RepeatedOption {
+        option: char,
+        first: Location,
+        second: Location,
+    },
 
     /// The `-a` option is given with a resource limit operand.
     #[error("cannot set limit for -a")]
@@ -62,8 +89,40 @@ impl Error {
     /// Converts the error to a report.
     #[must_use]
     pub fn to_report(&self) -> Report<'_> {
+        /// Footnote attributing the error to the `portable` shell option
+        fn portable_footnote() -> Footnote<'static> {
+            Footnote {
+                r#type: FootnoteType::Note,
+                label: "this error is reported because the `portable` shell option is enabled"
+                    .into(),
+            }
+        }
+
         let snippets = match self {
             Self::CommonError(e) => return e.to_report(),
+            Self::ConflictingOption(e) => {
+                let mut report = e.to_report();
+                report.footnotes.push(portable_footnote());
+                return report;
+            }
+            Self::GroupedOptions(location) => Snippet::with_primary_span(
+                location,
+                "these options must be specified in separate arguments".into(),
+            ),
+            Self::RepeatedOption { first, second, .. } => {
+                let mut snippets = Snippet::with_primary_span(first, "first specified here".into());
+                add_span(
+                    &second.code,
+                    Span {
+                        range: second.byte_range(),
+                        role: SpanRole::Primary {
+                            label: "specified again here".into(),
+                        },
+                    },
+                    &mut snippets,
+                );
+                snippets
+            }
             Self::AllWithOperand(field) => Snippet::with_primary_span(
                 &field.origin,
                 format!("{field}: unexpected operand").into(),
@@ -99,6 +158,9 @@ impl Error {
         report.r#type = ReportType::Error;
         report.title = self.to_string().into();
         report.snippets = snippets;
+        if let Self::GroupedOptions(_) | Self::RepeatedOption { .. } = self {
+            report.footnotes.push(portable_footnote());
+        }
         report
     }
 }
@@ -145,9 +207,59 @@ const OPTION_SPECS: &[OptionSpec] = &[
     OptionSpec::new().short('w').long("swap").extension(true),
 ];
 
+/// Rejects the option syntax POSIX does not guarantee for the `ulimit` utility.
+///
+/// This function checks the grouping and repetition of options. The `-H` and
+/// `-S` options being used together is not checked here because reporting it
+/// consumes the option occurrences.
+fn check_option_syntax(options: &[OptionOccurrence]) -> std::result::Result<(), Error> {
+    // POSIX exempts the ulimit utility from Utility Syntax Guideline 5, so an
+    // implementation need not recognize grouped option letters like `-fH`.
+    if let Some(option) = options.iter().find(|o| o.spelling.is_grouped()) {
+        return Err(Error::GroupedOptions(option.location.clone()));
+    }
+
+    // POSIX leaves the behavior unspecified if an option other than -H and -S
+    // is repeated.
+    for (index, option) in options.iter().enumerate() {
+        let short = option.spec.get_short().unwrap();
+        if matches!(short, 'H' | 'S') {
+            continue;
+        }
+        let first = options[..index]
+            .iter()
+            .find(|o| o.spec.get_short() == Some(short));
+        if let Some(first) = first {
+            return Err(Error::RepeatedOption {
+                option: short,
+                first: first.location.clone(),
+                second: option.location.clone(),
+            });
+        }
+    }
+
+    Ok(())
+}
+
 /// Parses command line arguments.
+///
+/// While the `Portable` shell option is on, this function additionally rejects
+/// the option syntax POSIX does not guarantee. POSIX exempts the `ulimit`
+/// utility from Utility Syntax Guideline 5, so option letters grouped in a
+/// single argument (as in `ulimit -fH`) are rejected with
+/// [`Error::GroupedOptions`]. POSIX writes the synopsis as
+/// `ulimit [-H|-S] ...`, so the two options cannot be used together, which is
+/// rejected with [`Error::ConflictingOption`]. POSIX also leaves the behavior
+/// unspecified if an option other than `-H` and `-S` is repeated, which is
+/// rejected with [`Error::RepeatedOption`]; repeating `-H` or `-S` remains
+/// valid.
 pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
     let (options, operands) = parse_arguments(OPTION_SPECS, Mode::with_env(env), args)?;
+    let portable = env.options.get(Portable) == State::On;
+
+    if portable {
+        check_option_syntax(&options)?;
+    }
 
     let mut resource_option = None;
     let mut hard = None;
@@ -155,8 +267,8 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
 
     for option in options {
         match option.spec.get_short().unwrap() {
-            'H' => hard = Some(option.location),
-            'S' => soft = Some(option.location),
+            'H' => hard = Some(option),
+            'S' => soft = Some(option),
             c => {
                 if resource_option.is_some_and(|c2| c2 != c) {
                     return Err(Error::TooManyResources(option.location));
@@ -165,6 +277,16 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
             }
         }
     }
+
+    // POSIX writes the synopsis as `ulimit [-H|-S] ...`, so only one of the
+    // two options may be used. Repeating the same one is not a conflict.
+    if portable && let (Some(hard), Some(soft)) = (&hard, &soft) {
+        let conflict = vec![hard.clone(), soft.clone()];
+        return Err(ConflictingOptionError::new(conflict).into());
+    }
+
+    let hard = hard.map(|option| option.location);
+    let soft = soft.map(|option| option.location);
 
     let resource = match resource_option {
         Some('a') => {
@@ -239,6 +361,7 @@ impl FromStr for SetLimitValue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
 
     #[test]
     fn show_default_soft_default_fsize() {
@@ -484,6 +607,67 @@ mod tests {
         let args = Field::dummies(["0", "1"]);
         let result = parse(&env, args.clone());
         assert_eq!(result, Err(Error::TooManyOperands(args)));
+    }
+
+    #[test]
+    fn separate_options_accepted_under_portable() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, Field::dummies(["-S", "-f", "0"]));
+        assert_eq!(
+            result,
+            Ok(Command::Set(
+                Resource::FSIZE,
+                SetLimitType::Soft,
+                SetLimitValue::Number(0)
+            ))
+        );
+    }
+
+    #[test]
+    fn grouped_options_rejected_under_portable() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, Field::dummies(["-Sf", "0"]));
+        assert_eq!(result, Err(Error::GroupedOptions(Location::dummy("-Sf"))));
+    }
+
+    #[test]
+    fn set_hard_and_soft_rejected_under_portable() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, Field::dummies(["-H", "-S", "0"]));
+        assert_matches!(result, Err(Error::ConflictingOption(_)));
+    }
+
+    #[test]
+    fn repeated_limit_type_option_accepted_under_portable() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, Field::dummies(["-H", "-H", "0"]));
+        assert_eq!(
+            result,
+            Ok(Command::Set(
+                Resource::FSIZE,
+                SetLimitType::Hard,
+                SetLimitValue::Number(0)
+            ))
+        );
+    }
+
+    #[test]
+    fn repeated_resource_option_rejected_under_portable() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, Field::dummies(["-d", "-d", "0"]));
+        assert_eq!(
+            result,
+            Err(Error::RepeatedOption {
+                option: 'd',
+                first: Location::dummy("-d"),
+                second: Location::dummy("-d"),
+            })
+        );
     }
 
     #[test]

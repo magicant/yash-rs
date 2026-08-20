@@ -74,6 +74,12 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `command::syntax::Error::ConflictingOption`, returned by
   `command::syntax::parse` for an invocation of the `command` built-in that
   has both the `-v` and `-V` options while the `portable` shell option is on.
+- `ulimit::syntax::Error::GroupedOptions`,
+  `ulimit::syntax::Error::ConflictingOption`, and
+  `ulimit::syntax::Error::RepeatedOption`, returned by `ulimit::syntax::parse`
+  for an invocation of the `ulimit` built-in that groups option letters in a
+  single argument, that has both the `-H` and `-S` options, or that repeats an
+  option other than `-H` and `-S`, while the `portable` shell option is on.
 - `source::syntax::Error::NonPortableOperand`, returned by
   `source::syntax::parse` for an invocation of the `.` built-in that has an
   operand after the file operand while the `portable` shell option is on.
@@ -109,6 +115,13 @@ A _private dependency_ is used internally and not visible to downstream users.
   `-k`, `-l`, `-m`, `-q`, `-r`, `-R`, `-u`, `-w`, and `-x` options, in
   addition to their long spellings, when the `portable` shell option is on.
   These options are not required by POSIX.
+- The `ulimit` built-in (`ulimit::syntax::parse`) now rejects the option
+  syntax POSIX does not guarantee when the `portable` shell option is on:
+  option letters grouped in a single argument, which POSIX exempts the
+  `ulimit` utility from having to recognize; the `-H` and `-S` options given
+  together, which the POSIX synopsis `ulimit [-H|-S] ...` does not allow; and
+  an option other than `-H` and `-S` specified more than once, whose behavior
+  POSIX leaves unspecified. Repeating `-H` or `-S` is still accepted.
 - The `kill` built-in (`kill::syntax::parse`) now rejects the command line
   syntax POSIX does not specify when the `portable` shell option is on: the
   `-n` and `-v` options, a signal number other than `0` given to the `-s`
