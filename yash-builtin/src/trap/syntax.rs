@@ -178,6 +178,7 @@ fn is_non_negative_integer(s: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::syntax::OptionSpelling;
     use std::num::NonZero;
     use yash_env::signal::Number;
     use yash_env::source::Location;
@@ -263,6 +264,7 @@ mod tests {
         let print = OptionOccurrence {
             spec: &OptionSpec::new().short('p').long("print"),
             location: Location::dummy("-p"),
+            spelling: OptionSpelling::Short(1),
             argument: None,
         };
         let result = interpret(vec![print], vec![], &system);
@@ -280,6 +282,7 @@ mod tests {
         let print = OptionOccurrence {
             spec: &OptionSpec::new().short('p').long("print"),
             location: Location::dummy("-p"),
+            spelling: OptionSpelling::Short(1),
             argument: None,
         };
         let result = interpret(vec![print], Field::dummies(["INT"]), &system);
@@ -300,6 +303,7 @@ mod tests {
         let print = OptionOccurrence {
             spec: &OptionSpec::new().short('p').long("print"),
             location: Location::dummy("-p"),
+            spelling: OptionSpelling::Short(1),
             argument: None,
         };
         let result = interpret(

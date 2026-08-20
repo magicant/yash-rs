@@ -331,6 +331,53 @@ impl Mode {
     }
 }
 
+/// How an option was written on the command line
+///
+/// This value records the notation the user chose for an option, which the
+/// [`OptionSpec`] alone does not tell. It is reported in
+/// [`OptionOccurrence::spelling`].
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
+pub enum OptionSpelling {
+    /// The option was written as a short option, as in `-f`.
+    ///
+    /// The value is the byte index of the option character in the field
+    /// containing it. The index is `1` if the option character directly
+    /// follows the leading hyphen, and larger if the option is grouped after
+    /// another option in the same field.
+    ///
+    /// Note that the index refers to the field value after quote removal and
+    /// expansion, so it does not necessarily correspond to a byte offset in
+    /// the source code the field's [`location`](OptionOccurrence::location)
+    /// points to. Use it for composing an error message rather than for
+    /// pointing at a character in the source code.
+    Short(usize),
+
+    /// The option was written as a long option, as in `--fsize`.
+    Long,
+
+    /// The option was not written by the user.
+    ///
+    /// A built-in may add an option occurrence of its own to the result of
+    /// [`parse_arguments`], in which case the occurrence has this spelling.
+    Implied,
+}
+
+impl OptionSpelling {
+    /// Returns whether the option was grouped after another option in the same
+    /// field.
+    ///
+    /// This is `true` for a [`Short`](Self::Short) option whose index is
+    /// larger than `1`, that is, an option like the `H` in `-fH`. POSIX
+    /// Utility Syntax Guideline 5 allows grouping option letters this way, but
+    /// some utilities (notably `ulimit`) are exempt from the guideline, so
+    /// their parsers need to tell grouped options apart.
+    #[must_use]
+    pub const fn is_grouped(&self) -> bool {
+        matches!(self, Self::Short(index) if *index > 1)
+    }
+}
+
 /// Occurrence of an option
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[non_exhaustive]
@@ -340,6 +387,9 @@ pub struct OptionOccurrence<'a> {
 
     /// Location of the field containing this option
     pub location: Location,
+
+    /// How this option was written
+    pub spelling: OptionSpelling,
 
     /// Argument to this option
     ///
@@ -492,10 +542,12 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
         Some(field) => field,
     };
 
-    let mut chars = field.value.chars();
+    let mut chars = field.value.char_indices();
     chars.next(); // Skip the initial hyphen
 
-    while let Some(c) = chars.next() {
+    // `index` is the byte index of `c` in the field value, which is `1` for
+    // the first option in the field and larger for a grouped one.
+    while let Some((index, c)) = chars.next() {
         let spec = match option_specs.iter().find(|spec| spec.get_short() == Some(c)) {
             None => return Err(ParseError::UnknownShortOption(c, field)),
             Some(spec) => spec,
@@ -508,6 +560,7 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
                 option_occurrences.push(OptionOccurrence {
                     spec,
                     location: field.origin.clone(),
+                    spelling: OptionSpelling::Short(index),
                     argument: None,
                 });
             }
@@ -533,6 +586,7 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
                 option_occurrences.push(OptionOccurrence {
                     spec,
                     location,
+                    spelling: OptionSpelling::Short(index),
                     argument: Some(argument),
                 });
                 break;
@@ -634,6 +688,7 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
     Ok(Some(OptionOccurrence {
         spec,
         location,
+        spelling: OptionSpelling::Long,
         argument,
     }))
 }
@@ -801,6 +856,14 @@ mod tests {
     use assert_matches::assert_matches;
 
     #[test]
+    fn is_grouped_is_true_only_for_short_option_after_the_first() {
+        assert!(!OptionSpelling::Short(1).is_grouped());
+        assert!(OptionSpelling::Short(2).is_grouped());
+        assert!(!OptionSpelling::Long.is_grouped());
+        assert!(!OptionSpelling::Implied.is_grouped());
+    }
+
+    #[test]
     fn empty_arguments() {
         let (options, operands) = parse_arguments(&[], Mode::default(), vec![]).unwrap();
         assert_eq!(options, []);
@@ -933,6 +996,32 @@ mod tests {
         assert_eq!(options[1].spec.get_short(), Some('p'));
         assert_eq!(options[2].spec.get_short(), Some('q'));
         assert_eq!(operands, []);
+    }
+
+    #[test]
+    fn spelling_of_short_options() {
+        let specs = &[OptionSpec::new().short('p'), OptionSpec::new().short('q')];
+
+        let arguments = Field::dummies(["-p", "-qp"]);
+        let (options, _operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
+        assert_eq!(options.len(), 3, "options = {options:?}");
+        assert_eq!(options[0].spelling, OptionSpelling::Short(1));
+        assert_eq!(options[1].spelling, OptionSpelling::Short(1));
+        assert_eq!(options[2].spelling, OptionSpelling::Short(2));
+    }
+
+    #[test]
+    fn spelling_of_long_option() {
+        let specs = &[OptionSpec::new().short('p').long("print")];
+
+        let arguments = Field::dummies(["--print"]);
+        let mode = Mode {
+            long_option_names: true,
+            ..Mode::default()
+        };
+        let (options, _operands) = parse_arguments(specs, mode, arguments).unwrap();
+        assert_eq!(options.len(), 1, "options = {options:?}");
+        assert_eq!(options[0].spelling, OptionSpelling::Long);
     }
 
     #[test]
@@ -1594,26 +1683,31 @@ mod tests {
             OptionOccurrence {
                 spec: &OPTION_SPEC_A,
                 location: Location::dummy("-a"),
+                spelling: OptionSpelling::Short(1),
                 argument: None,
             },
             OptionOccurrence {
                 spec: &OPTION_SPEC_B,
                 location: Location::dummy("-b"),
+                spelling: OptionSpelling::Short(1),
                 argument: None,
             },
             OptionOccurrence {
                 spec: &OPTION_SPEC_C,
                 location: Location::dummy("-c"),
+                spelling: OptionSpelling::Short(1),
                 argument: None,
             },
             OptionOccurrence {
                 spec: &OPTION_SPEC_D,
                 location: Location::dummy("-d"),
+                spelling: OptionSpelling::Short(1),
                 argument: None,
             },
             OptionOccurrence {
                 spec: &OPTION_SPEC_E,
                 location: Location::dummy("-e"),
+                spelling: OptionSpelling::Short(1),
                 argument: None,
             },
         ]

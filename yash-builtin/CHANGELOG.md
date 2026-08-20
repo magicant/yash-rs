@@ -32,6 +32,12 @@ A _private dependency_ is used internally and not visible to downstream users.
   whether a short option's argument may be attached to the option name, and
   `common::syntax::ParseError::UnseparatedOptionArgument` for reporting an
   attached argument when this syntax is disabled.
+- `common::syntax::OptionSpelling` and the
+  `common::syntax::OptionOccurrence::spelling` field, which tell how an option
+  was written: as a short option, as a long option, or not by the user at all.
+  A short option additionally carries its byte position in the field
+  containing it, so an option grouped after another one can be told from the
+  first one in the field.
 - `set::syntax::Error::NonPortableShortOption` and
   `set::syntax::Error::NonPortableLongOption`, returned when the `set` built-in
   is given an option name that POSIX does not specify while the `portable`
