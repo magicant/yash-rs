@@ -76,6 +76,30 @@ test_O -d -e 2 'specifying -a and -f at once'
 ulimit -a -f
 __IN__
 
+test_OE -e 0 'grouped option letters accepted as an extension'
+ulimit -Sf >/dev/null
+__IN__
+
+test_O -d -e 2 'grouped option letters rejected under the portable option' -o portable
+ulimit -Sf
+__IN__
+
+test_OE -e 0 'separate option letters still accepted under the portable option' -o portable
+ulimit -S -f >/dev/null
+__IN__
+
+test_O -d -e 2 'giving -H and -S together rejected under the portable option' -o portable
+ulimit -H -S 0
+__IN__
+
+test_OE -e 0 'repeated -H still accepted under the portable option' -o portable
+ulimit -H -H >/dev/null
+__IN__
+
+test_O -d -e 2 'repeated resource option rejected under the portable option' -o portable
+ulimit -f -f
+__IN__
+
 test_O -d -e 2 'invalid operand (non-numeric)'
 ulimit X
 __IN__

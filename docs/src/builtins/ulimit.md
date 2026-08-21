@@ -193,9 +193,11 @@ The long option names (such as `--hard` and `--soft`) are a non-standard extensi
 
 (Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, using a long option name is rejected with an error; use the corresponding short option instead. However, the options that are themselves extensions (`-b`, `-e`, `-i`, `-k`, `-l`, `-m`, `-q`, `-r`, `-R`, `-u`, `-w`, and `-x`) are rejected under `portable` regardless of whether they are spelled as a short or long option, because POSIX does not define them at all.
 
-Some shells do not allow combining options (e.g., `ulimit -fH`). For portability, specify options separately (e.g., `ulimit -f -H`).
+POSIX exempts the `ulimit` utility from the Utility Syntax Guideline that requires grouped option letters to be recognized, and some shells do not allow combining options (e.g., `ulimit -fH`). For portability, specify options separately (e.g., `ulimit -f -H`). (Since 3.3.5) The [`portable` option](../environment/options.md#portable) rejects grouped option letters with an error.
 
-Shells differ in behavior when both `-H` and `-S` are given. Yash-rs sets both limits when a *limit* operand is given, but treats the combination as an error when displaying a limit; older versions of yash only honored the last one.
+POSIX leaves the behavior unspecified when an option other than `-H` and `-S` is specified more than once, but this implementation ignores the repetition. (Since 3.3.5) The [`portable` option](../environment/options.md#portable) rejects the repetition with an error (e.g., `ulimit -f -f`). Repeating `-H` or `-S` remains accepted, as POSIX specifies the behavior for those options.
+
+POSIX specifies the `-H` and `-S` options as mutually exclusive, but shells differ in behavior when both are given. Yash-rs sets both limits when a *limit* operand is given, but treats the combination as an error when displaying a limit; older versions of yash only honored the last one. (Since 3.3.5) The [`portable` option](../environment/options.md#portable) rejects the combination with an error whether setting or displaying a limit.
 
 Specifying multiple resource options is an error in yash-rs, but some shells allow operating on multiple resources at once.
 

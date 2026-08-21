@@ -27,6 +27,7 @@ use crate::common::report::report_error;
 use crate::common::syntax::Mode;
 use crate::common::syntax::OptionOccurrence;
 use crate::common::syntax::OptionSpec;
+use crate::common::syntax::OptionSpelling;
 use crate::common::syntax::parse_arguments;
 use yash_env::Env;
 use yash_env::option::Option::Portable;
@@ -52,6 +53,7 @@ fn parse<S>(env: &mut Env<S>, args: Vec<Field>) -> Result<Identify, crate::comma
     options.push(OptionOccurrence {
         spec: &spec,
         location,
+        spelling: OptionSpelling::Implied,
         argument: None,
     });
 
