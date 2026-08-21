@@ -31,6 +31,8 @@
 //! The re-export of [`yash_env::semantics::command::search`] as
 //! `command_search` is now deprecated. Please use `command::search` instead.
 
+#![cfg_attr(test, recursion_limit = "256")]
+
 pub mod assign;
 pub mod command;
 pub mod expansion;
