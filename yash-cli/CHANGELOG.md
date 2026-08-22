@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - With `portable` enabled, the `set` built-in now rejects a `-` used as a separator between options and operands (for example, `set - foo` or `set -a - foo`) as an error. POSIX leaves the results unspecified if the first argument is `-`, and shells disagree on what such a `-` means: some turn off the `-v` and `-x` options, some drop it as yash-rs does, and older versions of yash treated it as an ordinary operand. Use `--` instead. A `-` that is not consumed as a separator, as in `set -- -`, remains an ordinary operand.
+- With `portable` enabled, the shell command line now rejects `-` and `--` given together as option-operand separators (for example, `yash3 - -- myscript`) as an error. POSIX allows either one alone to mark the end of the options, but leaves the results undefined if both are given.
 
 ## [3.4.0] - 2026-08-22
 
