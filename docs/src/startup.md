@@ -92,6 +92,10 @@ yash3 -o portable --rcfile myrc myscript   # rejected
 
 (Since 3.3.5) The [POSIX Utility Argument Syntax](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_01) requires a conforming application to write an option argument as a separate argument. When the `portable` option is enabled on the command line, the shell rejects the argument to `-o` or `+o` written in the same argument as the option itself, as in `yash3 -oerrexit`. Write `yash3 -o errexit` instead.
 
+(Since 3.5.0) POSIX allows a single `-` to mark the end of the options, just as `--` does, but leaves the results undefined if both are given. When the `portable` option is enabled on the command line, the shell rejects `-` and `--` given together, as in `yash3 - -- myscript`.
+
+POSIX also leaves the results undefined if other operands precede a single `-`, as in `yash3 myscript -`. Yash-rs treats such a `-` as an ordinary operand, as other shells do, and the `portable` option does not reject it.
+
 (Since 3.3.3) POSIX only requires the shell to support [environment variable]s whose names consist of ASCII letters, digits, and underscores and do not start with a digit. When the `portable` option is enabled on the command line, the shell ignores inherited environment variables with other names instead of importing them, so that a script cannot rely on them.
 
 POSIX.1-2024 does not specify login shells or profile files. The behavior described here is specific to yash-rs and may differ from other shells.

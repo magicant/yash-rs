@@ -19,21 +19,6 @@ Run from repository root.
 - Per-crate MSRV checks: `./check-msrv.sh <crate>`
 - Build and check the user manual: `./check-docs.sh`
 
-## Workspace map
-
-This workspace contains `yash-*` crates.
-
-- [yash-cli](yash-cli/README.md): shell binary (`yash3`) and CLI integration.
-- [yash-syntax](yash-syntax/README.md): shell language syntax and parser.
-- [yash-semantics](yash-semantics/README.md): shell language semantics.
-- [yash-builtin](yash-builtin/README.md): built-in utilities.
-- [yash-env](yash-env/README.md): shell execution environment/state.
-- [yash-arith](yash-arith/README.md): arithmetic expansion.
-- [yash-prompt](yash-prompt/README.md): command-line prompt rendering.
-- [yash-executor](yash-executor/README.md): single-threaded futures executor.
-- [yash-fnmatch](yash-fnmatch/README.md): POSIX-style glob matching.
-- [yash-quote](yash-quote/README.md): shell quoting utility.
-
 ## Testing expectations
 
 - Follow Kent Beck's Canon TDD when implementing a feature or fixing a bug. This will guide you to the right amount of tests (neither too many nor too few). Use the [`unit-tests` skill](.agents/skills/unit-tests/SKILL.md) when writing the tests; it is the canonical guide to how unit tests are organized, named, and implemented in this workspace.

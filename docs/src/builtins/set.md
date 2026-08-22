@@ -106,7 +106,9 @@ The `set` built-in is specified by POSIX.1-2024. See [Compatibility](../environm
 
 The output format of `set -o` and `set +o` depends on the shell.
 
-The semantics of `-` as an option-operand separator is unspecified in POSIX. You should prefer `--`. Older versions of yash treated `-` simply as an operand.
+The semantics of `-` as an option-operand separator is unspecified in POSIX, which formerly specified `set -` as an obsolescent way to turn off the `-v` and `-x` options. Shells disagree accordingly: some turn off `-v` and `-x`, some drop the `-` as yash-rs does, and older versions of yash treated `-` simply as an operand. You should prefer `--`.
+
+(Since 3.5.0) When the [`portable` option](../environment/options.md#portable) is set, the built-in rejects a `-` that would act as an option-operand separator with an error. A `-` that is not a separator, as in `set -- -`, remains an ordinary operand.
 
 Many (but not all) shells specially treat `+`, especially when it appears in
 place of an option-operand separator. Yash does not treat `+` specially, so it can be used as an operand without another separator.
