@@ -9,6 +9,12 @@ used by other programs.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.0] - Unreleased
+
+### Changed
+
+- With `portable` enabled, the `set` built-in now rejects a `-` used as a separator between options and operands (for example, `set - foo` or `set -a - foo`) as an error. POSIX leaves the results unspecified if the first argument is `-`, and shells disagree on what such a `-` means: some turn off the `-v` and `-x` options, some drop it as yash-rs does, and older versions of yash treated it as an ordinary operand. Use `--` instead. A `-` that is not consumed as a separator, as in `set -- -`, remains an ordinary operand.
+
 ## [3.4.0] - 2026-08-22
 
 This version was accidentally published as 3.3.5, which was then yanked.
@@ -459,6 +465,7 @@ later.
 
 - Initial release of the shell
 
+[3.5.0]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.5.0
 [3.4.0]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.4.0
 [3.3.4]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.3.4
 [3.3.3]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.3.3
