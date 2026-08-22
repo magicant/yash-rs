@@ -1,6 +1,6 @@
 ---
 name: bump-versions
-description: 'Apply the yash-rs versioning rules: bump affected crate versions, sync the root Cargo.toml, and add Unreleased changelog headings, per the PR template. Documentation updates are out of scope (see the update-docs skill).'
+description: 'Apply the yash-rs versioning rules: bump affected crate versions, sync the root Cargo.toml, and add Unreleased changelog headings. Use proactively, before committing, for every code change to any yash-* crate in this workspace — not just when the user asks about versioning. Documentation updates are out of scope (see the update-docs skill).'
 argument-hint: 'Which crates/behavior changed in this commit?'
 ---
 
