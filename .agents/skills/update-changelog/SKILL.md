@@ -53,10 +53,30 @@ Produce changelog updates that:
    - Security: Vulnerability or hardening update
 
 5. Write concise, user-meaningful bullets.
-   State what changed and why it matters. Avoid internal-only jargon unless the crate is developer-facing.
+   State what changed, concretely. Avoid internal-only jargon unless the crate is developer-facing.
    For `yash-cli/CHANGELOG.md`, keep entries focused on user-visible behavior and
    avoid implementation details aimed at crate developers.
    Order bullets by importance first, then by relatedness within a category.
+
+   **Keep each bullet minimal, but do state the value.** Say what changed, and say
+   what it gives the user when that is not already obvious — a new convenience, a
+   problem it solves, a capability it unlocks. "The `portable` option now catches
+   more portability problems" is worth writing, because it tells the reader what
+   they gain. What to leave out is anything that merely recites facts without
+   conveying value:
+   - **The reason**, when it follows from the change itself and the purpose of the
+     feature involved. A new restriction under the `portable` option, for instance,
+     needs no explanation of the POSIX requirement behind it — checking portability
+     is what that option is for.
+   - **Background and comparative detail**, such as how other shells or older
+     versions behave.
+   - **Guidance the shell itself prints.** If the error message already tells the
+     user to write `--` instead, the changelog does not repeat it.
+   - **What the change does *not* affect**, unless a reader would otherwise expect
+     it to change.
+
+   The manual under `docs/src` is where the full rationale and the portable
+   alternative belong; link there rather than restating them.
 
    **Represent net release state, not commit history.**
    Before adding a new bullet, scan the existing Unreleased section for bullets that
@@ -103,6 +123,12 @@ Produce changelog updates that:
 - Every affected crate has matching changelog coverage.
 - Category headings are consistent with repository style.
 - Bullets describe behavior or impact, not vague implementation activity.
+- Where a change gives users something new, the bullet says so; where it does not,
+  it stays minimal.
+- No bullet explains a reason that follows from the change itself and the purpose of
+  the feature involved, recounts how other shells or older versions behave, repeats
+  guidance the shell already prints in its error message, or states what the change
+  leaves unchanged without a reason to.
 - In `yash-cli/CHANGELOG.md`, bullets stay user-facing and avoid deep internal details.
 - Bullets are ordered by importance and relatedness, not by edit time.
 - No duplicate bullets across categories.

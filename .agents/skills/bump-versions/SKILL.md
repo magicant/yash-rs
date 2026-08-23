@@ -81,8 +81,21 @@ crate's current major version.
   - Breaking API change → *breaking*.
   - Backward-compatible API addition → *compatible*.
   - No API change (internal only, bug fix) → *patch-level*.
-- **`yash-cli` (binary):** classify by **observable shell behavior**.
-  - Behavior change or new feature → *compatible*; bug fix → *patch-level*.
+- **`yash-cli` (binary):** classify by **what the release gives users**.
+  - A genuinely new feature or capability — a new shell option, built-in,
+    syntax, or the like — → *compatible* (a minor bump).
+  - Anything else → *patch-level*: a change or restriction of existing
+    behavior, a relaxation of it, or a bug fix. **Refining existing behavior is
+    patch-level**, including each new rejection added under the `portable`
+    option.
+  - The test to apply: does the release *add* something a user can newly
+    invoke? "Users can now write X" is minor; "the shell now rejects / now
+    reports / now behaves differently for X" is patch. Precedents: 3.3.0 was
+    minor because it introduced the `portable` option itself, while versions
+    3.3.1 through 3.3.4 stayed patch-level despite carrying many new
+    `portable` rejections. 3.4.0 was minor despite also carrying many such
+    rejections, because it separately added the `kill -SIGINT` form users can
+    newly write — the rejections did not earn the bump.
   - `yash-cli` re-exports nothing, so only observable behavior drives its
     version. A dependency bump alone never bumps `yash-cli`, and unlike every
     other crate, its changelog never records dependency version changes either

@@ -69,14 +69,16 @@ Review Rust code changes comprehensively from every angle, focusing on issues th
 
 ### 8. Compatibility and Portability
 - **Platform Compatibility**: Does the code work on all target platforms (Linux, macOS, Windows where applicable)?
-- **MSRV Compatibility**: Does the code use features available in Rust 1.87.0?
+- **MSRV Compatibility**: Does the code use features available in the Rust version specified in Cargo.toml?
 - **Dependency Compatibility**: Are new dependencies justified and compatible with existing ones?
 
 ### 9. Version Management (CRITICAL for yash-rs)
 - **Version Bumping**: Is the version bumped appropriately in affected crates?
-  - Patch: Bug fixes, internal changes
-  - Minor: New features, non-breaking API additions
-  - Major: Breaking changes
+  The canonical rules, including the pre-1.0 mapping and how `yash-cli` is
+  classified, are in the [`bump-versions` skill](../../.agents/skills/bump-versions/SKILL.md).
+  Note in particular that a `yash-cli` release earns a minor bump only when it
+  adds a new feature users can invoke; refining existing behavior, such as
+  a new `portable`-mode rejection, is patch-level.
 - **Avoid Double Bumps**: If a version was already bumped in a previous unreleased PR, is it bumped again incorrectly?
 - **Workspace Dependencies**: Are workspace dependency versions updated in root `Cargo.toml`?
 
