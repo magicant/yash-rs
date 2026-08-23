@@ -23,3 +23,7 @@ __IN__
 test_O -d -e 2 'lone % rejected under the portable option' -o portable
 jobs %
 __IN__
+
+test_O -d -e 2 'operand without the leading % rejected under the portable option' -o portable
+jobs 1
+__IN__

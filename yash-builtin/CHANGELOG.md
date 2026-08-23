@@ -30,6 +30,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `bg`, `fg`, `jobs`, `kill`, and `wait` built-ins now reject the lone `%`
   as a job ID when the `portable` shell option is on. All five return exit
   status 2 in this case, as for any other command argument error.
+- The `jobs` built-in now rejects an operand that does not start with a `%` when
+  the `portable` shell option is on, returning exit status 2.
 - The `fg` built-in now reports an error caused by its operand with the operand
   as the error location, as the other job ID built-ins do.
 - The `bg`, `fg`, and `kill` built-ins now return exit status 2 for an operand

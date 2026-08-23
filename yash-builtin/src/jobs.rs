@@ -35,6 +35,7 @@ use yash_env::job::fmt::Accumulator;
 use yash_env::job::id::ParseError;
 use yash_env::job::id::parse_tail;
 use yash_env::option::Option::Portable;
+use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::Report;
 use yash_env::source::pretty::ReportType;
@@ -115,9 +116,14 @@ where
         // Report jobs specified by the operands
         let portable = env.options.get(Portable);
         for operand in operands {
-            // A job ID must start with a `%`, but this built-in assumes one
-            // if the operand lacks it.
-            let tail = operand.value.strip_prefix('%').unwrap_or(&operand.value);
+            let tail = match operand.value.strip_prefix('%') {
+                Some(tail) => tail,
+                None if portable == State::Off => &operand.value,
+                None => {
+                    let report = parse_error_report(ParseError::MissingPercent, &operand);
+                    return report_error(env, report).await;
+                }
+            };
             let job_id = match parse_tail(tail, portable) {
                 Ok(job_id) => job_id,
                 Err(error) => {
@@ -128,6 +134,9 @@ where
             match job_id.find(&env.jobs) {
                 Ok(index) => accumulator.add(index, &env.jobs[index], &env.system),
                 Err(error) => {
+                    // TODO Returning here masks the errors of the remaining
+                    // operands. Collect all operand errors and report them
+                    // together instead.
                     let report = operand_error_report(&error, &operand);
                     return report_failure(env, report).await;
                 }
@@ -165,7 +174,6 @@ mod tests {
     use yash_env::job::Pid;
     use yash_env::job::ProcessResult;
     use yash_env::job::ProcessState;
-    use yash_env::option::State;
     use yash_env::semantics::ExitStatus;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
@@ -381,6 +389,33 @@ mod tests {
             );
             assert!(
                 stderr.contains("use `%%` or `%+` instead"),
+                "stderr = {stderr:?}",
+            );
+        });
+    }
+
+    #[test]
+    fn operand_without_percent_rejected_under_portable_option() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.options.set(Portable, State::On);
+        env.jobs.insert(Job::new(Pid(42)));
+
+        let args = Field::dummies(["1"]);
+        let result = main(&mut env, args).now_or_never().unwrap();
+
+        assert_eq!(result, Result::new(ExitStatus::ERROR));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+        assert_stderr(&state, |stderr| {
+            assert!(
+                stderr.contains("a job ID must start with a \'%\'"),
+                "stderr = {stderr:?}",
+            );
+            assert!(
+                stderr.contains(
+                    "this error is reported because the `portable` shell option is enabled"
+                ),
                 "stderr = {stderr:?}",
             );
         });
