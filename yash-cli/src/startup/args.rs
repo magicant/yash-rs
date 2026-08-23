@@ -156,6 +156,13 @@ pub enum Error {
     #[error("non-portable option name `{}`{}", .0, suggestion(.1))]
     NonPortableLongOption(String, Option<String>),
 
+    /// Both `-` and `--` given as option-operand separators
+    ///
+    /// POSIX leaves the results undefined if both `-` and `--` are given, so
+    /// this error occurs only while the `portable` shell option is on.
+    #[error("non-portable use of both `-` and `--` as separators; use `--` alone instead")]
+    BothSeparators,
+
     /// `-o` or `+o` whose argument is not a separate argument
     ///
     /// POSIX requires conforming applications to specify an option argument as
@@ -315,7 +322,15 @@ where
         }
     }
 
-    args.next_if(|arg| arg == "-" || arg == "--");
+    // Check portability of - and --
+    if let Some(separator) = args.next_if(|arg| arg == "-" || arg == "--")
+        && portable == State::On
+    {
+        let other = if separator == "-" { "--" } else { "-" };
+        if args.peek().is_some_and(|arg| arg == other) {
+            return Err(Error::BothSeparators);
+        }
+    }
 
     // Parse operands
     if result.options.contains(&(ShellOption::CmdLine, State::On)) {
@@ -1587,6 +1602,47 @@ mod tests {
                 "{arg}"
             );
         }
+    }
+
+    #[test]
+    fn portable_rejects_both_separators() {
+        assert_eq!(
+            parse(["yash", "-o", "portable", "-", "--", "file"]),
+            Err(Error::BothSeparators),
+        );
+        assert_eq!(
+            parse(["yash", "-o", "portable", "--", "-", "file"]),
+            Err(Error::BothSeparators),
+        );
+    }
+
+    #[test]
+    fn portable_accepts_a_single_separator() {
+        assert_matches!(
+            parse(["yash", "-o", "portable", "-", "file"]),
+            Ok(Parse::Run(run)) => assert_eq!(run.arg0, "file")
+        );
+        assert_matches!(
+            parse(["yash", "-o", "portable", "--", "file"]),
+            Ok(Parse::Run(run)) => assert_eq!(run.arg0, "file")
+        );
+    }
+
+    #[test]
+    fn portable_accepts_a_separator_appearing_among_operands() {
+        assert_matches!(
+            parse(["yash", "-o", "portable", "-s", "x", "-", "y"]),
+            Ok(Parse::Run(run)) => {
+                assert_eq!(run.positional_params, ["x", "-", "y"]);
+            }
+        );
+        assert_matches!(
+            parse(["yash", "-o", "portable", "-", "file", "--"]),
+            Ok(Parse::Run(run)) => {
+                assert_eq!(run.arg0, "file");
+                assert_eq!(run.positional_params, ["--"]);
+            }
+        );
     }
 
     #[test]

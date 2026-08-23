@@ -64,6 +64,26 @@ test_O -d -e 2 'shell invocation rejects --norcfile under the portable option' -
 echo not reached
 __IN__
 
+test_O -d -e 2 'shell invocation rejects - followed by -- under the portable option' -o portable - --
+echo not reached
+__IN__
+
+test_O -d -e 2 'shell invocation rejects -- followed by - under the portable option' -o portable -- -
+echo not reached
+__IN__
+
+test_o 'shell invocation accepts - alone under the portable option' -o portable -
+echo $#
+__IN__
+0
+__OUT__
+
+test_o 'shell invocation accepts - among operands under the portable option' -o portable -s x - y
+echo "$@"
+__IN__
+x - y
+__OUT__
+
 test_x -e 0 'shell invocation accepts long option without the portable option' --allexport
 echo "$-" | grep -q a
 __IN__

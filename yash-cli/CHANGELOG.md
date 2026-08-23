@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - With `portable` enabled, the `set` built-in now rejects a `-` used as a separator between options and operands (for example, `set - foo` or `set -a - foo`) as an error.
+- With `portable` enabled, the shell command line now rejects `-` and `--` given together as option-operand separators (for example, `yash3 - -- myscript`) as an error.
 
 ## [3.4.0] - 2026-08-22
 
