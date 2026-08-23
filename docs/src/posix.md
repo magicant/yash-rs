@@ -81,11 +81,13 @@ The shell reports an error and does not run the construct:
 - (Since 3.3.0) A word that would be recognized as a file descriptor specification, used as the target of a [redirection](language/redirections/index.html) (for example, the `1` in `< 1>file`).
 - (Since 3.3.5) A [shell option](environment/options.md#compatibility) given to the [`set` built-in](builtins/set.md) or on the [command line](startup.md) in a spelling POSIX does not specify (for example, `set --errexit`). The `portable` option itself is always accepted, so that it can be turned off again.
 - (Since 3.3.5) An argument to `-o` or `+o` written in the same argument as the option itself on the [command line](startup.md#compatibility) (for example, `yash3 -oerrexit`).
+- (Since 3.4.1) Both `-` and `--` given as option-operand separators on the [command line](startup.md#compatibility).
 - (Since 3.3.4) Executing an [elective or extension built-in](builtins/index.html#elective-built-ins) (for example, [`typeset`](builtins/typeset.md)).
 - (Since 3.3.5) An option that POSIX does not specify, a [long option](builtins/index.html#options), an [option argument](builtins/index.html#option-arguments) written in the same argument as the option name, or a combination of options POSIX does not allow, given to the [`cd`](builtins/cd.md), [`command`](builtins/command.md), [`exit`](builtins/exit.md), [`export`](builtins/export.md), [`jobs`](builtins/jobs.md), [`pwd`](builtins/pwd.md), [`read`](builtins/read.md), [`readonly`](builtins/readonly.md), [`return`](builtins/return.md), [`trap`](builtins/trap.md), [`ulimit`](builtins/ulimit.md), or [`unset`](builtins/unset.md) built-in.
 - (Since 3.3.5) A number of operands that POSIX does not allow with the accompanying options, given to the [`.`](builtins/source.md), [`command`](builtins/command.md), [`export`](builtins/export.md), [`readonly`](builtins/readonly.md), [`type`](builtins/type.md), or [`unset`](builtins/unset.md) built-in.
 - (Since 3.3.5) A non-portable way of specifying a signal or listing signals with the [`kill` built-in](builtins/kill.md).
 - (Since 3.3.3) Making the `PWD`, `OLDPWD`, `OPTIND`, `OPTARG`, or `LINENO` [variable](language/parameters/variables.md#reserved-variable-names) read-only with the [`readonly` built-in](builtins/readonly.md).
+- (Since 3.4.1) A `-` used as an option-operand separator with the [`set` built-in](builtins/set.md) (for example, `set - foo`).
 - (Since 3.3.4) Executing the [`.` built-in](builtins/source.md) under the name `source`.
 - (Since 3.3.2) The increment and decrement operators (`++` and `--`) in an [arithmetic expression](arithmetic.md).
 

@@ -32,6 +32,18 @@ test_O -d -e 2 'set built-in rejects short option POSIX does not specify' -o por
 set -l
 __IN__
 
+test_O -d -e 2 'set built-in rejects - as a separator under the portable option' -o portable
+set - foo
+__IN__
+
+test_O -d -e 2 'set built-in rejects - alone under the portable option' -o portable
+set -
+__IN__
+
+test_O -d -e 2 'set built-in rejects - after an option under the portable option' -o portable
+set -a - foo
+__IN__
+
 test_x -e 0 'set built-in accepts long option without the portable option'
 set --errexit
 echo "$-" | grep -q e
@@ -86,6 +98,27 @@ test_x -e 0 'set built-in accepts POSIX -o names under the portable option' -o p
 set -o noclobber -o errexit +o noclobber
 echo "$-" | grep -q e
 __IN__
+
+test_o 'set built-in accepts - as a separator without the portable option'
+set - foo
+echo "$@"
+__IN__
+foo
+__OUT__
+
+test_o 'set built-in accepts -- as a separator under the portable option' -o portable
+set -- - foo
+echo "$@"
+__IN__
+- foo
+__OUT__
+
+test_o 'set built-in accepts - as an operand under the portable option' -o portable
+set -- foo -
+echo "$@"
+__IN__
+foo -
+__OUT__
 
 test_x -e 0 'set built-in can turn off the portable option' -o portable
 set +o portable

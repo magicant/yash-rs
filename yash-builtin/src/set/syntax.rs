@@ -82,6 +82,13 @@ pub enum Error {
         std::option::Option<(yash_env::option::Option, State)>,
     ),
 
+    /// `-` used as a separator between options and operands
+    ///
+    /// POSIX does not specify `-` as an option-operand separator, so this
+    /// error occurs only while the `portable` shell option is on.
+    #[error("non-portable option-operand separator {:?}", .0.value)]
+    NonPortableSeparator(Field),
+
     /// `-o` or `+o` whose argument is not a separate field
     ///
     /// POSIX requires conforming applications to specify an option argument as
@@ -141,6 +148,7 @@ impl Error {
             Error::UnmodifiableLongOption(field) => field,
             Error::NonPortableShortOption(_char, field) => field,
             Error::NonPortableLongOption(field, _option) => field,
+            Error::NonPortableSeparator(field) => field,
             Error::UnseparatedOptionArgument(field, _spelling) => field,
         }
     }
@@ -157,6 +165,7 @@ impl Error {
 
         if let Error::NonPortableShortOption(..)
         | Error::NonPortableLongOption(..)
+        | Error::NonPortableSeparator(..)
         | Error::UnseparatedOptionArgument(..) = self
         {
             report.footnotes.push(Footnote {
@@ -170,6 +179,7 @@ impl Error {
             Error::NonPortableLongOption(_field, Some((option, state))) => {
                 portable_spelling(*option, *state)
             }
+            Error::NonPortableSeparator(_field) => Some("--".to_string()),
             Error::UnseparatedOptionArgument(_field, spelling) => Some(spelling.clone()),
             _ => None,
         };
@@ -368,15 +378,16 @@ pub fn parse(args: Vec<Field>, portable: State) -> Result<Command, Error> {
         }
     }
 
-    let separated = match args.peek().map(|arg| arg.value.as_str()) {
-        Some("--" | "-") => {
-            drop(args.next());
-            true
-        }
-        _ => false,
-    };
+    let separator = args
+        .next_if_map(|arg| match arg.value.as_str() {
+            "--" => Ok(Ok(arg)),
+            "-" if portable == State::Off => Ok(Ok(arg)),
+            "-" => Ok(Err(Error::NonPortableSeparator(arg))),
+            _ => Err(arg),
+        })
+        .transpose()?;
 
-    let positional_params = (separated || args.peek().is_some()).then(|| args.collect());
+    let positional_params = (separator.is_some() || args.peek().is_some()).then(|| args.collect());
 
     Ok(Command::Modify {
         options,
@@ -1261,5 +1272,97 @@ mod tests {
     fn non_portable_error_omits_suggestion_when_posix_has_no_name() {
         let error = parse(Field::dummies(["--login"]), On).unwrap_err();
         assert_eq!(error.to_report().footnotes.len(), 1);
+    }
+
+    #[test]
+    fn portable_rejects_single_hyphen_separator() {
+        for args in [
+            ["-"].as_slice(),
+            ["-", "foo"].as_slice(),
+            ["-", "-"].as_slice(),
+            ["-a", "-"].as_slice(),
+            ["-a", "-", "foo"].as_slice(),
+        ] {
+            assert_matches!(
+                parse(Field::dummies(args.iter().copied()), On),
+                Err(Error::NonPortableSeparator(field)) => {
+                    assert_eq!(field.value, "-");
+                },
+                "{args:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn portable_accepts_double_hyphen_separator() {
+        assert_matches!(
+            parse(Field::dummies(["--"]), On),
+            Ok(Command::Modify {
+                options,
+                positional_params
+            }) => {
+                assert_eq!(options, []);
+                assert_eq!(positional_params.unwrap().as_slice(), []);
+            }
+        );
+
+        assert_matches!(
+            parse(Field::dummies(["--", "-", "foo"]), On),
+            Ok(Command::Modify {
+                options,
+                positional_params
+            }) => {
+                assert_eq!(options, []);
+                assert_matches!(positional_params.unwrap().as_slice(), [first, second] => {
+                    assert_eq!(first.value, "-");
+                    assert_eq!(second.value, "foo");
+                });
+            }
+        );
+    }
+
+    #[test]
+    fn portable_accepts_single_hyphen_that_is_not_a_separator() {
+        assert_matches!(
+            parse(Field::dummies(["foo", "-"]), On),
+            Ok(Command::Modify {
+                options,
+                positional_params
+            }) => {
+                assert_eq!(options, []);
+                assert_matches!(positional_params.unwrap().as_slice(), [first, second] => {
+                    assert_eq!(first.value, "foo");
+                    assert_eq!(second.value, "-");
+                });
+            }
+        );
+    }
+
+    #[test]
+    fn portable_state_at_the_separator_decides_the_rejection() {
+        assert_matches!(
+            parse(Field::dummies(["+o", "portable", "-", "foo"]), On),
+            Ok(Command::Modify { .. })
+        );
+
+        assert_matches!(
+            parse(Field::dummies(["-o", "portable", "-", "foo"]), Off),
+            Err(Error::NonPortableSeparator(field)) => {
+                assert_eq!(field.value, "-");
+            }
+        );
+    }
+
+    #[test]
+    fn non_portable_separator_error_reports_the_reason_and_spelling() {
+        let error = parse(Field::dummies(["-", "foo"]), On).unwrap_err();
+        let report = error.to_report();
+        assert_eq!(report.title, "non-portable option-operand separator \"-\"");
+        assert_eq!(report.footnotes.len(), 2);
+        assert_eq!(
+            report.footnotes[0].label,
+            "this error is reported because the `portable` shell option is enabled"
+        );
+        assert_eq!(report.footnotes[1].label, "use `--` instead");
     }
 }
