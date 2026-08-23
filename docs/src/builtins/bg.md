@@ -34,6 +34,8 @@ It is an error if:
 - the specified job is not job-controlled, that is, job control was off when the job was started, or
 - job control is off in the current shell environment.
 
+The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
+
 ## Exit status
 
 Zero unless an error occurs.
@@ -43,6 +45,8 @@ Zero unless an error occurs.
 See [Job control](../interactive/job_control.md).
 
 ## Compatibility
+
+(Since 3.4.1) When the [`portable` option](../environment/options.md#portable) is set, the lone `%` is rejected as a [job ID](../interactive/job_control.md#job-ids).
 
 Many implementations allow omitting the leading `%` from job IDs, though it is not required by POSIX.
 Previous versions of yash allowed it, but this is not yet supported in yash-rs.

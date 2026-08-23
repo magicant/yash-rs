@@ -19,6 +19,8 @@
 //! This module provides utilities for printing error messages and computing
 //! appropriate results (exit status and divert values) for built-ins.
 
+pub(crate) mod job;
+
 use std::mem::{Discriminant, discriminant};
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;

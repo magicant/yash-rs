@@ -28,10 +28,13 @@
 //! in [`Env::any`] to handle trapped signals while waiting for jobs. If there
 //! is no such instance, the built-in will ignore all signals.
 
-use crate::common::report::{merge_reports, report_error, report_simple_failure};
+use crate::common::report::{
+    group_errors_by_kind, merge_reports, report, report_error, report_simple_failure,
+};
 use itertools::Itertools as _;
 use yash_env::Env;
 use yash_env::job::Pid;
+use yash_env::option::Option::Portable;
 use yash_env::option::State::Off;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -103,12 +106,20 @@ impl Command {
         S: Isatty + SignalSystem + Wait + WaitForSignals + WriteAll + 'static,
     {
         // Resolve job specifications to indexes
+        let portable = env.options.get(Portable);
         let jobs = self.jobs.into_iter();
         let (indexes, errors): (Vec<_>, Vec<_>) = jobs
-            .map(|spec| search::resolve(&env.jobs, spec))
+            .map(|spec| search::resolve(&env.jobs, spec, portable))
             .partition_result();
-        if let Some(report) = merge_reports(&errors) {
-            return report_error(env, report).await;
+        if !errors.is_empty() {
+            let mut result = crate::Result::default();
+            for (_, group) in group_errors_by_kind(&errors) {
+                let exit_status = group[0].exit_status();
+                if let Some(merged) = merge_reports(group) {
+                    result = result.max(report(env, merged, exit_status).await);
+                }
+            }
+            return result;
         }
 
         // Await jobs specified by the indexes
@@ -136,17 +147,19 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures_util::FutureExt as _;
     use futures_util::poll;
     use std::pin::pin;
     use std::rc::Rc;
     use std::task::Poll;
     use yash_env::job::{Job, ProcessResult};
+    use yash_env::option::Option::Portable;
     use yash_env::option::{Monitor, On};
     use yash_env::subshell::Config;
     use yash_env::system::r#virtual::SIGSTOP;
     use yash_env::system::r#virtual::VirtualSystem;
     use yash_env::system::{Concurrent, GetPid, SendSignal};
-    use yash_env::test_helper::{in_virtual_system, stub_tty};
+    use yash_env::test_helper::{assert_stderr, in_virtual_system, stub_tty};
     use yash_env::trap::RunSignalTrapIfCaught;
 
     pub(super) fn stub_run_signal_trap_if_caught<S: 'static>(env: &mut Env<S>) {
@@ -185,5 +198,75 @@ mod tests {
             let poll = poll!(main);
             assert_eq!(poll, Poll::Pending);
         })
+    }
+
+    #[test]
+    fn errors_of_different_kinds_are_reported_under_their_own_titles() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.options.set(Portable, On);
+        let mut job1 = Job::new(Pid(123));
+        job1.name = "sleep 1".into();
+        env.jobs.insert(job1);
+        let mut job2 = Job::new(Pid(456));
+        job2.name = "sleep 2".into();
+        env.jobs.insert(job2);
+
+        let result = main(&mut env, Field::dummies(["%sleep", "%"]))
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, crate::Result::from(ExitStatus::ERROR));
+        assert_stderr(&state, |stderr| {
+            assert!(stderr.contains("ambiguous job ID"), "stderr = {stderr:?}");
+            assert!(
+                stderr.contains("non-portable job ID"),
+                "stderr = {stderr:?}",
+            );
+        });
+    }
+
+    #[test]
+    fn non_portable_job_id_returns_error_exit_status() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.options.set(Portable, On);
+        env.jobs.insert(Job::new(Pid(123)));
+
+        let result = main(&mut env, Field::dummies(["%"]))
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, crate::Result::from(ExitStatus::ERROR));
+        assert_stderr(&state, |stderr| {
+            assert!(
+                stderr.contains("a lone '%' is not a portable job ID"),
+                "stderr = {stderr:?}",
+            );
+        });
+    }
+
+    #[test]
+    fn ambiguous_job_id_returns_failure_exit_status() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        let mut job1 = Job::new(Pid(123));
+        job1.name = "sleep 1".into();
+        env.jobs.insert(job1);
+        let mut job2 = Job::new(Pid(456));
+        job2.name = "sleep 2".into();
+        env.jobs.insert(job2);
+
+        let result = main(&mut env, Field::dummies(["%sleep"]))
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, crate::Result::from(ExitStatus::FAILURE));
+        assert_stderr(&state, |stderr| {
+            assert!(stderr.contains("ambiguous job ID"), "stderr = {stderr:?}");
+        });
     }
 }

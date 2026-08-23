@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- With `portable` enabled, the `bg`, `fg`, `jobs`, `kill`, and `wait` built-ins now reject the lone `%` as a job ID (for example, `kill -s CONT %`) as an error.
+- The `bg`, `fg`, and `kill` built-ins now exit with status 2 for an operand they cannot parse, as they do for any other command argument error. They previously exited with status 1. This covers a job ID without the leading `%` given to `bg` or `fg`, such as `bg 1`. It also covers a target that is neither a job ID nor a process ID given to `kill`, such as `kill -s CONT foo`.
+- The `wait` built-in now exits with status 1, rather than 2, for an ambiguous job ID such as `wait %sleep` when more than one job name starts with `sleep`. The operand is well-formed, so the failure is a runtime one rather than a command argument error.
 - With `portable` enabled, the `set` built-in now rejects a `-` used as a separator between options and operands (for example, `set - foo` or `set -a - foo`) as an error.
 - With `portable` enabled, the shell command line now rejects `-` and `--` given together as option-operand separators (for example, `yash3 - -- myscript`) as an error.
 

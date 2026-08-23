@@ -190,6 +190,10 @@ for applications. Where POSIX specifies an equivalent, use it instead: `kill
 -sTERM`, and `TERM` rather than `SIGTERM`. The obsolete syntax is unaffected,
 so `kill -stop` still sends `SIGSTOP`.
 
+(Since 3.4.1) When the [`portable` option](../environment/options.md#portable)
+is set, the lone `%` is rejected as a
+[job ID](../interactive/job_control.md#job-ids).
+
 Some implementations print `0` or `EXIT` for `kill -l 0` or `kill -l EXIT`
 while this implementation regards them as invalid operands.
 

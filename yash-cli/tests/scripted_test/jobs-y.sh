@@ -19,3 +19,7 @@ __IN__
 test_OE -e 0 'jobs accepts a repeated -l option'
 jobs -l -l
 __IN__
+
+test_O -d -e 2 'lone % rejected under the portable option' -o portable
+jobs %
+__IN__

@@ -34,7 +34,8 @@
 //!
 //! [expected state]: yash_env::job::Job::expected_state
 
-use crate::common::report::{merge_reports, report_error, report_failure, report_simple_failure};
+use crate::common::report::job;
+use crate::common::report::{merge_reports, report, report_error, report_simple_failure};
 use crate::common::syntax::Mode;
 use crate::common::syntax::parse_arguments;
 use std::fmt::Display;
@@ -47,10 +48,11 @@ use yash_env::job::ProcessState;
 use yash_env::job::id::FindError;
 use yash_env::job::id::ParseError;
 use yash_env::job::id::parse;
-use yash_env::option::Option::Monitor;
+use yash_env::option::Option::{Monitor, Portable};
 use yash_env::option::State::Off;
+use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
-use yash_env::source::pretty::{Report, ReportType, Snippet};
+use yash_env::source::pretty::{Footnote, Report, ReportType, Snippet};
 use yash_env::system::concurrency::WriteAll;
 use yash_env::system::{Errno, Isatty, SendSignal, Signals};
 
@@ -81,9 +83,42 @@ pub(crate) enum OperandErrorKind {
     CannotResume(#[from] ResumeError),
 }
 
+impl OperandErrorKind {
+    /// Returns the exit status the built-in should return for this error.
+    ///
+    /// An operand that is not a valid job ID is a command argument error, which
+    /// the built-in reports with [`ExitStatus::ERROR`]. A job that cannot be
+    /// found or resumed is a runtime failure, reported with
+    /// [`ExitStatus::FAILURE`].
+    #[must_use]
+    pub(crate) fn exit_status(&self) -> ExitStatus {
+        match self {
+            Self::InvalidJobId(_) => ExitStatus::ERROR,
+            Self::UnidentifiedJob(_) | Self::CannotResume(_) => ExitStatus::FAILURE,
+        }
+    }
+
+    /// Returns the footnotes that tell the error comes from the `portable`
+    /// shell option and how to write the job ID portably.
+    ///
+    /// The result is empty for an error the option did not cause. An operand
+    /// without the leading `%` is rejected whether or not the option is on.
+    #[must_use]
+    pub(crate) fn portable_footnotes(&self) -> Vec<Footnote<'static>> {
+        match self {
+            Self::InvalidJobId(error @ ParseError::LonePercent) => {
+                job::non_portable_footnotes(*error)
+            }
+            _ => vec![],
+        }
+    }
+}
+
 /// An operand and the error that occurred when processing it
+///
+/// This type is shared with the `fg` built-in.
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
-struct OperandError(Field, OperandErrorKind);
+pub(crate) struct OperandError(pub(crate) Field, pub(crate) OperandErrorKind);
 
 impl Display for OperandError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -100,7 +135,14 @@ impl OperandError {
         report.title = "cannot resume job".into();
         let label = format!("{}: {}", self.0.value, self.1).into();
         report.snippets = Snippet::with_primary_span(&self.0.origin, label);
+        report.footnotes.extend(self.1.portable_footnotes());
         report
+    }
+
+    /// Returns the exit status the built-in should return for this error.
+    #[must_use]
+    pub(crate) fn exit_status(&self) -> ExitStatus {
+        self.1.exit_status()
     }
 }
 
@@ -155,7 +197,7 @@ async fn resume_job_by_id<S>(env: &mut Env<S>, job_id: &str) -> Result<(), Opera
 where
     S: Signals + SendSignal + WriteAll,
 {
-    let job_id = parse(job_id)?;
+    let job_id = parse(job_id, env.options.get(Portable))?;
     let index = job_id.find(&env.jobs)?;
     resume_job_by_index(env, index).await?;
     Ok(())
@@ -193,10 +235,11 @@ where
                 Err(error) => errors.push(OperandError(operand, error)),
             }
         }
-        match merge_reports(&errors) {
-            None => crate::Result::default(),
-            Some(report) => report_failure(env, report).await,
-        }
+        let Some(exit_status) = errors.iter().map(OperandError::exit_status).max() else {
+            return crate::Result::default();
+        };
+        let merged = merge_reports(&errors).unwrap();
+        report(env, merged, exit_status).await
     }
 }
 
@@ -443,6 +486,52 @@ mod tests {
 
         assert_stderr(&system.state, |stderr| {
             assert!(stderr.contains("there is no job"), "{stderr:?}");
+        });
+    }
+
+    #[test]
+    fn main_rejects_lone_percent_under_portable_option() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
+        env.options.set(Monitor, On);
+        env.options.set(Portable, On);
+
+        let result = main(&mut env, Field::dummies(["%"]))
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, crate::Result::from(ExitStatus::ERROR));
+
+        assert_stderr(&system.state, |stderr| {
+            assert!(
+                stderr.contains("a lone '%' is not a portable job ID"),
+                "{stderr:?}",
+            );
+            assert!(
+                stderr.contains(
+                    "this error is reported because the `portable` shell option is enabled"
+                ),
+                "{stderr:?}",
+            );
+            assert!(stderr.contains("use `%%` or `%+` instead"), "{stderr:?}");
+        });
+    }
+
+    #[test]
+    fn main_returns_error_exit_status_for_operand_that_is_not_a_job_id() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
+        env.options.set(Monitor, On);
+
+        let result = main(&mut env, Field::dummies(["1"]))
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, crate::Result::from(ExitStatus::ERROR));
+
+        assert_stderr(&system.state, |stderr| {
+            assert!(
+                stderr.contains("a job ID must start with a '%'"),
+                "{stderr:?}"
+            );
         });
     }
 

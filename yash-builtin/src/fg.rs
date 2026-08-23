@@ -36,9 +36,10 @@
 //! This return value should be propagated to the top-level loop, which should
 //! interrupt the shell and return to the prompt.
 
+use crate::bg::OperandError;
 use crate::bg::OperandErrorKind;
 use crate::bg::ResumeError;
-use crate::common::report::{report_error, report_simple_failure};
+use crate::common::report::{report, report_error, report_simple_failure};
 use crate::common::syntax::Mode;
 use crate::common::syntax::parse_arguments;
 use std::ops::ControlFlow::Break;
@@ -51,7 +52,7 @@ use yash_env::job::ProcessState;
 use yash_env::job::RunBlocking;
 use yash_env::job::id::parse;
 use yash_env::job::tcsetpgrp_with_block;
-use yash_env::option::Option::Monitor;
+use yash_env::option::Option::{Monitor, Portable};
 use yash_env::option::State::Off;
 use yash_env::semantics::Divert::Interrupt;
 use yash_env::semantics::ExitStatus;
@@ -155,7 +156,7 @@ where
         + WaitForSignals
         + WriteAll,
 {
-    let job_id = parse(job_id)?;
+    let job_id = parse(job_id, env.options.get(Portable))?;
     let index = job_id.find(&env.jobs)?;
     Ok(resume_job_by_index(env, index).await?)
 }
@@ -206,26 +207,42 @@ where
         return report_simple_failure(env, "job control is disabled").await;
     }
 
-    let result = if operands.is_empty() {
-        if let Some(index) = env.jobs.current_job() {
-            resume_job_by_index(env, index).await.map_err(Into::into)
-        } else {
+    // The two branches below differ in how a failure is reported: an operand
+    // gives the error a source location to point at, while the default job has
+    // none.
+    if operands.is_empty() {
+        let Some(index) = env.jobs.current_job() else {
             return report_simple_failure(env, "there is no job").await;
+        };
+        match resume_job_by_index(env, index).await {
+            Ok(result) => finish(env, result),
+            Err(error) => report_simple_failure(env, &error.to_string()).await,
         }
     } else if operands.len() > 1 {
         // TODO Support multiple operands
-        return report_simple_failure(env, "too many operands").await;
+        report_simple_failure(env, "too many operands").await
     } else {
-        resume_job_by_id(env, &operands[0].value).await
-    };
-
-    match result {
-        Ok(result) if should_interrupt(env, &result) => {
-            let divert = Break(Interrupt(Some(ExitStatus::from(result))));
-            crate::Result::with_exit_status_and_divert(env.exit_status, divert)
+        let operand = operands.into_iter().next().unwrap();
+        match resume_job_by_id(env, &operand.value).await {
+            Ok(result) => finish(env, result),
+            Err(kind) => {
+                let error = OperandError(operand, kind);
+                report(env, &error, error.exit_status()).await
+            }
         }
-        Ok(result) => ExitStatus::from(result).into(),
-        Err(error) => report_simple_failure(env, &error.to_string()).await,
+    }
+}
+
+/// Converts a successfully resumed job's result into the built-in's result.
+fn finish<S>(env: &Env<S>, result: ProcessResult) -> crate::Result
+where
+    S: Signals,
+{
+    if should_interrupt(env, &result) {
+        let divert = Break(Interrupt(Some(ExitStatus::from(result))));
+        crate::Result::with_exit_status_and_divert(env.exit_status, divert)
+    } else {
+        ExitStatus::from(result).into()
     }
 }
 
@@ -602,6 +619,35 @@ mod tests {
         assert_eq!(result, crate::Result::from(ExitStatus::FAILURE));
         assert_stderr(&system.state, |stderr| {
             assert!(stderr.contains("there is no job"), "{stderr:?}");
+        });
+    }
+
+    #[test]
+    fn main_rejects_lone_percent_under_portable_option() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
+        env.options.set(Monitor, On);
+        env.options.set(Portable, On);
+
+        let result = main(&mut env, Field::dummies(["%"]))
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, crate::Result::from(ExitStatus::ERROR));
+        assert_stderr(&system.state, |stderr| {
+            assert!(stderr.contains("cannot resume job"), "{stderr:?}");
+            // The operand gives the error a source location to point at.
+            assert!(
+                stderr.contains("%: a lone '%' is not a portable job ID"),
+                "{stderr:?}",
+            );
+            assert!(
+                stderr.contains(
+                    "this error is reported because the `portable` shell option is enabled"
+                ),
+                "{stderr:?}",
+            );
+            assert!(stderr.contains("use `%%` or `%+` instead"), "{stderr:?}");
         });
     }
 

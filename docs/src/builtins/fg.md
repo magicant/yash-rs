@@ -36,6 +36,8 @@ It is an error if:
 - the specified job is not job-controlled, that is, job control was off when the job was started, or
 - job control is off in the current shell environment.
 
+The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
+
 ## Exit status
 
 The built-in returns with the exit status of the resumed job. If the job is suspended, the exit status is as if the job had been terminated with the signal that suspended it. (See also [Suspending foreground jobs](../interactive/job_control.md#suspending-foreground-jobs).)
@@ -47,5 +49,7 @@ On error, it returns a non-zero exit status.
 See [Job control](../interactive/job_control.md).
 
 ## Compatibility
+
+(Since 3.4.1) When the [`portable` option](../environment/options.md#portable) is set, the lone `%` is rejected as a [job ID](../interactive/job_control.md#job-ids).
 
 Many implementations allow omitting the leading `%` from job IDs and specifying multiple job IDs at once, though this is not required by POSIX and not yet supported in yash-rs.

@@ -125,4 +125,6 @@ The POSIX standard only defines the `-l` and `-p` options. <!-- TODO: Other opti
 
 POSIX specifies the options as `-l|-p` and does not define the behavior when both are used together. Other shells accept the combination, but what they do with it varies from shell to shell. (Since 3.3.5) yash-rs has no reason to prefer either option over the other, so it rejects the combination with an error, whichever order or spelling it is written in.
 
+(Since 3.4.1) When the [`portable` option](../environment/options.md#portable) is set, the lone `%` is rejected as a [job ID](../interactive/job_control.md#job-ids).
+
 A portable job ID must start with a `%`. If an operand does not have a leading `%`, the built-in assumes one silently, which is not portable.

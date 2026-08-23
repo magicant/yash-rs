@@ -21,7 +21,8 @@
 //! The string can take several forms:
 //!
 //! - Job IDs `%`, `%%`, and `%+` denote the
-//!   [current job](JobList::current_job).
+//!   [current job](JobList::current_job). The lone `%` is a common extension;
+//!   POSIX only specifies `%%` and `%+`.
 //! - Job ID `%-` specifies the [previous job](JobList::previous_job).
 //! - A job ID of the form `%n` (where `n` is a positive integer) refers to the
 //!   job with the specified job number, that is, the job with index `n-1`.
@@ -35,11 +36,13 @@
 //! which is not handled in this module.
 //!
 //! You can parse a job ID with [`parse`] or [`parse_tail`] and get a [`JobId`]
-//! as a result. Use the [`JobId::find`] method to find a job that matches the
-//! job ID.
+//! as a result. Both functions take a [`State`] telling whether the `portable`
+//! shell option is on; if it is, they reject the non-portable lone `%`. Use the
+//! [`JobId::find`] method to find a job that matches the job ID.
 
 use super::Job;
 use super::JobList;
+use crate::option::State;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::num::NonZeroUsize;
@@ -83,30 +86,46 @@ impl Display for JobId<'_> {
 }
 
 /// Error that may occur in job ID [parsing](parse)
-///
-/// This error occurs when a job ID string does not start with a `%`.
 #[derive(Clone, Copy, Debug, Eq, Error, Hash, PartialEq)]
-#[error("a job ID must start with a '%'")]
-pub struct ParseError;
+#[non_exhaustive]
+pub enum ParseError {
+    /// The job ID string does not start with a `%`.
+    #[error("a job ID must start with a '%'")]
+    MissingPercent,
+
+    /// The job ID is a lone `%`.
+    ///
+    /// POSIX specifies `%%` and `%+` for the current job but not `%`, so this
+    /// error occurs only when parsing requires portability.
+    #[error("a lone '%' is not a portable job ID")]
+    LonePercent,
+}
 
 /// Parses a job ID excluding the initial `%`.
 ///
 /// This function requires a job ID string that does not contain the initial `%`
 /// character. See also [`parse`].
 ///
+/// If `portable` is [`State::On`], an empty `tail`, which comes from the lone
+/// job ID `%`, is rejected with [`ParseError::LonePercent`].
+///
 /// ```
 /// # use std::num::NonZeroUsize;
-/// # use yash_env::job::id::{JobId, parse_tail};
-/// assert_eq!(parse_tail(""), JobId::CurrentJob);
-/// assert_eq!(parse_tail("%"), JobId::CurrentJob);
-/// assert_eq!(parse_tail("+"), JobId::CurrentJob);
-/// assert_eq!(parse_tail("-"), JobId::PreviousJob);
-/// assert_eq!(parse_tail("1"), JobId::JobNumber(NonZeroUsize::new(1).unwrap()));
-/// assert_eq!(parse_tail("foo"), JobId::NamePrefix("foo"));
-/// assert_eq!(parse_tail("?foo"), JobId::NameSubstring("foo"));
+/// # use yash_env::option::State;
+/// # use yash_env::job::id::{JobId, ParseError, parse_tail};
+/// assert_eq!(parse_tail("", State::Off), Ok(JobId::CurrentJob));
+/// assert_eq!(parse_tail("%", State::Off), Ok(JobId::CurrentJob));
+/// assert_eq!(parse_tail("+", State::Off), Ok(JobId::CurrentJob));
+/// assert_eq!(parse_tail("-", State::Off), Ok(JobId::PreviousJob));
+/// assert_eq!(parse_tail("1", State::Off), Ok(JobId::JobNumber(NonZeroUsize::new(1).unwrap())));
+/// assert_eq!(parse_tail("foo", State::Off), Ok(JobId::NamePrefix("foo")));
+/// assert_eq!(parse_tail("?foo", State::Off), Ok(JobId::NameSubstring("foo")));
+/// assert_eq!(parse_tail("", State::On), Err(ParseError::LonePercent));
+/// assert_eq!(parse_tail("%", State::On), Ok(JobId::CurrentJob));
 /// ```
-pub fn parse_tail(tail: &str) -> JobId<'_> {
-    match tail {
+pub fn parse_tail(tail: &str, portable: State) -> Result<JobId<'_>, ParseError> {
+    Ok(match tail {
+        "" if portable == State::On => return Err(ParseError::LonePercent),
         "" | "%" | "+" => JobId::CurrentJob,
         "-" => JobId::PreviousJob,
         _ => match tail.strip_prefix('?') {
@@ -116,37 +135,45 @@ pub fn parse_tail(tail: &str) -> JobId<'_> {
                 Err(_) => JobId::NamePrefix(tail),
             },
         },
-    }
+    })
 }
 
 /// Parses a job ID.
 ///
 /// This function requires a string starting with a `%`. If the string lacks the
-/// leading `%`, the result is a `ParseError`. See also [`parse_tail`].
+/// leading `%`, the result is [`ParseError::MissingPercent`]. If `portable` is
+/// [`State::On`], the lone `%` is rejected with [`ParseError::LonePercent`].
+/// See also [`parse_tail`].
 ///
 /// ```
 /// # use std::num::NonZeroUsize;
+/// # use yash_env::option::State;
 /// # use yash_env::job::id::{JobId, ParseError, parse};
-/// assert_eq!(parse(""), Err(ParseError));
-/// assert_eq!(parse("%"), Ok(JobId::CurrentJob));
-/// assert_eq!(parse("%%"), Ok(JobId::CurrentJob));
-/// assert_eq!(parse("%foo"), Ok(JobId::NamePrefix("foo")));
-/// assert_eq!(parse("%?foo"), Ok(JobId::NameSubstring("foo")));
-/// assert_eq!(parse("foo"), Err(ParseError));
+/// assert_eq!(parse("", State::Off), Err(ParseError::MissingPercent));
+/// assert_eq!(parse("%", State::Off), Ok(JobId::CurrentJob));
+/// assert_eq!(parse("%%", State::Off), Ok(JobId::CurrentJob));
+/// assert_eq!(parse("%foo", State::Off), Ok(JobId::NamePrefix("foo")));
+/// assert_eq!(parse("%?foo", State::Off), Ok(JobId::NameSubstring("foo")));
+/// assert_eq!(parse("foo", State::Off), Err(ParseError::MissingPercent));
+/// assert_eq!(parse("%", State::On), Err(ParseError::LonePercent));
+/// assert_eq!(parse("%%", State::On), Ok(JobId::CurrentJob));
 /// ```
-pub fn parse(job_id: &str) -> Result<JobId<'_>, ParseError> {
+pub fn parse(job_id: &str, portable: State) -> Result<JobId<'_>, ParseError> {
     match job_id.strip_prefix('%') {
-        Some(tail) => Ok(parse_tail(tail)),
-        None => Err(ParseError),
+        Some(tail) => parse_tail(tail, portable),
+        None => Err(ParseError::MissingPercent),
     }
 }
 
-/// Parses a job ID string.
+/// Parses a job ID string, accepting non-portable forms.
+///
+/// This conversion is equivalent to [`parse`] with `portable` set to
+/// [`State::Off`]; there is no way to require portability through this trait.
 impl<'a> TryFrom<&'a str> for JobId<'a> {
     type Error = ParseError;
     #[inline(always)]
     fn try_from(s: &'a str) -> Result<JobId<'a>, ParseError> {
-        parse(s)
+        parse(s, State::Off)
     }
 }
 
@@ -215,6 +242,32 @@ mod tests {
         );
         assert_eq!(JobId::NamePrefix("foo").to_string(), "%foo");
         assert_eq!(JobId::NameSubstring("bar").to_string(), "%?bar");
+    }
+
+    #[test]
+    fn parse_tail_rejects_lone_percent_when_portable() {
+        assert_eq!(parse_tail("", State::On), Err(ParseError::LonePercent));
+    }
+
+    #[test]
+    fn parse_tail_accepts_posix_job_ids_when_portable() {
+        assert_eq!(parse_tail("%", State::On), Ok(JobId::CurrentJob));
+        assert_eq!(parse_tail("+", State::On), Ok(JobId::CurrentJob));
+        assert_eq!(parse_tail("-", State::On), Ok(JobId::PreviousJob));
+        assert_eq!(
+            parse_tail("1", State::On),
+            Ok(JobId::JobNumber(NonZeroUsize::new(1).unwrap())),
+        );
+        assert_eq!(parse_tail("foo", State::On), Ok(JobId::NamePrefix("foo")));
+        assert_eq!(
+            parse_tail("?foo", State::On),
+            Ok(JobId::NameSubstring("foo")),
+        );
+    }
+
+    #[test]
+    fn parse_rejects_lone_percent_when_portable() {
+        assert_eq!(parse("%", State::On), Err(ParseError::LonePercent));
     }
 
     fn sample_job_list() -> JobList {

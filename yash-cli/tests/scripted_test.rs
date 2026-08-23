@@ -147,6 +147,11 @@ fn bg_builtin() {
 }
 
 #[test]
+fn bg_builtin_ex() {
+    run_with_pty("bg-y.sh")
+}
+
+#[test]
 fn bracket_ex() {
     run("bracket-y.sh")
 }
@@ -274,6 +279,11 @@ fn false_builtin_ex() {
 #[test]
 fn fg_builtin() {
     run_with_pty("fg-p.sh")
+}
+
+#[test]
+fn fg_builtin_ex() {
+    run_with_pty("fg-y.sh")
 }
 
 #[test]
@@ -601,6 +611,11 @@ fn until_loop() {
 #[test]
 fn wait_builtin() {
     run_with_pty("wait-p.sh")
+}
+
+#[test]
+fn wait_builtin_ex() {
+    run("wait-y.sh")
 }
 
 #[test]
