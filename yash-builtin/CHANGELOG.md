@@ -13,6 +13,20 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.23.1] - Unreleased
+
+### Added
+
+- `set::syntax::Error::NonPortableSeparator`, returned by `set::syntax::parse`
+  for an invocation of the `set` built-in that uses `-` as a separator between
+  options and operands while the `portable` shell option is on.
+
+### Changed
+
+- The `set` built-in (`set::syntax::parse`) now rejects a `-` used as a
+  separator between options and operands when the `portable` shell option is
+  on.
+
 ## [0.23.0] - 2026-08-22
 
 ### Added
@@ -1135,6 +1149,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - Initial implementation of the `yash-builtin` crate
 
+[0.23.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.23.1
 [0.23.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.23.0
 [0.22.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.22.0
 [0.21.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.21.1
