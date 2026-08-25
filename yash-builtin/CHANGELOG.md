@@ -26,6 +26,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `set` built-in (`set::syntax::parse`) now rejects a `-` used as a
   separator between options and operands when the `portable` shell option is
   on.
+- `common::report::merge_reports` no longer repeats a footnote that is equal to
+  one already collected from an earlier report. Built-ins that produce one
+  error report per operand, such as `alias`, printed the same note once per
+  offending operand.
 
 ## [0.23.0] - 2026-08-22
 
