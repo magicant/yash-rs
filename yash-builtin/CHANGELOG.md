@@ -20,6 +20,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `set::syntax::Error::NonPortableSeparator`, returned by `set::syntax::parse`
   for an invocation of the `set` built-in that uses `-` as a separator between
   options and operands while the `portable` shell option is on.
+- `common::report::group_errors_by_kind`, which groups errors by enum variant
+  so that a built-in can report each kind under its own title.
 
 ### Changed
 

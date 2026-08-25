@@ -22,13 +22,12 @@
 //! [`alias` built-in]: https://magicant.github.io/yash-rs/builtins/alias.html
 
 use crate::common::output;
+use crate::common::report::group_errors_by_kind;
 use crate::common::report::merge_reports;
 use crate::common::report::report_error;
 use crate::common::report::report_failure;
 use crate::common::syntax::Mode;
 use crate::common::syntax::parse_arguments;
-use std::mem::Discriminant;
-use std::mem::discriminant;
 use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
@@ -44,29 +43,6 @@ pub struct Command {
 }
 
 pub mod semantics;
-
-/// Groups the given errors by kind.
-///
-/// Errors of the same kind (e.g. two [`NonPortableAliasName`] errors) end up
-/// in the same group regardless of where they occur among the operands, so
-/// that [`main`] can report each kind as its own message rather than merging
-/// unrelated kinds of errors under one misleading shared title. The groups
-/// are returned in the order in which each kind first appears in `errors`.
-///
-/// [`NonPortableAliasName`]: semantics::Error::NonPortableAliasName
-fn group_errors_by_kind(
-    errors: &[semantics::Error],
-) -> Vec<(Discriminant<semantics::Error>, Vec<&semantics::Error>)> {
-    let mut groups: Vec<(_, Vec<_>)> = Vec::new();
-    for error in errors {
-        let kind = discriminant(error);
-        match groups.iter_mut().find(|(k, _)| *k == kind) {
-            Some((_, group)) => group.push(error),
-            None => groups.push((kind, vec![error])),
-        }
-    }
-    groups
-}
 
 /// Entry point for executing the `alias` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
@@ -174,51 +150,6 @@ mod tests {
             assert!(stderr.contains("not portable"), "stderr = {stderr:?}");
             assert!(stderr.contains("not found"), "stderr = {stderr:?}");
         });
-    }
-
-    #[test]
-    fn group_errors_by_kind_merges_non_adjacent_errors_of_the_same_kind() {
-        let a_b = semantics::Error::NonPortableAliasName {
-            name: Field::dummy("a.b"),
-        };
-        let missing = semantics::Error::NonExistentAlias {
-            name: Field::dummy("missing"),
-        };
-        let c_d = semantics::Error::NonPortableAliasName {
-            name: Field::dummy("c.d"),
-        };
-        let errors = vec![a_b.clone(), missing.clone(), c_d.clone()];
-
-        let groups = group_errors_by_kind(&errors);
-
-        assert_eq!(
-            groups,
-            [
-                (discriminant(&a_b), vec![&a_b, &c_d]),
-                (discriminant(&missing), vec![&missing])
-            ]
-        );
-    }
-
-    #[test]
-    fn group_errors_by_kind_orders_groups_by_first_occurrence() {
-        let missing = semantics::Error::NonExistentAlias {
-            name: Field::dummy("missing"),
-        };
-        let a_b = semantics::Error::NonPortableAliasName {
-            name: Field::dummy("a.b"),
-        };
-        let errors = vec![missing.clone(), a_b.clone()];
-
-        let groups = group_errors_by_kind(&errors);
-
-        assert_eq!(
-            groups,
-            [
-                (discriminant(&missing), vec![&missing]),
-                (discriminant(&a_b), vec![&a_b])
-            ]
-        );
     }
 
     #[test]
