@@ -108,3 +108,11 @@ __OUT__
 test_OE -e 0 'option -l without operands accepted under the portable option' -o portable
 kill -l >/dev/null
 __IN__
+
+test_O -d -e 2 'lone % rejected as a target under the portable option' -o portable
+kill -s CONT %
+__IN__
+
+test_O -d -e 2 'target that is neither a job ID nor a process ID rejected as a syntax error'
+kill -s CONT foo
+__IN__

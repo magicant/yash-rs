@@ -264,7 +264,7 @@ The current job is usually the most recently suspended job, or another job if no
 [Built-in utilities](../builtins/index.html) that operate on jobs use job IDs to specify them. A job ID matches one of these formats:
 
 **`%`**, **`%%`**, or **`%+`**
-: the current job.
+: the current job. (The lone `%` is not portable; see [Compatibility](#compatibility).)
 
 **`%-`**
 : the previous job.
@@ -347,7 +347,7 @@ View the current configuration with `stty -a`.
 
 POSIX.1-2024 defines job control but allows for implementation-defined behavior in many areas. Yash-rs follows the standard closely, with some deviations (marked with ⚠️). Job control is complex, and implementations differ. Perfect POSIX compliance is not expected in any shell, including yash-rs.
 
-The job ID `%` is a common extension to POSIX.1-2024. The strictly portable way to refer to the current job is `%%` or `%+`.
+The job ID `%` is a common extension to POSIX.1-2024. The strictly portable way to refer to the current job is `%%` or `%+`. (Since 3.4.1) The [`portable` option](../environment/options.md#portable) rejects the lone `%` with an error wherever a job ID is expected.
 
 In yash-rs, jobs are currently defined as subshells, whereas POSIX.1-2024 treats a wider range of commands as jobs. At present, yash-rs does not support suspending [built-ins](../builtins/index.html), since they run within the current shell environment rather than in a subshell. Future versions of yash-rs may expand the definition of jobs to include this capability.
 

@@ -21,18 +21,21 @@
 //! [`jobs` built-in]: https://magicant.github.io/yash-rs/builtins/jobs.html
 
 use crate::common::output;
+use crate::common::report::job;
 use crate::common::report::report_error;
 use crate::common::report::report_failure;
 use crate::common::syntax::ConflictingOptionError;
 use crate::common::syntax::Mode;
 use crate::common::syntax::OptionSpec;
 use crate::common::syntax::parse_arguments;
+use std::fmt::Display;
 use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::job::fmt::Accumulator;
-use yash_env::job::id::FindError;
-use yash_env::job::id::parse;
+use yash_env::job::id::ParseError;
 use yash_env::job::id::parse_tail;
+use yash_env::option::Option::Portable;
+use yash_env::option::State;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::Report;
 use yash_env::source::pretty::ReportType;
@@ -47,8 +50,8 @@ const OPTIONS: &[OptionSpec] = &[
     OptionSpec::new().short('p').long("pgid-only"),
 ];
 
-/// Error report for job ID parsing and finding errors
-fn find_error_report(error: FindError, operand: &Field) -> Report<'_> {
+/// Error report for an operand that does not name a single job
+fn operand_error_report<'a>(error: &dyn Display, operand: &'a Field) -> Report<'a> {
     let mut report = Report::new();
     report.r#type = ReportType::Error;
     report.title = "cannot report job status".into();
@@ -56,6 +59,16 @@ fn find_error_report(error: FindError, operand: &Field) -> Report<'_> {
         &operand.origin,
         format!("{:?}: {}", operand.value, error).into(),
     );
+    report
+}
+
+/// Error report for job ID parsing errors
+///
+/// Every parse error this built-in produces comes from the `portable` shell
+/// option, so the report always carries the footnote that says so.
+fn parse_error_report<'a>(error: ParseError, operand: &'a Field) -> Report<'a> {
+    let mut report = operand_error_report(&error, operand);
+    report.footnotes = job::non_portable_footnotes(error);
     report
 }
 
@@ -101,12 +114,31 @@ where
         }
     } else {
         // Report jobs specified by the operands
+        let portable = env.options.get(Portable);
         for operand in operands {
-            let job_id = parse(&operand.value).unwrap_or_else(|_| parse_tail(&operand.value));
+            let tail = match operand.value.strip_prefix('%') {
+                Some(tail) => tail,
+                None if portable == State::Off => &operand.value,
+                None => {
+                    let report = parse_error_report(ParseError::MissingPercent, &operand);
+                    return report_error(env, report).await;
+                }
+            };
+            let job_id = match parse_tail(tail, portable) {
+                Ok(job_id) => job_id,
+                Err(error) => {
+                    let report = parse_error_report(error, &operand);
+                    return report_error(env, report).await;
+                }
+            };
             match job_id.find(&env.jobs) {
                 Ok(index) => accumulator.add(index, &env.jobs[index], &env.system),
                 Err(error) => {
-                    return report_failure(env, find_error_report(error, &operand)).await;
+                    // TODO Returning here masks the errors of the remaining
+                    // operands. Collect all operand errors and report them
+                    // together instead.
+                    let report = operand_error_report(&error, &operand);
+                    return report_failure(env, report).await;
                 }
             }
         }
@@ -328,6 +360,83 @@ mod tests {
                 stdout,
                 "[1] - Running              echo first\n[2] + Stopped(SIGSTOP)     echo second\n"
             )
+        });
+    }
+
+    #[test]
+    fn lone_percent_rejected_under_portable_option() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.options.set(Portable, State::On);
+        env.jobs.insert(Job::new(Pid(42)));
+
+        let args = Field::dummies(["%"]);
+        let result = main(&mut env, args).now_or_never().unwrap();
+
+        assert_eq!(result, Result::new(ExitStatus::ERROR));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+        assert_stderr(&state, |stderr| {
+            assert!(
+                stderr.contains("a lone '%' is not a portable job ID"),
+                "stderr = {stderr:?}",
+            );
+            assert!(
+                stderr.contains(
+                    "this error is reported because the `portable` shell option is enabled"
+                ),
+                "stderr = {stderr:?}",
+            );
+            assert!(
+                stderr.contains("use `%%` or `%+` instead"),
+                "stderr = {stderr:?}",
+            );
+        });
+    }
+
+    #[test]
+    fn operand_without_percent_rejected_under_portable_option() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.options.set(Portable, State::On);
+        env.jobs.insert(Job::new(Pid(42)));
+
+        let args = Field::dummies(["1"]);
+        let result = main(&mut env, args).now_or_never().unwrap();
+
+        assert_eq!(result, Result::new(ExitStatus::ERROR));
+        assert_stdout(&state, |stdout| assert_eq!(stdout, ""));
+        assert_stderr(&state, |stderr| {
+            assert!(
+                stderr.contains("a job ID must start with a \'%\'"),
+                "stderr = {stderr:?}",
+            );
+            assert!(
+                stderr.contains(
+                    "this error is reported because the `portable` shell option is enabled"
+                ),
+                "stderr = {stderr:?}",
+            );
+        });
+    }
+
+    #[test]
+    fn portable_job_ids_accepted_under_portable_option() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.options.set(Portable, State::On);
+        let mut job = Job::new(Pid(42));
+        job.name = "echo first".to_string();
+        env.jobs.insert(job);
+
+        let args = Field::dummies(["%%"]);
+        let result = main(&mut env, args).now_or_never().unwrap();
+
+        assert_eq!(result, Result::new(ExitStatus::SUCCESS));
+        assert_stdout(&state, |stdout| {
+            assert_eq!(stdout, "[1] + Running              echo first\n")
         });
     }
 

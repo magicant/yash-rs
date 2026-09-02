@@ -69,6 +69,11 @@ impl<'a> From<&'a Error> for Report<'a> {
     }
 }
 
+/// Parses an operand into a job specification.
+///
+/// An operand starting with `%` is a job ID; otherwise it must be a
+/// non-negative decimal integer process ID. The job ID itself is parsed later
+/// by [`resolve`](super::search::resolve).
 impl TryFrom<Field> for JobSpec {
     type Error = Error;
 

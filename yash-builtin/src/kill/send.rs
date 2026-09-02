@@ -20,14 +20,17 @@
 //! [`send`] uses [`resolve_target`] to determine the argument to the
 //! [`kill`](SendSignal::kill) system call.
 
-use crate::common::report::{merge_reports, report_failure};
+use crate::common::report::job;
+use crate::common::report::{merge_reports, report, report_failure};
 use std::num::{NonZero, ParseIntError};
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::job::Pid;
-use yash_env::job::id::parse_tail;
+use yash_env::job::id::{ParseError, parse_tail};
 use yash_env::job::{JobList, id::FindError};
-use yash_env::semantics::Field;
+use yash_env::option::Option::Portable;
+use yash_env::option::State;
+use yash_env::semantics::{ExitStatus, Field};
 use yash_env::signal::{Number, RawNumber};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::system::concurrency::WriteAll;
@@ -40,9 +43,12 @@ pub enum Error {
     /// The specified process (group) ID was not a valid integer.
     #[error(transparent)]
     ProcessId(#[from] ParseIntError),
+    /// The specified job ID was not a portable job ID.
+    #[error(transparent)]
+    JobIdSyntax(#[from] ParseError),
     /// The specified job ID did not uniquely identify a job.
     #[error(transparent)]
-    JobId(#[from] FindError),
+    JobIdSearch(#[from] FindError),
     /// The target job is not controlled by the current shell environment.
     #[error("target job is not controlled by the current shell environment")]
     Unowned,
@@ -61,9 +67,12 @@ pub enum Error {
 ///
 /// The target may be specified as a job ID, a process ID, or a process group
 /// ID. In case of a process group ID, the value should be negative.
-pub fn resolve_target(jobs: &JobList, target: &str) -> Result<Pid, Error> {
+///
+/// If `portable` is [`State::On`], a non-portable job ID is rejected with
+/// [`Error::JobIdSyntax`].
+pub fn resolve_target(jobs: &JobList, target: &str, portable: State) -> Result<Pid, Error> {
     if let Some(tail) = target.strip_prefix('%') {
-        let job_id = parse_tail(tail);
+        let job_id = parse_tail(tail, portable)?;
         let index = job_id.find(jobs)?;
         let job = &jobs[index];
         if !job.is_owned {
@@ -86,7 +95,7 @@ pub async fn send<S: SendSignal>(
     signal: Option<Number>,
     target: &Field,
 ) -> Result<(), Error> {
-    let pid = resolve_target(&env.jobs, &target.value)?;
+    let pid = resolve_target(&env.jobs, &target.value, env.options.get(Portable))?;
     env.system.kill(pid, signal).await?;
     Ok(())
 }
@@ -136,7 +145,30 @@ impl TargetError<'_> {
             &self.target.origin,
             format!("{}: {}", self.target.value, self.error).into(),
         );
+        // A job ID is rejected here only when the `portable` option is on:
+        // `resolve_target` supplies the leading `%` itself.
+        if let Error::JobIdSyntax(error) = self.error {
+            report.footnotes = job::non_portable_footnotes(error);
+        }
         report
+    }
+
+    /// Returns the exit status the built-in should return for this error.
+    ///
+    /// A target the built-in cannot parse is a command argument error, which it
+    /// reports with [`ExitStatus::ERROR`]. A target that names a job the
+    /// built-in cannot signal is a runtime failure, reported with
+    /// [`ExitStatus::FAILURE`].
+    #[must_use]
+    fn exit_status(&self) -> ExitStatus {
+        match self.error {
+            Error::ProcessId(_) | Error::JobIdSyntax(_) => ExitStatus::ERROR,
+            Error::JobIdSearch(_)
+            | Error::Unowned
+            | Error::Unmonitored
+            | Error::Finished
+            | Error::System(_) => ExitStatus::FAILURE,
+        }
     }
 }
 
@@ -180,11 +212,11 @@ where
         }
     }
 
-    if let Some(report) = merge_reports(&errors) {
-        report_failure(env, report).await
-    } else {
-        crate::Result::default()
-    }
+    let Some(exit_status) = errors.iter().map(TargetError::exit_status).max() else {
+        return crate::Result::default();
+    };
+    let merged = merge_reports(&errors).unwrap();
+    report(env, merged, exit_status).await
 }
 
 #[cfg(test)]
@@ -195,6 +227,7 @@ mod tests {
     use std::rc::Rc;
     use yash_env::job::Job;
     use yash_env::job::ProcessState;
+    use yash_env::option::Option::Portable;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::Concurrent;
     use yash_env::system::r#virtual::VirtualSystem;
@@ -204,10 +237,10 @@ mod tests {
     fn resolve_target_process_ids() {
         let jobs = JobList::new();
 
-        let result = resolve_target(&jobs, "123");
+        let result = resolve_target(&jobs, "123", State::Off);
         assert_eq!(result, Ok(Pid(123)));
 
-        let result = resolve_target(&jobs, "-456");
+        let result = resolve_target(&jobs, "-456", State::Off);
         assert_eq!(result, Ok(Pid(-456)));
     }
 
@@ -221,15 +254,15 @@ mod tests {
         job.name = "my job".into();
         jobs.insert(job);
 
-        let result = resolve_target(&jobs, "%my");
+        let result = resolve_target(&jobs, "%my", State::Off);
         assert_eq!(result, Ok(Pid(-123)));
     }
 
     #[test]
     fn resolve_target_job_find_error() {
         let jobs = JobList::new();
-        let result = resolve_target(&jobs, "%my");
-        assert_eq!(result, Err(Error::JobId(FindError::NotFound)));
+        let result = resolve_target(&jobs, "%my", State::Off);
+        assert_eq!(result, Err(Error::JobIdSearch(FindError::NotFound)));
     }
 
     #[test]
@@ -242,7 +275,7 @@ mod tests {
         job.name = "my job".into();
         jobs.insert(job);
 
-        let result = resolve_target(&jobs, "%my");
+        let result = resolve_target(&jobs, "%my", State::Off);
         assert_eq!(result, Err(Error::Unowned));
     }
 
@@ -256,7 +289,7 @@ mod tests {
         job.name = "my job".into();
         jobs.insert(job);
 
-        let result = resolve_target(&jobs, "%my");
+        let result = resolve_target(&jobs, "%my", State::Off);
         assert_eq!(result, Err(Error::Unmonitored));
     }
 
@@ -270,14 +303,40 @@ mod tests {
         job.name = "my job".into();
         jobs.insert(job);
 
-        let result = resolve_target(&jobs, "%my");
+        let result = resolve_target(&jobs, "%my", State::Off);
         assert_eq!(result, Err(Error::Finished));
+    }
+
+    #[test]
+    fn resolve_target_rejects_lone_percent_when_portable() {
+        let jobs = JobList::new();
+        let result = resolve_target(&jobs, "%", State::On);
+        assert_eq!(result, Err(Error::JobIdSyntax(ParseError::LonePercent)));
+    }
+
+    #[test]
+    fn non_portable_job_id_report_has_portable_footnote() {
+        let target = Field::dummy("%");
+        let error = TargetError {
+            target: &target,
+            error: Error::JobIdSyntax(ParseError::LonePercent),
+        };
+
+        let report = error.to_report();
+
+        assert_matches::assert_matches!(&report.footnotes[..], [suggestion, portable] => {
+            assert_eq!(suggestion.label, "use `%%` or `%+` instead");
+            assert_eq!(
+                portable.label,
+                "this error is reported because the `portable` shell option is enabled",
+            );
+        });
     }
 
     #[test]
     fn resolve_target_invalid_string() {
         let jobs = JobList::new();
-        let result = resolve_target(&jobs, "abc");
+        let result = resolve_target(&jobs, "abc", State::Off);
         assert_matches!(result, Err(Error::ProcessId(_)));
     }
 
@@ -297,5 +356,57 @@ mod tests {
         .unwrap();
         assert_eq!(result, crate::Result::from(ExitStatus::FAILURE));
         assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
+    }
+
+    #[test]
+    fn execute_non_portable_job_id_returns_error_exit_status() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.options.set(Portable, State::On);
+
+        let result = execute(&mut env, 0, None, &Field::dummies(["%"]))
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, crate::Result::from(ExitStatus::ERROR));
+        assert_stderr(&state, |stderr| {
+            assert!(
+                stderr.contains("a lone '%' is not a portable job ID"),
+                "stderr = {stderr:?}",
+            );
+        });
+    }
+
+    #[test]
+    fn execute_invalid_target_returns_error_exit_status() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+
+        let result = execute(&mut env, 0, None, &Field::dummies(["foo"]))
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, crate::Result::from(ExitStatus::ERROR));
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
+    }
+
+    #[test]
+    fn execute_repeats_the_portable_footnote_only_once() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.options.set(Portable, State::On);
+
+        let result = execute(&mut env, 0, None, &Field::dummies(["%", "%"]))
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, crate::Result::from(ExitStatus::ERROR));
+        assert_stderr(&state, |stderr| {
+            let note = "this error is reported because the `portable` shell option is enabled";
+            assert_eq!(stderr.matches(note).count(), 1, "stderr = {stderr:?}");
+        });
     }
 }

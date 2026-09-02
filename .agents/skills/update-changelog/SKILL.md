@@ -74,6 +74,10 @@ Produce changelog updates that:
      user to write `--` instead, the changelog does not repeat it.
    - **What the change does *not* affect**, unless a reader would otherwise expect
      it to change.
+   - **Internal implementation history**, such as where an item used to live,
+     that it was previously private, or which module it was extracted from.
+     Readers of a changelog see only the crate's public surface as it is now;
+     where a newly public item came from tells them nothing they can act on.
 
    The manual under `docs/src` is where the full rationale and the portable
    alternative belong; link there rather than restating them.

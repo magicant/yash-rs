@@ -13,6 +13,19 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.17.0] - Unreleased
+
+### Changed
+
+- `job::id::ParseError` is now an enum. The `MissingPercent` variant stands for
+  the error the previous unit struct represented, and the new `LonePercent`
+  variant tells that the job ID is the lone `%`, which POSIX does not specify.
+- `job::id::parse` and `job::id::parse_tail` now take an `option::State`
+  parameter that tells whether the `portable` shell option is on. When it is on,
+  they reject the lone `%` with `ParseError::LonePercent`.
+- `job::id::parse_tail` now returns `Result<JobId, ParseError>` rather than
+  `JobId`.
+
 ## [0.16.1] - 2026-08-22
 
 ### Added
@@ -1493,6 +1506,7 @@ This version has been yanked due to an issue that prevents the crate from buildi
 
 - Initial implementation of the `yash-env` crate
 
+[0.17.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.17.0
 [0.16.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.16.1
 [0.16.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.16.0
 [0.15.5]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.15.5

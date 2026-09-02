@@ -35,6 +35,8 @@ The following error conditions causes the built-in to return a non-zero exit sta
 
 If the shell receives a signal that has a [trap](../environment/traps.md#what-are-traps) action set, the trap action is executed and the built-in returns immediately.
 
+The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
+
 ## Exit status
 
 If you specify one or more operands, the built-in returns the exit status of the job specified by the last operand. If there is no operand, the exit status is 0 regardless of the awaited jobs.
@@ -73,6 +75,8 @@ In the above example, `wait` treats the job `%` as an unknown job and returns ex
 ## Compatibility
 
 The `wait` built-in is specified in POSIX.1-2024.
+
+(Since 3.4.1) When the [`portable` option](../environment/options.md#portable) is set, the lone `%` is rejected as a [job ID].
 
 Many existing shells behave differently on various errors. POSIX requires that an unknown process ID be treated as a process that has already exited with exit status 127, but the behavior for other errors should not be considered portable.
 

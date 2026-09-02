@@ -13,19 +13,51 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
-## [0.23.1] - Unreleased
+## [0.24.0] - Unreleased
 
 ### Added
 
+- `kill::send::Error::JobIdSyntax`, returned by `kill::send::resolve_target` for
+  a non-portable job ID.
 - `set::syntax::Error::NonPortableSeparator`, returned by `set::syntax::parse`
   for an invocation of the `set` built-in that uses `-` as a separator between
   options and operands while the `portable` shell option is on.
+- `common::report::group_errors_by_kind`, which groups errors by enum variant
+  so that a built-in can report each kind under its own title.
 
 ### Changed
 
+- The `bg`, `fg`, `jobs`, `kill`, and `wait` built-ins now reject the lone `%`
+  as a job ID when the `portable` shell option is on. All five return exit
+  status 2 in this case, as for any other command argument error.
+- The `jobs` built-in now rejects an operand that does not start with a `%` when
+  the `portable` shell option is on, returning exit status 2.
+- The `fg` built-in now reports an error caused by its operand with the operand
+  as the error location, as the other job ID built-ins do.
+- The `bg`, `fg`, and `kill` built-ins now return exit status 2 for an operand
+  they cannot parse, as for any other command argument error. This applies to a
+  job ID without the leading `%` in `bg` and `fg` and to a target that is
+  neither a job ID nor a process ID in `kill`; these previously returned 1.
+- `kill::send::Error::JobIdSearch` replaces `kill::send::Error::JobId`.
+- `wait::search::Error`, an enum with the `NonPortableJobId` and
+  `AmbiguousJobId` variants, replaces `wait::search::AmbiguousJobId`. The `wait`
+  built-in reports each kind under its own title and returns exit status 2 for
+  the former and 1 for the latter.
+- `wait::search::resolve` now parses the job ID contained in a `wait::JobSpec`
+  and takes a third parameter that tells whether the `portable` shell option is
+  on. It no longer panics on a job ID without a leading `%`.
+- `kill::send::resolve_target` now takes a third parameter that tells whether
+  the `portable` shell option is on.
 - The `set` built-in (`set::syntax::parse`) now rejects a `-` used as a
   separator between options and operands when the `portable` shell option is
   on.
+- `common::report::merge_reports` no longer repeats a footnote that is equal to
+  one already collected from an earlier report. Built-ins that produce one
+  error report per operand, such as `alias`, printed the same note once per
+  offending operand.
+- Public dependency versions:
+    - yash-env 0.16.1 → 0.17.0
+    - yash-semantics (optional) 0.20.0 → 0.21.0
 
 ## [0.23.0] - 2026-08-22
 
@@ -1149,7 +1181,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - Initial implementation of the `yash-builtin` crate
 
-[0.23.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.23.1
+[0.24.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.24.0
 [0.23.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.23.0
 [0.22.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.22.0
 [0.21.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.21.1

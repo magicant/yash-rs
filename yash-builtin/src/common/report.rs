@@ -19,6 +19,9 @@
 //! This module provides utilities for printing error messages and computing
 //! appropriate results (exit status and divert values) for built-ins.
 
+pub(crate) mod job;
+
+use std::mem::{Discriminant, discriminant};
 use std::ops::ControlFlow::{Break, Continue};
 use yash_env::Env;
 use yash_env::semantics::{Divert, ExitStatus};
@@ -239,7 +242,10 @@ where
 ///
 /// If the given iterator is empty, this function returns `None`. Otherwise,
 /// the first report's title and type are used as the merged report's title and
-/// type. Snippets and footnotes from all reports are concatenated.
+/// type. Snippets from all reports are concatenated. Footnotes are also
+/// concatenated, except that a footnote equal to one already collected is
+/// dropped: reports produced from one error per operand tend to repeat the same
+/// note, which should be printed only once.
 #[must_use]
 pub fn merge_reports<'a, I, R>(reports: I) -> Option<Report<'a>>
 where
@@ -254,15 +260,40 @@ where
             let to_snippet = snippet_for_code(&mut first.snippets, from_snippet.code);
             to_snippet.spans.extend(from_snippet.spans);
         }
-        first.footnotes.extend(report.footnotes);
+        for footnote in report.footnotes {
+            if !first.footnotes.contains(&footnote) {
+                first.footnotes.push(footnote);
+            }
+        }
     }
     Some(first)
+}
+
+/// Groups the given errors by kind.
+///
+/// Errors of the same kind (that is, the same enum variant) end up in the same
+/// group regardless of where they occur among the operands, so that a built-in
+/// can report each kind as its own message rather than merging unrelated kinds
+/// of errors under one misleading shared title. The groups are returned in the
+/// order in which each kind first appears in `errors`.
+#[must_use]
+pub fn group_errors_by_kind<E>(errors: &[E]) -> Vec<(Discriminant<E>, Vec<&E>)> {
+    let mut groups: Vec<(_, Vec<_>)> = Vec::new();
+    for error in errors {
+        let kind = discriminant(error);
+        match groups.iter_mut().find(|(k, _)| *k == kind) {
+            Some((_, group)) => group.push(error),
+            None => groups.push((kind, vec![error])),
+        }
+    }
+    groups
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use yash_env::semantics::Field;
+    use yash_env::source::pretty::{Footnote, FootnoteType};
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
 
@@ -365,6 +396,82 @@ mod tests {
             SpanRole::Primary {
                 label: "label 3".into()
             }
+        );
+    }
+
+    /// Error enum used to exercise [`group_errors_by_kind`]
+    #[derive(Debug, Eq, PartialEq)]
+    enum TestError {
+        Foo(&'static str),
+        Bar(&'static str),
+    }
+
+    #[test]
+    fn group_errors_by_kind_merges_non_adjacent_errors_of_the_same_kind() {
+        let errors = [
+            TestError::Foo("a"),
+            TestError::Bar("b"),
+            TestError::Foo("c"),
+        ];
+
+        let groups = group_errors_by_kind(&errors);
+
+        assert_eq!(
+            groups,
+            [
+                (discriminant(&errors[0]), vec![&errors[0], &errors[2]]),
+                (discriminant(&errors[1]), vec![&errors[1]]),
+            ]
+        );
+    }
+
+    #[test]
+    fn group_errors_by_kind_orders_groups_by_first_occurrence() {
+        let errors = [TestError::Bar("b"), TestError::Foo("a")];
+
+        let groups = group_errors_by_kind(&errors);
+
+        assert_eq!(
+            groups,
+            [
+                (discriminant(&errors[0]), vec![&errors[0]]),
+                (discriminant(&errors[1]), vec![&errors[1]]),
+            ]
+        );
+    }
+
+    #[test]
+    fn merge_reports_drops_duplicate_footnotes() {
+        let mut report1 = Report::new();
+        report1.title = "title".into();
+        report1.footnotes.push(Footnote {
+            r#type: FootnoteType::Note,
+            label: "same note".into(),
+        });
+        let mut report2 = Report::new();
+        report2.footnotes.push(Footnote {
+            r#type: FootnoteType::Note,
+            label: "same note".into(),
+        });
+        report2.footnotes.push(Footnote {
+            r#type: FootnoteType::Suggestion,
+            label: "other note".into(),
+        });
+
+        let merged = merge_reports([report1, report2]).unwrap();
+
+        assert_eq!(
+            merged.footnotes,
+            [
+                Footnote {
+                    r#type: FootnoteType::Note,
+                    label: "same note".into(),
+                },
+                Footnote {
+                    r#type: FootnoteType::Suggestion,
+                    label: "other note".into(),
+                },
+            ],
         );
     }
 }
