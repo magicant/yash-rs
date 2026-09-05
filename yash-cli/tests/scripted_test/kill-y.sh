@@ -42,8 +42,14 @@ test_O -d -e 2 'attached signal argument rejected under the portable option' -o 
 kill -sCONT $$
 __IN__
 
+# The test cases below need a background job to send signals to. The job body
+# must be a built-in blocking on this FIFO rather than an external command like
+# "sleep": the shell forks again to run an external command, so $! would name
+# the intermediate subshell and the utility would survive the signal.
+mkfifo fifo
+
 test_OE -e 0 'signal number argument to -s accepted without the portable option'
-sleep 10 &
+read x <fifo &
 kill -s 9 $!
 wait $!
 :
@@ -91,7 +97,7 @@ kill -0 $$
 __IN__
 
 test_OE -e 0 'bare signal name starting with s accepted under the portable option' -o portable
-sleep 10 &
+read x <fifo &
 kill -stop $!
 kill -cont $!
 kill -s KILL $!
