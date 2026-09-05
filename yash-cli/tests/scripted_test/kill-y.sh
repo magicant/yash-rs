@@ -116,3 +116,30 @@ __IN__
 test_O -d -e 2 'target that is neither a job ID nor a process ID rejected as a syntax error'
 kill -s CONT foo
 __IN__
+
+(
+# The state keyword of ps is not specified by POSIX. Skip the test case where
+# it is not supported rather than reporting a failure that is not the shell's.
+[ "$(ps -o state= -p $$ 2>/dev/null)" ] || skip="true"
+
+# The job below is suspended, so its process must still be in the stopped
+# state ("T") after kill has rejected the targets. Had the signal been sent,
+# the process would have been killed and left as a zombie. The test case
+# resumes the job at the end so that the process does not linger.
+test_o -d -e 0 'kill sends no signal when a later target has a syntax error' -m
+sh -c 'kill -s STOP $$'
+kill -s KILL %1 foo
+echo "kill: $?"
+# The unquoted expansion drops the padding some ps implementations add.
+state=$(echo $(ps -o state= -p "$(jobs -p %1)"))
+case $state in
+    T*) echo "job is stopped";;
+    *) echo "job state is $state";;
+esac
+kill -s CONT %1
+wait %1
+__IN__
+kill: 2
+job is stopped
+__OUT__
+)

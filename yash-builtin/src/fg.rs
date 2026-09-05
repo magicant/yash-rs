@@ -39,7 +39,8 @@
 use crate::bg::OperandError;
 use crate::bg::OperandErrorKind;
 use crate::bg::ResumeError;
-use crate::common::report::{report, report_error, report_simple_failure};
+use crate::bg::report_operand_errors;
+use crate::common::report::{report_error, report_simple_failure};
 use crate::common::syntax::Mode;
 use crate::common::syntax::parse_arguments;
 use std::ops::ControlFlow::Break;
@@ -225,10 +226,7 @@ where
         let operand = operands.into_iter().next().unwrap();
         match resume_job_by_id(env, &operand.value).await {
             Ok(result) => finish(env, result),
-            Err(kind) => {
-                let error = OperandError(operand, kind);
-                report(env, &error, error.exit_status()).await
-            }
+            Err(kind) => report_operand_errors(env, &[OperandError(&operand, kind)]).await,
         }
     }
 }

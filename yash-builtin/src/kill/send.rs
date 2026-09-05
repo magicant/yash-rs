@@ -16,17 +16,20 @@
 
 //! Implementation of `Command::Send`
 //!
-//! [`execute`] calls [`send`] for each target and reports all errors.
-//! [`send`] uses [`resolve_target`] to determine the argument to the
-//! [`kill`](SendSignal::kill) system call.
+//! [`execute`] works in two phases. It first applies [`parse_target`] to every
+//! target to check the syntax of all of them, and aborts without sending any
+//! signal if some target is invalid. Only then does it call [`send`] for each
+//! parsed target and report all errors. [`send`] uses [`resolve_target`] to
+//! determine the argument to the [`kill`](SendSignal::kill) system call.
 
 use crate::common::report::job;
 use crate::common::report::{merge_reports, report, report_failure};
+use itertools::Itertools as _;
 use std::num::{NonZero, ParseIntError};
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::job::Pid;
-use yash_env::job::id::{ParseError, parse_tail};
+use yash_env::job::id::{JobId, ParseError, parse_tail};
 use yash_env::job::{JobList, id::FindError};
 use yash_env::option::Option::Portable;
 use yash_env::option::State;
@@ -63,29 +66,54 @@ pub enum Error {
     System(#[from] Errno),
 }
 
-/// Resolves the specified target into a process (group) ID.
+/// Target of a signal, as parsed from a command-line operand
+///
+/// A target is either a job ID or a process (group) ID. See [`parse_target`].
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Target<'a> {
+    /// Process ID, or process group ID if negative
+    ProcessId(Pid),
+    /// Job ID
+    JobId(JobId<'a>),
+}
+
+/// Parses the specified target.
 ///
 /// The target may be specified as a job ID, a process ID, or a process group
 /// ID. In case of a process group ID, the value should be negative.
 ///
-/// If `portable` is [`State::On`], a non-portable job ID is rejected with
+/// This function only examines the syntax of the target; it does not need the
+/// job list to tell whether the target is valid. If `portable` is
+/// [`State::On`], a non-portable job ID is rejected with
 /// [`Error::JobIdSyntax`].
-pub fn resolve_target(jobs: &JobList, target: &str, portable: State) -> Result<Pid, Error> {
-    if let Some(tail) = target.strip_prefix('%') {
-        let job_id = parse_tail(tail, portable)?;
-        let index = job_id.find(jobs)?;
-        let job = &jobs[index];
-        if !job.is_owned {
-            Err(Error::Unowned)
-        } else if !job.job_controlled {
-            Err(Error::Unmonitored)
-        } else if !job.state.is_alive() {
-            Err(Error::Finished)
-        } else {
-            Ok(-job.pid)
+pub fn parse_target(target: &str, portable: State) -> Result<Target<'_>, Error> {
+    match target.strip_prefix('%') {
+        Some(tail) => Ok(Target::JobId(parse_tail(tail, portable)?)),
+        None => Ok(Target::ProcessId(Pid(target.parse()?))),
+    }
+}
+
+/// Resolves the specified target into a process (group) ID.
+///
+/// A job ID is resolved into the process group ID of the job it names, which
+/// requires the job to be alive and controlled by the current shell
+/// environment. A process (group) ID is returned as is.
+pub fn resolve_target(jobs: &JobList, target: Target<'_>) -> Result<Pid, Error> {
+    match target {
+        Target::ProcessId(pid) => Ok(pid),
+        Target::JobId(job_id) => {
+            let index = job_id.find(jobs)?;
+            let job = &jobs[index];
+            if !job.is_owned {
+                Err(Error::Unowned)
+            } else if !job.job_controlled {
+                Err(Error::Unmonitored)
+            } else if !job.state.is_alive() {
+                Err(Error::Finished)
+            } else {
+                Ok(-job.pid)
+            }
         }
-    } else {
-        Ok(Pid(target.parse()?))
     }
 }
 
@@ -93,9 +121,9 @@ pub fn resolve_target(jobs: &JobList, target: &str, portable: State) -> Result<P
 pub async fn send<S: SendSignal>(
     env: &mut Env<S>,
     signal: Option<Number>,
-    target: &Field,
+    target: Target<'_>,
 ) -> Result<(), Error> {
-    let pid = resolve_target(&env.jobs, &target.value, env.options.get(Portable))?;
+    let pid = resolve_target(&env.jobs, target)?;
     env.system.kill(pid, signal).await?;
     Ok(())
 }
@@ -146,7 +174,7 @@ impl TargetError<'_> {
             format!("{}: {}", self.target.value, self.error).into(),
         );
         // A job ID is rejected here only when the `portable` option is on:
-        // `resolve_target` supplies the leading `%` itself.
+        // `parse_target` supplies the leading `%` itself.
         if let Error::JobIdSyntax(error) = self.error {
             report.footnotes = job::non_portable_footnotes(error);
         }
@@ -199,9 +227,22 @@ where
 {
     let signal_number = NonZero::new(signal).map(Number::from_raw_unchecked);
 
+    // Parse all targets before sending any signal so that a syntax error in a
+    // later target does not leave the signal sent to an earlier one.
+    let portable = env.options.get(Portable);
+    let (parsed_targets, errors): (Vec<_>, Vec<_>) = targets
+        .iter()
+        .map(|target| {
+            parse_target(&target.value, portable).map_err(|error| TargetError { target, error })
+        })
+        .partition_result();
+    if !errors.is_empty() {
+        return report_target_errors(env, &errors).await;
+    }
+
     let mut errors = Vec::new();
-    for target in targets {
-        match send(env, signal_number, target).await {
+    for (target, parsed_target) in targets.iter().zip(parsed_targets) {
+        match send(env, signal_number, parsed_target).await {
             Ok(()) => (),
             Err(Error::System(Errno::EINVAL)) => {
                 let origin = signal_origin.unwrap();
@@ -212,10 +253,22 @@ where
         }
     }
 
+    report_target_errors(env, &errors).await
+}
+
+/// Reports the given target errors, if any.
+///
+/// The exit status is the highest of the exit statuses the errors imply. If
+/// there is no error, this function returns the default (successful) result
+/// without printing anything.
+async fn report_target_errors<S>(env: &mut Env<S>, errors: &[TargetError<'_>]) -> crate::Result
+where
+    S: Isatty + Signals + WriteAll,
+{
     let Some(exit_status) = errors.iter().map(TargetError::exit_status).max() else {
         return crate::Result::default();
     };
-    let merged = merge_reports(&errors).unwrap();
+    let merged = merge_reports(errors).unwrap();
     report(env, merged, exit_status).await
 }
 
@@ -230,17 +283,35 @@ mod tests {
     use yash_env::option::Option::Portable;
     use yash_env::semantics::ExitStatus;
     use yash_env::system::Concurrent;
-    use yash_env::system::r#virtual::VirtualSystem;
+    use yash_env::system::r#virtual::{Process, SIGSTOP, VirtualSystem};
     use yash_env::test_helper::assert_stderr;
+
+    #[test]
+    fn parse_target_process_ids() {
+        let result = parse_target("123", State::Off);
+        assert_eq!(result, Ok(Target::ProcessId(Pid(123))));
+
+        let result = parse_target("-456", State::Off);
+        assert_eq!(result, Ok(Target::ProcessId(Pid(-456))));
+    }
+
+    #[test]
+    fn parse_target_job_ids() {
+        let result = parse_target("%my", State::Off);
+        assert_eq!(result, Ok(Target::JobId(JobId::NamePrefix("my"))));
+
+        let result = parse_target("%", State::Off);
+        assert_eq!(result, Ok(Target::JobId(JobId::CurrentJob)));
+    }
 
     #[test]
     fn resolve_target_process_ids() {
         let jobs = JobList::new();
 
-        let result = resolve_target(&jobs, "123", State::Off);
+        let result = resolve_target(&jobs, Target::ProcessId(Pid(123)));
         assert_eq!(result, Ok(Pid(123)));
 
-        let result = resolve_target(&jobs, "-456", State::Off);
+        let result = resolve_target(&jobs, Target::ProcessId(Pid(-456)));
         assert_eq!(result, Ok(Pid(-456)));
     }
 
@@ -254,14 +325,14 @@ mod tests {
         job.name = "my job".into();
         jobs.insert(job);
 
-        let result = resolve_target(&jobs, "%my", State::Off);
+        let result = resolve_target(&jobs, Target::JobId(JobId::NamePrefix("my")));
         assert_eq!(result, Ok(Pid(-123)));
     }
 
     #[test]
     fn resolve_target_job_find_error() {
         let jobs = JobList::new();
-        let result = resolve_target(&jobs, "%my", State::Off);
+        let result = resolve_target(&jobs, Target::JobId(JobId::NamePrefix("my")));
         assert_eq!(result, Err(Error::JobIdSearch(FindError::NotFound)));
     }
 
@@ -275,7 +346,7 @@ mod tests {
         job.name = "my job".into();
         jobs.insert(job);
 
-        let result = resolve_target(&jobs, "%my", State::Off);
+        let result = resolve_target(&jobs, Target::JobId(JobId::NamePrefix("my")));
         assert_eq!(result, Err(Error::Unowned));
     }
 
@@ -289,7 +360,7 @@ mod tests {
         job.name = "my job".into();
         jobs.insert(job);
 
-        let result = resolve_target(&jobs, "%my", State::Off);
+        let result = resolve_target(&jobs, Target::JobId(JobId::NamePrefix("my")));
         assert_eq!(result, Err(Error::Unmonitored));
     }
 
@@ -303,14 +374,13 @@ mod tests {
         job.name = "my job".into();
         jobs.insert(job);
 
-        let result = resolve_target(&jobs, "%my", State::Off);
+        let result = resolve_target(&jobs, Target::JobId(JobId::NamePrefix("my")));
         assert_eq!(result, Err(Error::Finished));
     }
 
     #[test]
-    fn resolve_target_rejects_lone_percent_when_portable() {
-        let jobs = JobList::new();
-        let result = resolve_target(&jobs, "%", State::On);
+    fn parse_target_rejects_lone_percent_when_portable() {
+        let result = parse_target("%", State::On);
         assert_eq!(result, Err(Error::JobIdSyntax(ParseError::LonePercent)));
     }
 
@@ -334,9 +404,8 @@ mod tests {
     }
 
     #[test]
-    fn resolve_target_invalid_string() {
-        let jobs = JobList::new();
-        let result = resolve_target(&jobs, "abc", State::Off);
+    fn parse_target_invalid_string() {
+        let result = parse_target("abc", State::Off);
         assert_matches!(result, Err(Error::ProcessId(_)));
     }
 
@@ -408,5 +477,37 @@ mod tests {
             let note = "this error is reported because the `portable` shell option is enabled";
             assert_eq!(stderr.matches(note).count(), 1, "stderr = {stderr:?}");
         });
+    }
+
+    #[test]
+    fn execute_sends_no_signal_when_a_later_target_has_a_syntax_error() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
+        env.options.set(Portable, State::On);
+        let pid = Pid(123);
+        let mut job = Job::new(pid);
+        job.job_controlled = true;
+        job.is_owned = true;
+        job.state = ProcessState::Running;
+        env.jobs.insert(job);
+        let process = Process::with_parent_and_group(system.process_id, pid);
+        state.borrow_mut().processes.insert(pid, process);
+
+        let result = execute(
+            &mut env,
+            SIGSTOP.as_raw(),
+            None,
+            &Field::dummies(["%1", "%"]),
+        )
+        .now_or_never()
+        .unwrap();
+
+        assert_eq!(result, crate::Result::from(ExitStatus::ERROR));
+        // The signal must not have been sent to the first target.
+        assert_eq!(
+            state.borrow().processes[&pid].state(),
+            ProcessState::Running
+        );
     }
 }

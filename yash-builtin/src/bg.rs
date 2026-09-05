@@ -38,6 +38,7 @@ use crate::common::report::job;
 use crate::common::report::{merge_reports, report, report_error, report_simple_failure};
 use crate::common::syntax::Mode;
 use crate::common::syntax::parse_arguments;
+use itertools::Itertools as _;
 use std::fmt::Display;
 use thiserror::Error;
 use yash_env::Env;
@@ -46,6 +47,7 @@ use yash_env::io::Fd;
 use yash_env::job::JobList;
 use yash_env::job::ProcessState;
 use yash_env::job::id::FindError;
+use yash_env::job::id::JobId;
 use yash_env::job::id::ParseError;
 use yash_env::job::id::parse;
 use yash_env::option::Option::{Monitor, Portable};
@@ -118,15 +120,15 @@ impl OperandErrorKind {
 ///
 /// This type is shared with the `fg` built-in.
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
-pub(crate) struct OperandError(pub(crate) Field, pub(crate) OperandErrorKind);
+pub(crate) struct OperandError<'a>(pub(crate) &'a Field, pub(crate) OperandErrorKind);
 
-impl Display for OperandError {
+impl Display for OperandError<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: {}", self.0.value, self.1)
     }
 }
 
-impl OperandError {
+impl OperandError<'_> {
     /// Converts the error to a [`Report`].
     #[must_use]
     pub fn to_report(&self) -> Report<'_> {
@@ -146,7 +148,7 @@ impl OperandError {
     }
 }
 
-impl<'a> From<&'a OperandError> for Report<'a> {
+impl<'a> From<&'a OperandError<'a>> for Report<'a> {
     #[inline]
     fn from(error: &'a OperandError) -> Self {
         error.to_report()
@@ -192,15 +194,33 @@ where
     Ok(())
 }
 
-/// Resumes the job specified by the operand.
-async fn resume_job_by_id<S>(env: &mut Env<S>, job_id: &str) -> Result<(), OperandErrorKind>
+/// Resumes the job specified by the job ID.
+async fn resume_job_by_id<S>(env: &mut Env<S>, job_id: JobId<'_>) -> Result<(), OperandErrorKind>
 where
     S: Signals + SendSignal + WriteAll,
 {
-    let job_id = parse(job_id, env.options.get(Portable))?;
     let index = job_id.find(&env.jobs)?;
     resume_job_by_index(env, index).await?;
     Ok(())
+}
+
+/// Reports the given operand errors, if any.
+///
+/// The exit status is the highest of the exit statuses the errors imply. If
+/// there is no error, this function returns the default (successful) result
+/// without printing anything.
+pub(crate) async fn report_operand_errors<S>(
+    env: &mut Env<S>,
+    errors: &[OperandError<'_>],
+) -> crate::Result
+where
+    S: Isatty + Signals + WriteAll,
+{
+    let Some(exit_status) = errors.iter().map(OperandError::exit_status).max() else {
+        return crate::Result::default();
+    };
+    let merged = merge_reports(errors).unwrap();
+    report(env, merged, exit_status).await
 }
 
 /// Entry point of the `bg` built-in
@@ -228,18 +248,27 @@ where
             report_simple_failure(env, "there is no job").await
         }
     } else {
+        // Parse all operands before resuming any job so that a syntax error in
+        // a later operand does not leave an earlier job resumed.
+        let portable = env.options.get(Portable);
+        let (job_ids, errors): (Vec<_>, Vec<_>) = operands
+            .iter()
+            .map(|operand| {
+                parse(&operand.value, portable).map_err(|error| OperandError(operand, error.into()))
+            })
+            .partition_result();
+        if !errors.is_empty() {
+            return report_operand_errors(env, &errors).await;
+        }
+
         let mut errors = Vec::new();
-        for operand in operands {
-            match resume_job_by_id(env, &operand.value).await {
+        for (operand, job_id) in operands.iter().zip(job_ids) {
+            match resume_job_by_id(env, job_id).await {
                 Ok(()) => {}
                 Err(error) => errors.push(OperandError(operand, error)),
             }
         }
-        let Some(exit_status) = errors.iter().map(OperandError::exit_status).max() else {
-            return crate::Result::default();
-        };
-        let merged = merge_reports(&errors).unwrap();
-        report(env, merged, exit_status).await
+        report_operand_errors(env, &errors).await
     }
 }
 
@@ -613,5 +642,33 @@ mod tests {
         assert_eq!(state.processes[&pgid].state(), ProcessState::Running);
         // Some error messages should be printed for the invalid operands.
         assert_stderr(&system.state, |stderr| assert_ne!(stderr, ""));
+    }
+
+    #[test]
+    fn main_resumes_no_job_if_a_later_operand_has_a_syntax_error() {
+        let system = VirtualSystem::new();
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
+        env.options.set(Monitor, On);
+        let pgid = Pid(100);
+        let mut job = Job::new(pgid);
+        job.job_controlled = true;
+        env.jobs.insert(job);
+        let mut leader = Process::with_parent_and_group(system.process_id, pgid);
+        _ = leader.set_state(ProcessState::stopped(SIGSTOP));
+        system.state.borrow_mut().processes.insert(pgid, leader);
+
+        // The second operand lacks the leading `%`, which is a syntax error.
+        let result = main(&mut env, Field::dummies(["%1", "1"]))
+            .now_or_never()
+            .unwrap();
+        assert_eq!(result, crate::Result::from(ExitStatus::ERROR));
+
+        // The first job should not have been resumed.
+        let state = system.state.borrow();
+        assert_eq!(
+            state.processes[&pgid].state(),
+            ProcessState::stopped(SIGSTOP)
+        );
+        assert_stdout(&system.state, |stdout| assert_eq!(stdout, ""));
     }
 }

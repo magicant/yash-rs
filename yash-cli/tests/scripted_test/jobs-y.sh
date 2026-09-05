@@ -27,3 +27,12 @@ __IN__
 test_O -d -e 2 'operand without the leading % rejected under the portable option' -o portable
 jobs 1
 __IN__
+
+test_o -d -e 0 'jobs reports no job when a later operand has a syntax error' -m -o portable
+sleep 10&
+jobs %1 %
+echo "jobs: $?"
+kill -s KILL %1
+__IN__
+jobs: 2
+__OUT__
