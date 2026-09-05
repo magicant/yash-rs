@@ -60,6 +60,10 @@ A _private dependency_ is used internally and not visible to downstream users.
   signal sent and no job resumed. Previously, these built-ins acted on each
   operand in turn and reported a syntax error only after the effects of the
   preceding operands had taken place.
+- The `jobs` built-in now examines the syntax of all its operands before it
+  looks up any job, so that a syntax error in an operand is reported even if an
+  earlier operand names no job. It also reports the errors of all its operands
+  rather than only the first one.
 - `common::report::merge_reports` no longer repeats a footnote that is equal to
   one already collected from an earlier report. Built-ins that produce one
   error report per operand, such as `alias`, printed the same note once per

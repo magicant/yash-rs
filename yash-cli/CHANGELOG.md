@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - With `portable` enabled, the `set` built-in now rejects a `-` used as a separator between options and operands (for example, `set - foo` or `set -a - foo`) as an error.
 - With `portable` enabled, the shell command line now rejects `-` and `--` given together as option-operand separators (for example, `yash3 - -- myscript`) as an error.
 - The `bg` and `kill` built-ins now examine the syntax of all their operands before taking any action. A syntax error in an operand now leaves no signal sent and no job resumed, whereas these built-ins previously acted on the operands preceding the erroneous one. For example, `kill %1 %` with `portable` enabled no longer sends the signal to job 1 before rejecting the lone `%`.
+- The `jobs` built-in now reports the errors of all its operands rather than only the first one, and reports a syntax error in an operand even if an earlier operand names no job.
 
 ## [3.4.0] - 2026-08-22
 
