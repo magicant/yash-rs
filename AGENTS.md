@@ -23,9 +23,8 @@ Run from repository root.
 
 - Follow Kent Beck's Canon TDD when implementing a feature or fixing a bug. Canon TDD ends with a refactoring phase; do not stop at a green test. This will guide you to the right amount of tests (neither too many nor too few). Use the [`unit-tests` skill](.agents/skills/unit-tests/SKILL.md) when writing the tests; it is the canonical guide to how unit tests are organized, named, and implemented in this workspace.
 - Put unit tests in the same file as the code they test, using `#[cfg(test)] mod tests { ... }`.
-- If shell-observable behavior changes, add/update scripted tests under [yash-cli/tests/scripted_test](yash-cli/tests/scripted_test/).
+- If shell-observable behavior changes, add/update scripted tests under [yash-cli/tests/scripted_test](yash-cli/tests/scripted_test/). Use the [`scripted-tests` skill](.agents/skills/scripted-tests/SKILL.md) when writing them; it is the canonical guide to the test harness and the conventions of these tests.
 - The scripted test harness entry point is [yash-cli/tests/scripted_test.rs](yash-cli/tests/scripted_test.rs), which invokes [yash-cli/tests/scripted_test/run-test.sh](yash-cli/tests/scripted_test/run-test.sh) as the test driver.
-- In a scripted test, prefer letting the harness compare the result: print what the test produces and declare the expectation in a `__OUT__`/`__ERR__` section (`test_o`, `test_oE`, `test_oe`, …) rather than asserting inside the test case with `[ ... ]` and `test_x`. A harness comparison shows the expected and actual output when it fails, whereas an in-case assertion only reports a non-zero exit status. Assert inside the case only where the harness cannot express the check.
 
 ## Code style
 
