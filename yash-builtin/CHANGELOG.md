@@ -55,10 +55,11 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `set` built-in (`set::syntax::parse`) now rejects a `-` used as a
   separator between options and operands when the `portable` shell option is
   on.
-- The `kill` built-in now examines the syntax of all its targets before sending
-  any signal, so that a syntax error in a target leaves no signal sent.
-  Previously, the built-in acted on each target in turn and reported a syntax
-  error only after the signal had been sent for the preceding targets.
+- The `bg` and `kill` built-ins now examine the syntax of all their operands
+  before taking any action, so that a syntax error in an operand leaves no
+  signal sent and no job resumed. Previously, these built-ins acted on each
+  operand in turn and reported a syntax error only after the effects of the
+  preceding operands had taken place.
 - `common::report::merge_reports` no longer repeats a footnote that is equal to
   one already collected from an earlier report. Built-ins that produce one
   error report per operand, such as `alias`, printed the same note once per

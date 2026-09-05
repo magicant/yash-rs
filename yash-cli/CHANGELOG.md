@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `wait` built-in now exits with status 1, rather than 2, for an ambiguous job ID such as `wait %sleep` when more than one job name starts with `sleep`.
 - With `portable` enabled, the `set` built-in now rejects a `-` used as a separator between options and operands (for example, `set - foo` or `set -a - foo`) as an error.
 - With `portable` enabled, the shell command line now rejects `-` and `--` given together as option-operand separators (for example, `yash3 - -- myscript`) as an error.
-- The `kill` built-in now examines the syntax of all its targets before sending any signal. A syntax error in a target now leaves no signal sent, whereas the built-in previously acted on the targets preceding the erroneous one. For example, `kill %1 %` with `portable` enabled no longer sends the signal to job 1 before rejecting the lone `%`.
+- The `bg` and `kill` built-ins now examine the syntax of all their operands before taking any action. A syntax error in an operand now leaves no signal sent and no job resumed, whereas these built-ins previously acted on the operands preceding the erroneous one. For example, `kill %1 %` with `portable` enabled no longer sends the signal to job 1 before rejecting the lone `%`.
 
 ## [3.4.0] - 2026-08-22
 
