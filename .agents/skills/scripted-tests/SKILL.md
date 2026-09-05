@@ -1,6 +1,6 @@
 ---
 name: scripted-tests
-description: 'Write scripted tests for the yash shell executable: file naming, the test_* harness aliases, exit status and output checks, skipping unsupported environments, and the environment a test case runs in. Use when shell-observable behavior changes and a test under yash-cli/tests/scripted_test is added, updated, or reviewed.'
+description: 'Write scripted tests for the yash shell executable: file naming, the test_* harness aliases, exit status and output checks, skipping unsupported environments, the environment a test case runs in, and cleaning up background jobs so no process is left behind. Use when shell-observable behavior changes and a test under yash-cli/tests/scripted_test is added, updated, or reviewed.'
 argument-hint: 'Which shell behavior needs a scripted test?'
 ---
 
@@ -180,6 +180,46 @@ __OUT__
 - Where a state change is inherently asynchronous, arrange the test so that the
   comparison does not depend on when it happens — print the markers after the
   job has finished rather than around it.
+
+## Leaving no process behind
+
+- A test case must not outlive itself. When the testee exits, every process it
+  started should be gone; a `sleep` that lingers after the suite has finished is
+  a defect in the test even when the case passes.
+- Do not leave a background job running at the end of a case. Kill it, and be
+  aware that the shell forks twice for an asynchronous external utility: the
+  asynchronous job is a subshell that forks again to exec the utility, so `$!`
+  names the subshell and `kill $!` leaves the utility orphaned.
+- With job control (`-m`), each job has its own process group, so a job ID
+  reaches the whole job. An `EXIT` trap is the tidiest place for it because it
+  does not disturb the exit status the case is checking:
+
+  ```sh
+  test_O -e 0 'a case that needs a background job' -m
+  trap 'kill -s KILL %1' EXIT
+  sleep 10&
+  ...
+  __IN__
+  ```
+
+- Without job control, `kill %1` would signal the shell's own process group.
+  Use a job whose body is a single built-in instead, so the job is one process
+  that `kill $!` fully covers. A `read` blocking on a FIFO waits without
+  spawning anything:
+
+  ```sh
+  mkfifo fifo
+
+  test_OE -e 0 'a case that signals a background job'
+  read x <fifo &
+  kill -s KILL $!
+  wait $!
+  :
+  __IN__
+  ```
+
+- After adding a case that starts a process, run the suite and check with `ps`
+  that nothing is left behind.
 
 ## Before you are done
 
