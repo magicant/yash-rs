@@ -2,11 +2,6 @@
 
 posix="true"
 
-# The "sleep 0" commands in the test cases below are a hack to ensure that the
-# shell receives SIGCHLD and takes in the latest status of the background jobs.
-# Without this, the "wait" built-in may return before the background jobs are
-# actually resumed.
-
 cat >job1 <<'__END__'
 exec sh -c 'kill -s STOP $$; echo'
 __END__
@@ -25,7 +20,6 @@ test_o 'default operand chooses most recently suspended job' -m
 :&
 sh -c 'kill -s STOP $$; echo 1'
 bg >/dev/null
-sleep 0
 wait
 __IN__
 1
@@ -40,7 +34,6 @@ __IN__
 test_O -e 17 'resumed job is awaitable' -m
 sh -c 'kill -s STOP $$; exit 17'
 bg >/dev/null
-sleep 0
 wait %
 __IN__
 
@@ -49,7 +42,6 @@ sh -c 'kill -s STOP $$; trap "" TTIN; head -n 1 /dev/tty'
 # The shell is ignoring SIGTTIN, so the "head" command will just fail with EIO
 # when it tries to read from the terminal in the background.
 bg >/dev/null
-sleep 0
 wait %
 __IN__
 
@@ -59,7 +51,6 @@ test_o 'specifying job ID' -m
 echo -
 bg %./job1 >/dev/null
 bg %./job2 >/dev/null
-sleep 0
 wait
 __IN__
 -
@@ -72,7 +63,6 @@ test_o 'specifying more than one job ID' -m
 ./job2
 echo -
 bg %./job1 %./job2 >/dev/null
-sleep 0
 wait
 __IN__
 -
