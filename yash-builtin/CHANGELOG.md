@@ -17,8 +17,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Added
 
-- `kill::send::Error::JobIdSyntax`, returned by `kill::send::resolve_target` for
+- `kill::send::Error::JobIdSyntax`, returned by `kill::send::parse_target` for
   a non-portable job ID.
+- `kill::send::Target`, the result of parsing a target operand of the `kill`
+  built-in, and `kill::send::parse_target`, which produces it.
 - `set::syntax::Error::NonPortableSeparator`, returned by `set::syntax::parse`
   for an invocation of the `set` built-in that uses `-` as a separator between
   options and operands while the `portable` shell option is on.
@@ -46,11 +48,17 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `wait::search::resolve` now parses the job ID contained in a `wait::JobSpec`
   and takes a third parameter that tells whether the `portable` shell option is
   on. It no longer panics on a job ID without a leading `%`.
-- `kill::send::resolve_target` now takes a third parameter that tells whether
-  the `portable` shell option is on.
+- `kill::send::resolve_target` and `kill::send::send` now take a parsed
+  `kill::send::Target` instead of the raw target string. The syntax of a target
+  is now examined by `kill::send::parse_target`, which does not need the job
+  list.
 - The `set` built-in (`set::syntax::parse`) now rejects a `-` used as a
   separator between options and operands when the `portable` shell option is
   on.
+- The `kill` built-in now examines the syntax of all its targets before sending
+  any signal, so that a syntax error in a target leaves no signal sent.
+  Previously, the built-in acted on each target in turn and reported a syntax
+  error only after the signal had been sent for the preceding targets.
 - `common::report::merge_reports` no longer repeats a footnote that is equal to
   one already collected from an earlier report. Built-ins that produce one
   error report per operand, such as `alias`, printed the same note once per
