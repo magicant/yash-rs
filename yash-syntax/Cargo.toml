@@ -12,7 +12,7 @@ repository = "https://github.com/magicant/yash-rs"
 license = "GPL-3.0-or-later"
 keywords = ["posix", "shell"]
 categories = ["command-line-utilities", "parser-implementations"]
-publish = false
+publish = true
 
 [package.metadata.docs.rs]
 all-features = true
