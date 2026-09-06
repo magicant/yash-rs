@@ -717,8 +717,6 @@ A _private dependency_ is used internally and not visible to downstream users.
 - Public dependency versions:
     - yash-env 0.9.0 → 0.9.2
     - yash-semantics (optional) 0.10.0 → 0.11.0
-- Private dependency versions:
-    - yash-prompt (optional) 0.7.0 → 0.7.1
 
 ### Removed
 
@@ -728,6 +726,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `read::prompt` module has been removed. It was empty and unused.
 - Public dependency:
     - yash-syntax 0.16.0
+- Private dependency:
+    - yash-prompt 0.7.0 (optional)
 
 ## [0.11.0] - 2025-10-13
 
