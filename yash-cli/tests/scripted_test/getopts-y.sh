@@ -50,20 +50,20 @@ __ERR__
 )
 
 : TODO https://github.com/magicant/yash-rs/issues/448
-test_Oe -d -e 1 -f 'invalid operand variable name'
+test_O -d -e 1 -f 'invalid operand variable name'
 getopts '' =
 __IN__
 
 test_O -d -e 2 'getopts rejects non-portable variable name' -o portable
-getopts a foo-bar a-
+getopts a foo-bar -a
 __IN__
 
 test_O -d -e 2 'getopts rejects variable name starting with a digit' -o portable
-getopts a 1abc a-
+getopts a 1abc -a
 __IN__
 
 test_OE -e 0 'getopts accepts non-portable variable name without the portable option'
-getopts a foo-bar a-
+getopts a foo-bar -a
 __IN__
 
 test_O -d -e 2 'unset OPTIND'
@@ -121,10 +121,10 @@ test_O -d -e 2 'invalid option'
 getopts --no-such-option a o -a
 __IN__
 
-test_Oe -d -e 2 'missing operand (0)'
+test_O -d -e 2 'missing operand (0)'
 getopts
 __IN__
 
-test_Oe -d -e 2 'missing operand (1)'
+test_O -d -e 2 'missing operand (1)'
 getopts a
 __IN__
