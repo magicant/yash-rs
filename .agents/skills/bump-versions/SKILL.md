@@ -70,20 +70,31 @@ guess.
 
 ### State
 
-Maintain these four tables explicitly (write them down; `VALIDATE` checks them):
+Maintain these tables explicitly (write them down; `VALIDATE` checks them):
 
 ```
-severity : crate -> BREAKING | COMPATIBLE | PATCH      # highest accumulated this cycle
-version  : crate -> forecast version string            # output of FORECAST
-worklist : queue of crates whose severity rose and whose dependents are not yet fanned out
-log      : append-only list of (crate, severity, reason)   # the audit trail
+severity   : crate -> BREAKING | COMPATIBLE | PATCH    # highest accumulated this cycle
+version    : crate -> forecast version string          # output of FORECAST
+dep_events : crate -> set of workspace crates whose new version it must record
+worklist   : queue of crates whose severity rose and whose dependents are not yet fanned out
+root_before: crate -> its root requirement as it stood before Phase 3
+root_raised: crate -> whether Phase 3 raised that requirement
+log        : append-only list of (crate, severity, reason)   # the audit trail
 ```
+
+`dep_events` is deliberately separate from `severity`: a dependency bump that a
+crate must *record in its changelog* is not the same event as a bump that raises
+its *severity*, and a crate already at the propagated severity still has to
+record the dependency. `dep_events` stores crate names, not version strings, so a
+later re-raise of an upstream crate cannot leave a stale version behind —
+`WRITE_CHANGELOG` reads `version[X]` when it writes, after the fixpoint.
 
 ### MAIN
 
 ```
 MAIN(diff):
-    severity := {} ; version := {} ; worklist := [] ; log := []
+    severity := {} ; version := {} ; dep_events := {} ; worklist := []
+    root_before := {} ; root_raised := {} ; log := []
 
     # ---- Phase 1: seed from the diff --------------------------------------
     for each crate C that has a changed file in diff:
@@ -98,8 +109,9 @@ MAIN(diff):
         X := pop(worklist)
         version[X] := FORECAST(X, severity[X])
         for each D in DEPENDENTS(X):               # ALWAYS recompute; never trust the diff
-            RAISE(D, PROPAGATED_SEVERITY(X, D),
-                  "records new " + X + " " + version[X])
+            dep_events[D] += X                     # record FIRST: RAISE may dedup below,
+                                                   # but D must record X either way
+            RAISE(D, PROPAGATED_SEVERITY(X, D), "records new " + X)
     # Loop invariant: on exit, every dependent of every bumped crate is itself
     # in `severity` (or was returned NONE by PROPAGATED_SEVERITY). Phase 2 ends
     # only at that fixpoint — a single pass over the diff never reaches it,
@@ -110,7 +122,8 @@ MAIN(diff):
         set `version` in C/Cargo.toml to version[C]
         WRITE_CHANGELOG(C)                         # changelog before SYNC_ROOT: case 2 reads it
     for each crate X in severity:
-        SYNC_ROOT(X)
+        root_before[X] := current root requirement for X
+        root_raised[X] := SYNC_ROOT(X)             # ask the maintainer at most once
 
     # ---- Phase 4 ----------------------------------------------------------
     VALIDATE()
@@ -123,7 +136,10 @@ RAISE(C, s, reason):
     if s == NONE:                   return      # nothing to do for C
     if C in severity and severity[C] >= s:
         return                                  # no double bump for the same severity;
-                                                # nothing new to propagate either
+                                                # nothing new to propagate either.
+                                                # NOTE: this return drops nothing the
+                                                # changelog needs — the caller already
+                                                # recorded the event in dep_events[C].
     severity[C] := s                            # monotonic: severity never decreases
     log += (C, s, reason)
     push C onto worklist                        # re-entering an already-bumped crate is
@@ -315,26 +331,27 @@ dependents actually need — it is **not** automatically bumped just because the
 crate released a new version.
 
 ```
-SYNC_ROOT(X):
+SYNC_ROOT(X) -> raised?:             # returns whether it raised the requirement
     # case 1 — Forced: X's bump is breaking (0.x: a minor bump; 1.x: a major bump)
     if severity[X] == BREAKING:
         root[X] := version[X]            # mechanical; no confirmation needed
-        return
+        return true
 
     # case 2 — Internal-only compatible bump: leave the requirement unchanged
     if X's Unreleased changelog entries consist ONLY of
            - a Rust / MSRV version bump, and/or
            - internal fixes that do not touch the public API, and/or
            - private-dependency version bumps:
-        return                           # mechanical; no confirmation needed
+        return false                     # mechanical; no confirmation needed
 
     # case 3 — Public-API compatible bump: ask the maintainer (default: leave)
     if X's Unreleased changelog includes any public-API addition or change:
         if ASK_MAINTAINER("Does any dependent now require the new " + X +
                           ", so the workspace requirement should be raised?"):
             root[X] := version[X]
+            return true
         else:
-            return                       # default to leaving it unchanged if unconfirmed
+            return false                 # default to leaving it unchanged if unconfirmed
 ```
 
 - Case 1 rationale: the old caret requirement excludes the new version, so
@@ -355,10 +372,16 @@ SYNC_ROOT(X):
 WRITE_CHANGELOG(C):
     ensure C/CHANGELOG.md has an `[version[C]] - Unreleased` heading
     ensure it has an entry describing the change
-    if a Cargo.toml dependency was added, removed, or updated:
+
+    # Dependency notes come from dep_events, NOT from reading C/Cargo.toml:
+    # a workspace crate's bump usually leaves `X = { workspace = true }` untouched,
+    # so the manifest shows nothing even though the entry is required.
+    deps := { (X, version[X]) for X in dep_events[C] }
+          + any dependency added, removed, or updated in C/Cargo.toml itself
+    if deps is non-empty:
         if C == "yash-cli":  skip the dependency entry        # exception, see below
-        else:                note it, listing PRIVATE and PUBLIC dependency
-                             changes in separate lists
+        else:                note each, listing PRIVATE and PUBLIC dependency
+                             changes in separate lists (IS_PUBLIC_DEP decides which)
 ```
 
 Follow the [update-changelog skill](../update-changelog/SKILL.md) for category
@@ -394,7 +417,12 @@ VALIDATE():
     # A. Was the Phase 2 fixpoint really reached? Re-derive it from scratch.
     for each crate X in severity:
         for each D in DEPENDENTS(X):
-            assert D in severity  or  PROPAGATED_SEVERITY(X, D) == NONE
+            p := PROPAGATED_SEVERITY(X, D)
+            if p == NONE:  continue                  # only yash-cli
+            assert D in severity and severity[D] >= p
+                   # membership alone is NOT enough: a public dependent of a
+                   # BREAKING X sitting at PATCH is under-bumped and must fail here
+            assert X in dep_events[D]                # D must record X's new version
             # a failure here is THE missed-bump bug: go back to Phase 2
 
     # B. Per-crate consistency
@@ -402,14 +430,19 @@ VALIDATE():
         assert `version` in C/Cargo.toml == version[C]
         assert C/CHANGELOG.md has a `[version[C]] - Unreleased` heading
                # same version in both places
-        assert every entry under that heading corresponds to a change in the diff
+        assert every entry THIS RUN added under that heading is backed by either
+               a change in the diff or an entry in dep_events[C]
+               # scope matters: entries left by earlier commits in the same
+               # unreleased cycle are legitimate (FORECAST accounts for them), and
+               # propagated dependency notes are by construction absent from the
+               # diff — neither is an invented entry
 
     # C. Root table — a gap here is often CORRECT
-    for each crate X in severity:
-        if SYNC_ROOT(X) raised the requirement (case 1, or case 3 confirmed):
-            assert root entry for X == version[X]
-        else:
-            assert root entry for X is unchanged
+    for each crate X in severity:                    # read the Phase 3 outcome;
+        if root_raised[X]:                           # never call SYNC_ROOT again —
+            assert root entry for X == version[X]    # it is side-effecting and case 3
+        else:                                        # would re-prompt the maintainer
+            assert root entry for X == root_before[X]
             # the root deliberately stays at the lower caret minimum;
             # do NOT "fix" that gap (e.g. yash-arith crate 0.2.4 with root
             # requirement 0.2.3 is correct under SYNC_ROOT case 2)
