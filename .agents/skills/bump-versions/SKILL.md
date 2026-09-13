@@ -76,6 +76,7 @@ Maintain these tables explicitly (write them down; `VALIDATE` checks them):
 severity   : crate -> BREAKING | COMPATIBLE | PATCH    # highest accumulated this cycle
 version    : crate -> forecast version string          # output of FORECAST
 dep_events : crate -> set of workspace crates whose new version it must record
+             # an unlisted crate reads as the EMPTY SET, never as undefined
 worklist   : queue of crates whose severity rose and whose dependents are not yet fanned out
 root_before: crate -> its root requirement as it stood before Phase 3
 root_raised: crate -> whether Phase 3 raised that requirement
@@ -141,6 +142,8 @@ RAISE(C, s, reason):
                                                 # changelog needs — the caller already
                                                 # recorded the event in dep_events[C].
     severity[C] := s                            # monotonic: severity never decreases
+    if C not in dep_events:  dep_events[C] := {}   # every crate in severity has an
+                                                  # entry by the time Phase 3 reads it
     log += (C, s, reason)
     push C onto worklist                        # re-entering an already-bumped crate is
                                                 # correct and required when its severity rises
@@ -376,7 +379,7 @@ WRITE_CHANGELOG(C):
     # Dependency notes come from dep_events, NOT from reading C/Cargo.toml:
     # a workspace crate's bump usually leaves `X = { workspace = true }` untouched,
     # so the manifest shows nothing even though the entry is required.
-    deps := { (X, version[X]) for X in dep_events[C] }
+    deps := { (X, version[X]) for X in dep_events[C] }   # empty set if C had none
           + any dependency added, removed, or updated in C/Cargo.toml itself
     if deps is non-empty:
         if C == "yash-cli":  skip the dependency entry        # exception, see below
