@@ -9,6 +9,12 @@ used by other programs.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.2] - Unreleased
+
+### Changed
+
+- With `portable` enabled, the `ulimit` built-in now rejects `soft`, `hard`, and a number with a leading `+` as the limit operand (for example, `ulimit -S -f hard` or `ulimit -f +5`) as an error.
+
 ## [3.4.1] - 2026-09-06
 
 ### Changed
@@ -472,6 +478,7 @@ later.
 
 - Initial release of the shell
 
+[3.4.2]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.4.2
 [3.4.1]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.4.1
 [3.4.0]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.4.0
 [3.3.4]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.3.4

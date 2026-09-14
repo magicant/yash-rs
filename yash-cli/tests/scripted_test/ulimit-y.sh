@@ -112,6 +112,34 @@ test_O -d -e 2 'invalid operand (negative)'
 ulimit -- -1
 __IN__
 
+test_OE -e 0 'operand with leading + accepted as an extension'
+ulimit -S -f +5
+__IN__
+
+test_OE -e 0 'operand soft accepted as an extension'
+ulimit -S -f soft
+__IN__
+
+test_OE -e 0 'operand hard accepted as an extension'
+ulimit -S -f hard
+__IN__
+
+test_O -d -e 2 'operand soft rejected under the portable option' -o portable
+ulimit -S -f soft
+__IN__
+
+test_O -d -e 2 'operand hard rejected under the portable option' -o portable
+ulimit -S -f hard
+__IN__
+
+test_O -d -e 2 'operand with leading + rejected under the portable option' -o portable
+ulimit -S -f +5
+__IN__
+
+test_OE -e 0 'current hard limit value accepted under the portable option' -o portable
+ulimit -S -f "$(ulimit -H -f)"
+__IN__
+
 test_O -d -e 1 'printing to closed output stream'
 ulimit >&-
 __IN__
