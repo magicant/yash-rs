@@ -102,7 +102,7 @@ where
     let is_interactive = env.options.get(Interactive) == On;
 
     // Run initialization files
-    // TODO run profile if login
+    // TODO run profile if login (but not the default profile if portable)
     run_rcfile(env, work.rcfile).await;
 
     // Prepare the input for the main read-eval loop
