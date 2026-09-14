@@ -83,6 +83,14 @@ pub enum Error {
     /// An operand is not a valid limit.
     #[error("invalid limit")]
     InvalidLimit(Field, ParseIntError),
+
+    /// An operand is a valid limit that POSIX does not specify.
+    ///
+    /// POSIX specifies only numerals and `unlimited` as limits, so this error
+    /// occurs for `soft`, `hard`, and a number with a leading `+` only while
+    /// the `portable` shell option is on.
+    #[error("non-portable limit")]
+    NonPortableLimit(Field),
 }
 
 impl Error {
@@ -153,12 +161,26 @@ impl Error {
                 &operand.origin,
                 format!("{operand}: invalid limit ({parse_int_error})").into(),
             ),
+            Self::NonPortableLimit(operand) => Snippet::with_primary_span(
+                &operand.origin,
+                format!("{operand}: not specified by POSIX").into(),
+            ),
         };
         let mut report = Report::new();
         report.r#type = ReportType::Error;
         report.title = self.to_string().into();
         report.snippets = snippets;
-        if let Self::GroupedOptions(_) | Self::RepeatedOption { .. } = self {
+        if let Self::NonPortableLimit(operand) = self
+            && let Some(digits) = operand.value.strip_prefix('+')
+        {
+            report.footnotes.push(Footnote {
+                r#type: FootnoteType::Suggestion,
+                label: format!("use `{digits}` instead").into(),
+            });
+        }
+        if let Self::GroupedOptions(_) | Self::RepeatedOption { .. } | Self::NonPortableLimit(_) =
+            self
+        {
             report.footnotes.push(portable_footnote());
         }
         report
@@ -252,7 +274,9 @@ fn check_option_syntax(options: &[OptionOccurrence]) -> std::result::Result<(), 
 /// rejected with [`Error::ConflictingOption`]. POSIX also leaves the behavior
 /// unspecified if an option other than `-H` and `-S` is repeated, which is
 /// rejected with [`Error::RepeatedOption`]; repeating `-H` or `-S` remains
-/// valid.
+/// valid. The limits `soft` and `hard` and a number with a leading `+` are
+/// rejected with [`Error::NonPortableLimit`] because POSIX specifies only
+/// numerals and `unlimited` as limits.
 pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
     let (options, operands) = parse_arguments(OPTION_SPECS, Mode::with_env(env), args)?;
     let portable = env.options.get(Portable) == State::On;
@@ -312,7 +336,7 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
 
     if let Some(operand) = { operands }.pop() {
         let limit_type = set_limit_type(hard, soft);
-        let value = parse_value(operand)?;
+        let value = parse_value(operand, portable)?;
         return Ok(Command::Set(resource, limit_type, value));
     }
 
@@ -338,11 +362,20 @@ fn set_limit_type(hard: Option<Location>, soft: Option<Location>) -> SetLimitTyp
     }
 }
 
-fn parse_value(operand: Field) -> std::result::Result<SetLimitValue, Error> {
-    operand
-        .value
-        .parse()
-        .map_err(|e| Error::InvalidLimit(operand, e))
+fn parse_value(operand: Field, portable: bool) -> std::result::Result<SetLimitValue, Error> {
+    let value = match operand.value.parse() {
+        Ok(value) => value,
+        Err(e) => return Err(Error::InvalidLimit(operand, e)),
+    };
+    let is_portable = match value {
+        SetLimitValue::Number(_) => !operand.value.starts_with('+'),
+        SetLimitValue::Unlimited => true,
+        SetLimitValue::CurrentSoft | SetLimitValue::CurrentHard => false,
+    };
+    if portable && !is_portable {
+        return Err(Error::NonPortableLimit(operand));
+    }
+    Ok(value)
 }
 
 impl FromStr for SetLimitValue {
@@ -668,6 +701,78 @@ mod tests {
                 second: Location::dummy("-d"),
             })
         );
+    }
+
+    #[test]
+    fn portable_limits_accepted_under_portable() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+
+        let result = parse(&env, Field::dummies(["0"]));
+        assert_eq!(
+            result,
+            Ok(Command::Set(
+                Resource::FSIZE,
+                SetLimitType::Both,
+                SetLimitValue::Number(0)
+            ))
+        );
+
+        let result = parse(&env, Field::dummies(["unlimited"]));
+        assert_eq!(
+            result,
+            Ok(Command::Set(
+                Resource::FSIZE,
+                SetLimitType::Both,
+                SetLimitValue::Unlimited
+            ))
+        );
+    }
+
+    #[test]
+    fn soft_limit_value_rejected_under_portable() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, Field::dummies(["-H", "soft"]));
+        assert_eq!(result, Err(Error::NonPortableLimit(Field::dummy("soft"))));
+    }
+
+    #[test]
+    fn hard_limit_value_rejected_under_portable() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, Field::dummies(["-S", "hard"]));
+        assert_eq!(result, Err(Error::NonPortableLimit(Field::dummy("hard"))));
+    }
+
+    #[test]
+    fn plus_signed_limit_accepted_as_extension() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["+5"]));
+        assert_eq!(
+            result,
+            Ok(Command::Set(
+                Resource::FSIZE,
+                SetLimitType::Both,
+                SetLimitValue::Number(5)
+            ))
+        );
+    }
+
+    #[test]
+    fn plus_signed_limit_rejected_under_portable() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, Field::dummies(["+5"]));
+        assert_eq!(result, Err(Error::NonPortableLimit(Field::dummy("+5"))));
+    }
+
+    #[test]
+    fn invalid_limit_with_plus_sign_reported_as_invalid_under_portable() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let result = parse(&env, Field::dummies(["+x"]));
+        assert_matches!(result, Err(Error::InvalidLimit(field, _)) if field.value == "+x");
     }
 
     #[test]

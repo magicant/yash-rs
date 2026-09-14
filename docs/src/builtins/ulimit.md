@@ -201,6 +201,6 @@ POSIX specifies the `-H` and `-S` options as mutually exclusive, but shells diff
 
 Specifying multiple resource options is an error in yash-rs, but some shells allow operating on multiple resources at once.
 
-The `hard` and `soft` values for the *limit* operand are not defined by POSIX.
+POSIX specifies only numerals and `unlimited` as the *limit* operand. The `hard` and `soft` values are extensions, and so is a number with a leading `+` (e.g., `+5`), which many other shells reject. (Since 3.4.2) The [`portable` option](../environment/options.md#portable) rejects these operands with an error.
 
 The output format for `ulimit -a` is implementation-defined and subject to change.
