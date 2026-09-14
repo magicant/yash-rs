@@ -86,7 +86,10 @@ where
 /// be printed to the standard error and an empty string will be returned.
 ///
 /// TODO: If the POSIXly correct mode is off, the default path should be
-/// `~/.yashrc` (or maybe some XDG-compliant path).
+/// `~/.yashrc` (or maybe some XDG-compliant path). Such a path must not be used
+/// if the [`Portable`](yash_env::option::Portable) option is on because POSIX
+/// only specifies the `ENV` variable. A path given by the `--rcfile` option is
+/// not affected by the `Portable` option.
 ///
 /// [`ENV`]: yash_env::variable::ENV
 /// [`Text`]: yash_syntax::syntax::Text
