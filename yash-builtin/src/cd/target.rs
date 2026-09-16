@@ -20,11 +20,13 @@ use super::Command;
 use super::Mode;
 use thiserror::Error;
 use yash_env::Env;
+use yash_env::option::Option::Portable;
+use yash_env::option::State;
 use yash_env::path::Path;
 use yash_env::path::PathBuf;
 use yash_env::semantics::ExitStatus;
 use yash_env::source::Location;
-use yash_env::source::pretty::{Report, ReportType, Snippet};
+use yash_env::source::pretty::{Footnote, FootnoteType, Report, ReportType, Snippet};
 use yash_env::system::Fstat;
 use yash_env::variable::HOME;
 use yash_env::variable::OLDPWD;
@@ -61,6 +63,19 @@ pub enum TargetError {
         location: Location,
     },
 
+    /// The operand is `-`, but `$OLDPWD` is not an absolute path.
+    ///
+    /// This error is detected only while the `portable` shell option is on.
+    /// Otherwise, a relative `$OLDPWD` is resolved like a relative operand
+    /// as an extension to POSIX, which leaves the behavior unspecified.
+    #[error("$OLDPWD not absolute")]
+    NonAbsoluteOldpwd {
+        /// Value of `$OLDPWD`
+        oldpwd: String,
+        /// Location of the `-` operand
+        location: Location,
+    },
+
     /// Non-existing directory
     ///
     /// When the `-L` option is specified, the built-in tries to canonicalize
@@ -85,6 +100,7 @@ impl TargetError {
             TargetError::UnsetHome { .. } | TargetError::UnsetOldpwd { .. } => {
                 super::EXIT_STATUS_UNSET_VARIABLE
             }
+            TargetError::NonAbsoluteOldpwd { .. } => super::EXIT_STATUS_NON_ABSOLUTE_OLDPWD,
             TargetError::NonExistingDirectory { .. } => super::EXIT_STATUS_CANNOT_CANONICALIZE,
         }
     }
@@ -101,6 +117,11 @@ impl TargetError {
 
             UnsetOldpwd { location } => (location, "'-' operand requires non-empty $OLDPWD".into()),
 
+            NonAbsoluteOldpwd { oldpwd, location } => (
+                location,
+                format!("'-' operand requires absolute $OLDPWD, but it is '{oldpwd}'").into(),
+            ),
+
             NonExistingDirectory {
                 missing,
                 target: _,
@@ -115,6 +136,13 @@ impl TargetError {
         report.r#type = ReportType::Error;
         report.title = self.to_string().into();
         report.snippets = Snippet::with_primary_span(location, label);
+        if let NonAbsoluteOldpwd { .. } = self {
+            report.footnotes.push(Footnote {
+                r#type: FootnoteType::Note,
+                label: "this error is reported because the `portable` shell option is enabled"
+                    .into(),
+            });
+        }
         report
     }
 }
@@ -137,7 +165,8 @@ fn get_scalar<'a, S>(env: &'a Env<S>, name: &str) -> Option<&'a str> {
 ///
 /// This function implements steps 1 through 8 of the POSIX specification of the
 /// cd built-in. Additionally, this function resolves a `-` operand to
-/// `$OLDPWD`.
+/// `$OLDPWD`, rejecting a relative `$OLDPWD` while the `portable` shell option
+/// is on.
 ///
 /// The `pwd` parameter should be the current value of `$PWD`. This is used to
 /// resolve a logical path.
@@ -165,7 +194,13 @@ where
             let oldpwd = get_scalar(env, OLDPWD).ok_or_else(|| TargetError::UnsetOldpwd {
                 location: operand.origin.clone(),
             })?;
-            (PathBuf::from(&oldpwd), Origin::Oldpwd)
+            if !oldpwd.starts_with('/') && env.options.get(Portable) == State::On {
+                return Err(TargetError::NonAbsoluteOldpwd {
+                    oldpwd: oldpwd.to_owned(),
+                    location: operand.origin.clone(),
+                });
+            }
+            (PathBuf::from(oldpwd), Origin::Oldpwd)
         }
 
         Some(operand) => (PathBuf::from(&operand.value), Origin::Literal),
@@ -245,6 +280,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use yash_env::option::Option::Portable;
+    use yash_env::option::State;
     use yash_env::semantics::Field;
     use yash_env::stack::Builtin;
     use yash_env::stack::Frame;
@@ -354,6 +391,64 @@ mod tests {
 
         let e = target(&env, &command, "/ignored").unwrap_err();
         assert_eq!(e, TargetError::UnsetOldpwd { location });
+    }
+
+    #[test]
+    fn relative_oldpwd_accepted_as_extension() {
+        let mut env = Env::new_virtual();
+        let command = Command {
+            mode: Mode::Logical,
+            ensure_pwd: false,
+            operand: Some(Field::dummy("-")),
+        };
+        env.get_or_create_variable(OLDPWD, Scope::Global)
+            .assign("old/dir", None)
+            .unwrap();
+
+        let target = target(&env, &command, "/current").unwrap();
+        assert_eq!(target, (PathBuf::from("/current/old/dir"), Origin::Oldpwd));
+    }
+
+    #[test]
+    fn relative_oldpwd_rejected_under_portable() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let operand = Field::dummy("-");
+        let location = operand.origin.clone();
+        let command = Command {
+            mode: Mode::Logical,
+            ensure_pwd: false,
+            operand: Some(operand),
+        };
+        env.get_or_create_variable(OLDPWD, Scope::Global)
+            .assign("old/dir", None)
+            .unwrap();
+
+        let e = target(&env, &command, "/current").unwrap_err();
+        assert_eq!(
+            e,
+            TargetError::NonAbsoluteOldpwd {
+                oldpwd: "old/dir".to_string(),
+                location
+            }
+        );
+    }
+
+    #[test]
+    fn absolute_oldpwd_accepted_under_portable() {
+        let mut env = Env::new_virtual();
+        env.options.set(Portable, State::On);
+        let command = Command {
+            mode: Mode::default(),
+            ensure_pwd: false,
+            operand: Some(Field::dummy("-")),
+        };
+        env.get_or_create_variable(OLDPWD, Scope::Global)
+            .assign("/old/dir", None)
+            .unwrap();
+
+        let target = target(&env, &command, "/ignored").unwrap();
+        assert_eq!(target, (PathBuf::from("/old/dir"), Origin::Oldpwd));
     }
 
     #[test]
