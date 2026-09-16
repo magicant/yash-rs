@@ -88,11 +88,11 @@ The shell reports an error and does not run the construct:
 - (Since 3.3.5) A number of operands that POSIX does not allow with the accompanying options, given to the [`.`](builtins/source.md), [`command`](builtins/command.md), [`export`](builtins/export.md), [`readonly`](builtins/readonly.md), [`type`](builtins/type.md), or [`unset`](builtins/unset.md) built-in.
 - (Since 3.4.2) The `-` operand given to the [`cd` built-in](builtins/cd.md) while `OLDPWD` is not an absolute path.
 - (Since 3.4.1) An operand without the leading `%` given to the [`jobs` built-in](builtins/jobs.md).
-- (Since 3.4.2) The `hard` or `soft` value, or a number with a leading `+`, given as the *limit* operand to the [`ulimit` built-in](builtins/ulimit.md).
 - (Since 3.3.5) A non-portable way of specifying a signal or listing signals with the [`kill` built-in](builtins/kill.md).
 - (Since 3.3.3) Making the `PWD`, `OLDPWD`, `OPTIND`, `OPTARG`, or `LINENO` [variable](language/parameters/variables.md#reserved-variable-names) read-only with the [`readonly` built-in](builtins/readonly.md).
 - (Since 3.4.1) A `-` used as an option-operand separator with the [`set` built-in](builtins/set.md) (for example, `set - foo`).
 - (Since 3.3.4) Executing the [`.` built-in](builtins/source.md) under the name `source`.
+- (Since 3.4.2) The `hard` or `soft` value, or a number with a leading `+`, given as the *limit* operand to the [`ulimit` built-in](builtins/ulimit.md).
 - (Since 3.3.2) The increment and decrement operators (`++` and `--`) in an [arithmetic expression](arithmetic.md).
 
 ### Features that trigger a warning
