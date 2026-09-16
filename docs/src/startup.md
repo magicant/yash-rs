@@ -102,6 +102,8 @@ POSIX.1-2024 does not specify login shells or profile files. The behavior descri
 
 Using the `ENV` [environment variable] for initialization files is POSIX-specified. In the future, yash-rs may support a different default rcfile location depending on the command name and shell options.
 
+Such default locations will not be used while the [`portable` option](environment/options.md#portable) is enabled, because POSIX specifies only `ENV`. For the same reason, a login shell will not execute a default profile file under the `portable` option. Files you name with `--profile` or `--rcfile` (written before `-o portable`) are still executed, because they are what you explicitly asked for rather than defaults the shell picks.
+
 [arithmetic expansion]: language/words/arithmetic.md
 [command substitution]: language/words/command_substitution.md
 [environment variable]: language/parameters/variables.md#environment-variables

@@ -279,6 +279,12 @@ profile
 cil
 __OUT__
 
+test_oE 'startup: portable option ignores default profile and rcfile' \
+    -cil +m -o portable 'echo $-'
+__IN__
+cil
+__OUT__
+
 )
 
 test_oE 'startup: -cl with unset HOME' -cl 'echo $-'
@@ -470,6 +476,22 @@ __OUT__
 test_oE 'startup: --posix -ci +m' --posix -ci +m 'echo $-'
 __IN__
 env
+ci
+__OUT__
+
+echo echo rcfile >rcfile
+
+test_oE 'startup: portable option does not ignore rcfile from ENV' \
+    -o portable -ci +m 'echo $-'
+__IN__
+env
+ci
+__OUT__
+
+test_oE 'startup: portable option does not ignore rcfile from --rcfile' \
+    --rcfile=rcfile -o portable -ci +m 'echo $-'
+__IN__
+rcfile
 ci
 __OUT__
 
