@@ -51,6 +51,11 @@ pub const EXIT_STATUS_CANNOT_CANONICALIZE: ExitStatus = ExitStatus(3);
 /// Exit status for an unset or empty `$HOME` or `$OLDPWD`
 pub const EXIT_STATUS_UNSET_VARIABLE: ExitStatus = ExitStatus(4);
 
+/// Exit status for a `$OLDPWD` that is not an absolute path
+///
+/// This error is detected only while the `portable` shell option is on.
+pub const EXIT_STATUS_NON_ABSOLUTE_OLDPWD: ExitStatus = ExitStatus(4);
+
 /// Exit status for invalid command arguments
 pub const EXIT_STATUS_SYNTAX_ERROR: ExitStatus = ExitStatus(5);
 

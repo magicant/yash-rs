@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - With `portable` enabled, the `ulimit` built-in now rejects `soft`, `hard`, and a number with a leading `+` as the limit operand (for example, `ulimit -S -f hard` or `ulimit -f +5`) as an error.
+- With `portable` enabled, `cd -` now fails if `OLDPWD` is not an absolute path.
 
 ## [3.4.1] - 2026-09-06
 

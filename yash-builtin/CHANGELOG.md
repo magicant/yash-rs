@@ -20,9 +20,15 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `ulimit::syntax::Error::NonPortableLimit`, returned by `ulimit::syntax::parse`
   for a limit operand that POSIX does not specify while the `portable` shell
   option is on.
+- `cd::EXIT_STATUS_NON_ABSOLUTE_OLDPWD`
+- `cd::target::TargetError::NonAbsoluteOldpwd`, returned by
+  `cd::target::target` for a `-` operand when `$OLDPWD` is not an absolute
+  path. This error is detected only while the `portable` shell option is on.
 
 ### Changed
 
+- The `cd` built-in now fails with exit status 4 for the `-` operand when
+  `$OLDPWD` is not an absolute path while the `portable` shell option is on.
 - The `ulimit` built-in now rejects `soft`, `hard`, and a number with a leading
   `+` as the limit operand when the `portable` shell option is on, returning
   exit status 2.

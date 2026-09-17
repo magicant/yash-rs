@@ -187,6 +187,26 @@ test_O -e 0 'short option name still accepted under the portable option' -o port
 cd -P .
 __IN__
 
+testcase "$LINENO" -e 0 'relative OLDPWD accepted as an extension' \
+    3<<'__IN__' 4<<__OUT__ 5</dev/null
+unset CDPATH
+OLDPWD=dir cd -
+pwd
+__IN__
+$ORIGPWD/dir
+$ORIGPWD/dir
+__OUT__
+
+test_O -d -e 4 'relative OLDPWD rejected under the portable option' -o portable
+OLDPWD=dir cd -
+__IN__
+
+test_oE -e 0 'absolute OLDPWD accepted under the portable option' -o portable
+OLDPWD=/ cd -
+__IN__
+/
+__OUT__
+
 test_O -e 0 'printing to closed stream'
 OLDPWD=/ cd - >&-
 __IN__

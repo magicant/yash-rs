@@ -87,6 +87,7 @@ This built-in fails if the working directory cannot be changed, for example, in 
 - The operand does not resolve to an existing accessible directory.
 - The operand is omitted and `HOME` is not set or empty.
 - The operand is a single hyphen (`-`) and `OLDPWD` is not set or empty.
+- (Since 3.4.2) The operand is a single hyphen (`-`) and `OLDPWD` is not an absolute path. This error is detected only when the [`portable` option](../environment/options.md#portable) is set.
 - The resolved pathname of the new working directory is too long.
 
 It is also an error if a given operand is an empty string.
@@ -113,6 +114,7 @@ The [`portable` option](../environment/options.md#portable) causes additional er
 - If the working directory cannot be changed because of an error in the underlying `chdir` system call, the exit status is two.
 - If the `-L` option is effective and canonicalization fails because of a `..` component referring to a non-existent directory, the exit status is three.
 - If the operand cannot be processed because of an unset or empty `HOME` or `OLDPWD`, the exit status is four.
+- (Since 3.4.2) If the operand is a single hyphen (`-`) and `OLDPWD` is not an absolute path, the exit status is four.
 - If the command arguments are invalid, the exit status is five.
 
 ## Examples
@@ -176,6 +178,8 @@ POSIX-1.2024 defines the `cd` utility with the `-L`, `-P`, and `-e` options. <!-
 The long option names (`--logical`, `--physical`, `--ensure-pwd`) are a non-standard extension.
 
 (Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, using a long option name is rejected with an error. Use the corresponding short option instead.
+
+POSIX leaves the behavior of `cd -` unspecified if `OLDPWD` is not an absolute path. Yash-rs treats such a value in the same way as a relative pathname given as the operand. (Since 3.4.2) When the `portable` option is set, the built-in reports this case as an error.
 
 The shell sets `PWD` on the startup and modifies it in the `cd` built-in. If `PWD` is modified or unset otherwise, the behavior of `cd` and [`pwd`](pwd.md) is unspecified.
 
