@@ -67,10 +67,7 @@ pub enum Type {
     /// in POSIX XCU section 2.9.1.4.
     /// They are very similar to mandatory built-ins, but their behavior is not
     /// specified by POSIX, so they are not portable. They cannot be used when
-    /// the (TODO TBD) option is set. <!-- An option that disables non-portable
-    /// behavior would make elective built-ins unusable even if found. An option
-    /// that disables non-conforming behavior would not affect elective
-    /// built-ins. -->
+    /// the [`Portable`](crate::option::Portable) option is set.
     ///
     /// We call them "elective" because it is up to the shell whether to
     /// implement them.
@@ -88,8 +85,8 @@ pub enum Type {
     /// - When the [`PosixlyCorrect`](crate::option::PosixlyCorrect) option is
     ///   on, they are ignored: they are regarded as non-existing utilities so
     ///   that the command search falls through to external utilities.
-    /// - When the (TODO TBD) option is on, they cannot be used even if found
-    ///   in command search.
+    /// - When the [`Portable`](crate::option::Portable) option is on, they
+    ///   can be found in command search, but their execution always fails.
     Extension,
 
     /// Built-in that works like a standalone utility
