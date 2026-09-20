@@ -83,27 +83,43 @@ impl<'a> From<&'a Error> for Report<'a> {
     }
 }
 
+/// Tests whether a string is a condition written as a number.
+///
+/// A numeric condition is a non-empty sequence of ASCII digits, optionally with
+/// redundant leading zeros. A sign is not allowed, so neither `+2` nor `-2` is
+/// a numeric condition.
+fn is_non_negative_integer(s: &str) -> bool {
+    !s.is_empty() && s.chars().all(|c| c.is_ascii_digit())
+}
+
 /// Parses a single condition from a command line operand.
 ///
 /// On success, returns the parsed `Condition` and the original `Field`.
 /// On failure, returns `Error::UnknownCondition`.
 ///
 /// A condition can be `0` or `EXIT` for [`Condition::Exit`], or a signal
-/// name/number for [`Condition::Signal`].
+/// name/number for [`Condition::Signal`]. A signal number must be written as
+/// per [`is_non_negative_integer`].
 fn parse_condition<S: Signals>(field: Field, system: &S) -> Result<(Condition, Field), Error> {
     // TODO Case-insensitive parse
     // TODO Allow SIG prefix
-    match field.value.parse::<RawNumber>() {
-        Ok(0) => Ok((Condition::Exit, field)),
-        Ok(number) => match system.to_signal_number(number) {
+    if is_non_negative_integer(&field.value) {
+        // A number too large to be a signal number fails to parse here.
+        match field.value.parse::<RawNumber>() {
+            Ok(0) => Ok((Condition::Exit, field)),
+            Ok(number) => match system.to_signal_number(number) {
+                Some(number) => Ok((Condition::Signal(number), field)),
+                None => Err(Error::UnknownCondition(field)),
+            },
+            Err(_) => Err(Error::UnknownCondition(field)),
+        }
+    } else if field.value == "EXIT" {
+        Ok((Condition::Exit, field))
+    } else {
+        match system.str2sig(&field.value) {
             Some(number) => Ok((Condition::Signal(number), field)),
             None => Err(Error::UnknownCondition(field)),
-        },
-        Err(_) if field.value == "EXIT" => Ok((Condition::Exit, field)),
-        Err(_) => match system.str2sig(&field.value) {
-            Some(number) => Ok((Condition::Signal(number), field)),
-            None => Err(Error::UnknownCondition(field)),
-        },
+        }
     }
 }
 
@@ -171,10 +187,6 @@ pub fn interpret<S: Signals>(
     }
 }
 
-fn is_non_negative_integer(s: &str) -> bool {
-    !s.is_empty() && s.chars().all(|c| c.is_ascii_digit())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -239,11 +251,17 @@ mod tests {
     }
 
     #[test]
-    fn parse_condition_negative_number() {
+    fn parse_condition_rejects_signed_number() {
         let system = VirtualSystem::new();
-        let field = Field::dummy("-1");
-        let result = parse_condition(field.clone(), &system);
-        assert_eq!(result, Err(Error::UnknownCondition(field)));
+        for value in ["+2", "-2", "+0", "-0", "-1"] {
+            let field = Field::dummy(value);
+            let result = parse_condition(field.clone(), &system);
+            assert_eq!(
+                result,
+                Err(Error::UnknownCondition(field)),
+                "value={value:?}"
+            );
+        }
     }
 
     #[test]

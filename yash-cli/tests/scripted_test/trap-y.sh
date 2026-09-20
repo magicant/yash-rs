@@ -186,6 +186,18 @@ test_O -d -e 1 'invalid signal number'
 trap -- - -1
 __IN__
 
+test_O -d -e 1 'signal number with a plus sign rejected'
+trap -- - +1
+__IN__
+
+test_O -d -e 1 'zero with a plus sign rejected as a condition'
+trap -- - +0
+__IN__
+
+test_O -d -e 1 'zero with a minus sign rejected as a condition'
+trap -- - -0
+__IN__
+
 test_O -d -e 1 'printing to closed stream: printing all traps (w/o -p)'
 trap '' USR1
 trap >&-
