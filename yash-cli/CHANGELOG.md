@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `kill` built-in now accepts a signal name that starts with `l` or `v` written directly after the hyphen, such as `kill -vtalrm 0`. It previously took the leading letter as the `-l` or `-v` option and reported an error.
 - The `kill` built-in now rejects a signal number written with a sign, such as `kill -+9 123`, `kill -s -9 123`, or `kill -l -- +9`. Such a number was previously accepted even though a signal number consists of decimal digits only.
+- The `trap` built-in now rejects a condition written as a signal number with a sign, such as `trap '' +2` or `trap '' -0`. Such a condition was previously accepted even though a signal number consists of decimal digits only.
 
 ## [3.4.2] - 2026-09-20
 

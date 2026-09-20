@@ -47,6 +47,7 @@ A ***condition*** specifies when the action is triggered. It may be one of the f
 - A symbolic name of a [signal](../environment/traps.md#what-are-signals) without the `SIG` prefix (e.g. `INT`, `QUIT`, `TERM`)
     - Signal names must be specified in uppercase. Lowercase names and the `SIG` prefix may be supported in the future.
 - A positive decimal integer representing a signal number
+    - The number must be written with no sign, so `+2` is not a valid signal number.
 - The number `0` or the symbolic name `EXIT` representing the [termination](../termination.md) of the main shell process
     - This condition is not triggered when the shell exits due to a signal.
 

@@ -24,6 +24,10 @@ A _private dependency_ is used internally and not visible to downstream users.
   number that has a sign, such as `+9` or `-9`. They previously accepted such a
   number, which made the `kill` built-in treat `kill -+9 123` and
   `kill -s -9 123` as valid.
+- `trap::syntax::interpret` now rejects a condition that is a signal number
+  with a sign, such as `+2` or `-0`. It previously accepted such a condition,
+  which made the `trap` built-in treat `trap '' +2` as a trap for `SIGINT` and
+  `trap '' -0` as a trap for `EXIT`.
 
 ## [0.24.1] - 2026-09-20
 
