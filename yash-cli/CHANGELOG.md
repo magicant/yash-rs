@@ -9,6 +9,12 @@ used by other programs.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.3] - Unreleased
+
+### Fixed
+
+- The `kill` built-in now accepts a signal name that starts with `l` or `v` written directly after the hyphen, such as `kill -vtalrm 0`. It previously took the leading letter as the `-l` or `-v` option and reported an error.
+
 ## [3.4.2] - 2026-09-20
 
 ### Changed
@@ -479,6 +485,7 @@ later.
 
 - Initial release of the shell
 
+[3.4.3]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.4.3
 [3.4.2]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.4.2
 [3.4.1]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.4.1
 [3.4.0]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.4.0

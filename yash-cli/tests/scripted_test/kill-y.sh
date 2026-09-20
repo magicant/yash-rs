@@ -55,6 +55,22 @@ wait $!
 :
 __IN__
 
+(
+# SIGVTALRM is not defined on all platforms.
+[ "$("$TESTEE" -c 'kill -l VTALRM' 2>/dev/null)" ] || skip="true"
+
+# The job is killed even if the signal is rejected, so that wait cannot block
+# forever when the test case fails.
+test_oE -e 0 'bare signal name starting with an option letter'
+read x <fifo &
+kill -vtalrm $! || kill -s KILL $!
+wait $!
+kill -l $?
+__IN__
+VTALRM
+__OUT__
+)
+
 test_O -d -e 2 'signal number argument to -s rejected under the portable option' -o portable
 kill -s 9 $$
 __IN__
@@ -104,6 +120,20 @@ kill -s KILL $!
 wait $!
 :
 __IN__
+
+(
+# SIGVTALRM is not defined on all platforms.
+[ "$("$TESTEE" -c 'kill -l VTALRM' 2>/dev/null)" ] || skip="true"
+
+test_oE -e 0 'bare signal name starting with an option letter accepted under the portable option' -o portable
+read x <fifo &
+kill -vtalrm $! || kill -s KILL $!
+wait $!
+kill -l $?
+__IN__
+VTALRM
+__OUT__
+)
 
 test_oE -e 0 'single numeric operand to -l accepted under the portable option' -o portable
 kill -l 15
