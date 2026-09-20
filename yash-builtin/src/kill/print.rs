@@ -21,12 +21,13 @@
 //!
 //! [`print`]: print()
 
+use super::syntax::parse_signal_number;
 use crate::common::report::{merge_reports, report_failure};
 use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::{ExitStatus, Field};
-use yash_env::signal::{Number, RawNumber};
+use yash_env::signal::Number;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::system::concurrency::WriteAll;
 use yash_env::system::{Isatty, Signals};
@@ -102,7 +103,7 @@ impl<'a> From<&'a InvalidSignal<'a>> for Report<'a> {
 fn to_name_and_number<'a, S: Signals>(system: &S, spec: &'a str) -> Option<(Cow<'a, str>, Number)> {
     // TODO Skip any SIG prefix when specified by name
     // TODO Case-insensitive comparison when specified by name
-    if let Ok(number) = spec.parse::<RawNumber>() {
+    if let Some(number) = parse_signal_number(spec) {
         // Specified by number
         ExitStatus(number).to_signal(system, /* exact = */ false)
     } else {
@@ -182,6 +183,15 @@ mod tests {
         // Invalid number
         let result = to_name_and_number(&system, "0");
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn to_name_and_number_rejects_signed_number() {
+        let system = VirtualSystem::new();
+
+        assert_eq!(to_name_and_number(&system, "+9"), None);
+        assert_eq!(to_name_and_number(&system, "-9"), None);
+        assert_eq!(to_name_and_number(&system, "+386"), None);
     }
 
     #[test]

@@ -153,6 +153,22 @@ test_O -d -e 2 'target that is neither a job ID nor a process ID rejected as a s
 kill -s CONT foo
 __IN__
 
+test_O -d -e 2 'signal number with a plus sign rejected in the obsolete syntax'
+kill -+9 $$
+__IN__
+
+test_O -d -e 2 'signal number with a minus sign rejected in the obsolete syntax'
+kill --9 $$
+__IN__
+
+test_O -d -e 2 'signal number with a plus sign rejected as the argument to -s'
+kill -s +9 $$
+__IN__
+
+test_O -d -e 1 'signal number with a plus sign rejected as an operand to -l'
+kill -l -- +9
+__IN__
+
 (
 # The state keyword of ps is not specified by POSIX. Skip the test case where
 # it is not supported rather than reporting a failure that is not the shell's.
