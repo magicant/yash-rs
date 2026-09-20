@@ -470,15 +470,6 @@ fn set_signal(
     Ok(())
 }
 
-/// Converts an invalid signal error to an unknown option error.
-#[must_use]
-fn invalid_signal_to_unknown_option(error: Error) -> Error {
-    match error {
-        Error::InvalidSignal(field) => Error::UnknownOption(field),
-        error => error,
-    }
-}
-
 /// Parses operands after the `-l` or `-v` option, returning the final command.
 fn parse_list_case<I: Iterator<Item = Field>>(
     operands: I,
@@ -518,6 +509,14 @@ pub fn parse<S: Signals>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Erro
         if options == "-" {
             debug_assert_eq!(arg.value, "--");
             break;
+        }
+
+        // The obsolete `-SIGNAL` syntax takes precedence over option parsing so
+        // that a signal name made up of option characters, such as `-stop` or
+        // `-vtalrm`, is not mistaken for a cluster of options.
+        if let Some(number) = parse_signal(&env.system, options, allow_sig_prefix) {
+            set_signal(&mut signal, &mut signal_origin, Some(number), arg)?;
+            continue;
         }
 
         let mut chars = options.chars();
@@ -562,8 +561,7 @@ pub fn parse<S: Signals>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Erro
                             }
                             // If the remainder is a valid signal specification,
                             // it is an option argument attached to the option
-                            // name. Otherwise, the whole cluster may still be a
-                            // signal name as in `-stop`, which POSIX allows.
+                            // name.
                             if parse_signal(&env.system, remainder, allow_sig_prefix).is_some() {
                                 let argument_index = arg.value.len() - remainder.len();
                                 return Err(Error::UnseparatedSignalArgument {
@@ -582,8 +580,7 @@ pub fn parse<S: Signals>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Erro
                         set_signal(
                             &mut signal,
                             &mut signal_origin,
-                            parse_signal(&env.system, remainder, allow_sig_prefix)
-                                .or_else(|| parse_signal(&env.system, options, allow_sig_prefix)),
+                            parse_signal(&env.system, remainder, allow_sig_prefix),
                             arg,
                         )?;
                     }
@@ -602,14 +599,7 @@ pub fn parse<S: Signals>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Erro
                         // option, which would not explain the real cause.
                         check_portable_signal_prefix(&env.system, &arg, 1)?;
                     }
-                    set_signal(
-                        &mut signal,
-                        &mut signal_origin,
-                        parse_signal(&env.system, options, allow_sig_prefix),
-                        arg,
-                    )
-                    .map_err(invalid_signal_to_unknown_option)?;
-                    break;
+                    return Err(Error::UnknownOption(arg));
                 }
             }
         }
@@ -828,6 +818,48 @@ mod tests {
                 signal: VirtualSystem::SIGSTOP.as_raw(),
                 signal_origin: Some(Field::dummy("-stop")),
                 targets: Field::dummies(["1"]),
+            })
+        );
+    }
+
+    #[test]
+    fn bare_signal_name_starting_with_v() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["-vtalrm", "1"]));
+        assert_eq!(
+            result,
+            Ok(Command::Send {
+                signal: VirtualSystem::SIGVTALRM.as_raw(),
+                signal_origin: Some(Field::dummy("-vtalrm")),
+                targets: Field::dummies(["1"]),
+            })
+        );
+    }
+
+    #[test]
+    fn bare_signal_name_starting_with_l() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["-lost", "1"]));
+        assert_eq!(
+            result,
+            Ok(Command::Send {
+                signal: VirtualSystem::SIGLOST.unwrap().as_raw(),
+                signal_origin: Some(Field::dummy("-lost")),
+                targets: Field::dummies(["1"]),
+            })
+        );
+    }
+
+    #[test]
+    fn bare_signal_name_starting_with_v_conflicts_with_option_l() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["-l", "-vtalrm"]));
+        assert_eq!(
+            result,
+            Err(Error::ConflictingOptions {
+                signal_arg: Field::dummy("-vtalrm"),
+                list_option_name: 'l',
+                list_option_location: Location::dummy("-l"),
             })
         );
     }
@@ -1205,6 +1237,20 @@ mod tests {
             Ok(Command::Send {
                 signal: VirtualSystem::SIGSTOP.as_raw(),
                 signal_origin: Some(Field::dummy("-stop")),
+                targets: Field::dummies(["123"]),
+            })
+        );
+    }
+
+    #[test]
+    fn bare_signal_name_starting_with_v_accepted_under_portable() {
+        let env = portable_env();
+        let result = parse(&env, Field::dummies(["-vtalrm", "123"]));
+        assert_eq!(
+            result,
+            Ok(Command::Send {
+                signal: VirtualSystem::SIGVTALRM.as_raw(),
+                signal_origin: Some(Field::dummy("-vtalrm")),
                 targets: Field::dummies(["123"]),
             })
         );

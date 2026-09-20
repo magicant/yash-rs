@@ -13,6 +13,14 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.24.2] - Unreleased
+
+### Fixed
+
+- `kill::syntax::parse` now parses an argument like `-vtalrm` or `-lost` as the
+  signal to send. It previously took the leading `v` or `l` as the `-v` or `-l`
+  option and rejected the rest of the argument.
+
 ## [0.24.1] - 2026-09-20
 
 ### Added
@@ -1214,6 +1222,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - Initial implementation of the `yash-builtin` crate
 
+[0.24.2]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.24.2
 [0.24.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.24.1
 [0.24.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.24.0
 [0.23.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.23.0

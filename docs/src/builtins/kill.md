@@ -158,9 +158,11 @@ TERM` is therefore portable to other implementations, but is not the syntax
 POSIX prescribes for applications.
 
 The `kill -SIGNAL target…` form may not be parsed as expected by other
-implementations when the signal name starts with an `s`. For example, `kill
--stop 123` may try to send the `SIGTOP` signal instead of the `SIGSTOP`
-signal.
+implementations when the signal name starts with a letter that names an option
+there. POSIX defines the `-s` and `-l` options, so a name such as `STOP` or
+`LOST` is especially at risk: `kill -stop 123` may try to send the `SIGTOP`
+signal instead of the `SIGSTOP` signal. Write `kill -s SIGNAL target…` where
+this matters.
 
 POSIX defines the following signal numbers:
 
