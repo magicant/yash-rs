@@ -323,31 +323,38 @@ impl<'a> From<&'a Error> for Report<'a> {
     }
 }
 
-/// Converts a string to a signal.
+/// Parses a string as a signal number.
 ///
-/// The string may be a signal name or a number.
+/// A signal number is a non-empty sequence of ASCII digits, optionally with
+/// redundant leading zeros. A sign is not allowed, so neither `+9` nor `-9` is
+/// a signal number. This function returns `None` if the string is not of this
+/// form or if its value does not fit in a [`RawNumber`]. The returned value is
+/// not necessarily a supported signal number.
+#[must_use]
+pub(super) fn parse_signal_number(signal_spec: &str) -> Option<RawNumber> {
+    if !signal_spec.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    signal_spec.parse().ok()
+}
+
+/// Parses a string as a signal name.
 ///
 /// If the string is a valid signal name as per [`Signals::str2sig`], this
-/// function returns the corresponding signal number. If the string is a decimal
-/// integer, this function returns its value as a signal number regardless of
-/// whether it corresponds to a valid signal. Otherwise, this function returns
-/// `None`.
+/// function returns the corresponding signal number. Otherwise, it returns
+/// `None`. A signal number is not a name, so this function returns `None` for
+/// a string like `9`.
 ///
-/// The signal name is parsed case-insensitively.
+/// The name is parsed case-insensitively.
 ///
 /// If `allow_sig_prefix` is `true`, the `SIG` prefix is optional for signal
 /// names. Otherwise, the `SIG` prefix must **not** be present.
 #[must_use]
-pub fn parse_signal<S: Signals>(
+fn parse_signal_name<S: Signals>(
     system: &S,
     signal_spec: &str,
     allow_sig_prefix: bool,
 ) -> Option<RawNumber> {
-    // Try parsing as a number first
-    if let Ok(number) = signal_spec.parse() {
-        return Some(number);
-    }
-
     // Make the string uppercase for case-insensitive comparison
     let mut signal_spec = Cow::Borrowed(signal_spec);
     if signal_spec.contains(|c: char| c.is_ascii_lowercase()) {
@@ -360,18 +367,29 @@ pub fn parse_signal<S: Signals>(
         .flatten()
         .unwrap_or(&signal_spec);
 
-    // Parse as a signal name
     system.str2sig(signal_name).map(Number::as_raw)
 }
 
-/// Tests whether a signal specification is a signal name rather than a number.
+/// Converts a string to a signal.
 ///
-/// This function returns `true` if the string is not a decimal integer but is a
-/// valid signal name as per [`parse_signal`].
+/// The string may be a signal number or a signal name. If it is neither, this
+/// function returns `None`.
+///
+/// A signal number is a non-empty sequence of ASCII digits. A sign is not
+/// allowed, so neither `+9` nor `-9` is a signal number. Its value is returned
+/// regardless of whether it corresponds to a valid signal.
+///
+/// A signal name is one accepted by [`Signals::str2sig`], parsed
+/// case-insensitively. If `allow_sig_prefix` is `true`, the `SIG` prefix is
+/// optional. Otherwise, the `SIG` prefix must **not** be present.
 #[must_use]
-fn is_signal_name<S: Signals>(system: &S, signal_spec: &str, allow_sig_prefix: bool) -> bool {
-    signal_spec.parse::<RawNumber>().is_err()
-        && parse_signal(system, signal_spec, allow_sig_prefix).is_some()
+pub fn parse_signal<S: Signals>(
+    system: &S,
+    signal_spec: &str,
+    allow_sig_prefix: bool,
+) -> Option<RawNumber> {
+    parse_signal_number(signal_spec)
+        .or_else(|| parse_signal_name(system, signal_spec, allow_sig_prefix))
 }
 
 /// Returns the signal number if the string specifies a signal number that POSIX
@@ -381,10 +399,7 @@ fn is_signal_name<S: Signals>(system: &S, signal_spec: &str, allow_sig_prefix: b
 /// is non-portable.
 #[must_use]
 fn non_portable_signal_number(signal_spec: &str) -> Option<RawNumber> {
-    match signal_spec.parse() {
-        Ok(0) | Err(_) => None,
-        Ok(number) => Some(number),
-    }
+    parse_signal_number(signal_spec).filter(|&number| number != 0)
 }
 
 /// Returns the portable form of a signal name that has the `SIG` prefix.
@@ -412,8 +427,8 @@ fn check_portable_signal_prefix<S: Signals>(
     name_index: usize,
 ) -> Result<(), Error> {
     let signal_spec = &field.value[name_index..];
-    if parse_signal(system, signal_spec, false).is_none()
-        && parse_signal(system, signal_spec, true).is_some()
+    if parse_signal_name(system, signal_spec, false).is_none()
+        && parse_signal_name(system, signal_spec, true).is_some()
     {
         return Err(Error::NonPortableSignalPrefix {
             field: field.clone(),
@@ -433,7 +448,7 @@ fn check_portable_list_operands<S: Signals>(
     allow_sig_prefix: bool,
 ) -> Result<(), Error> {
     if let Some(first) = operands.first()
-        && is_signal_name(system, &first.value, allow_sig_prefix)
+        && parse_signal_name(system, &first.value, allow_sig_prefix).is_some()
     {
         return Err(Error::NonPortableListOperand(first.clone()));
     }
@@ -679,11 +694,27 @@ mod tests {
     }
 
     #[test]
+    fn parse_signal_number_with_redundant_leading_zeros() {
+        let system = VirtualSystem::new();
+        assert_eq!(parse_signal(&system, "09", false), Some(9));
+        assert_eq!(parse_signal(&system, "00", true), Some(0));
+    }
+
+    #[test]
     fn parse_signal_errors() {
         let system = VirtualSystem::new();
         assert_eq!(parse_signal(&system, "", false), None);
         assert_eq!(parse_signal(&system, "TERM1", false), None);
         assert_eq!(parse_signal(&system, "1TERM", false), None);
+    }
+
+    #[test]
+    fn parse_signal_rejects_signed_number() {
+        let system = VirtualSystem::new();
+        assert_eq!(parse_signal(&system, "+9", false), None);
+        assert_eq!(parse_signal(&system, "-9", false), None);
+        assert_eq!(parse_signal(&system, "+0", true), None);
+        assert_eq!(parse_signal(&system, "-0", true), None);
     }
 
     #[test]
@@ -1125,6 +1156,26 @@ mod tests {
     }
 
     #[test]
+    fn signed_signal_number_rejected_as_unknown_option() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["-+9", "123"]));
+        assert_eq!(result, Err(Error::UnknownOption(Field::dummy("-+9"))));
+
+        let result = parse(&env, Field::dummies(["--9", "123"]));
+        assert_eq!(result, Err(Error::UnknownOption(Field::dummy("--9"))));
+    }
+
+    #[test]
+    fn signed_signal_number_rejected_as_argument_to_option_s() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["-s", "+9", "123"]));
+        assert_eq!(result, Err(Error::InvalidSignal(Field::dummy("+9"))));
+
+        let result = parse(&env, Field::dummies(["-s-9", "123"]));
+        assert_eq!(result, Err(Error::InvalidSignal(Field::dummy("-s-9"))));
+    }
+
+    #[test]
     fn missing_target() {
         let env = Env::new_virtual();
         let result = parse(&env, vec![]);
@@ -1310,6 +1361,15 @@ mod tests {
                 number: 9,
             })
         );
+    }
+
+    #[test]
+    fn signed_signal_number_rejected_as_invalid_under_portable() {
+        // The number is not a valid signal specification in the first place,
+        // so it is not reported as a portability problem.
+        let env = portable_env();
+        let result = parse(&env, Field::dummies(["-s", "+9", "123"]));
+        assert_eq!(result, Err(Error::InvalidSignal(Field::dummy("+9"))));
     }
 
     #[test]

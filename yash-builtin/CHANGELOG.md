@@ -20,6 +20,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `kill::syntax::parse` now parses an argument like `-vtalrm` or `-lost` as the
   signal to send. It previously took the leading `v` or `l` as the `-v` or `-l`
   option and rejected the rest of the argument.
+- `kill::syntax::parse_signal` and `kill::print::print` now reject a signal
+  number that has a sign, such as `+9` or `-9`. They previously accepted such a
+  number, which made the `kill` built-in treat `kill -+9 123` and
+  `kill -s -9 123` as valid.
 
 ## [0.24.1] - 2026-09-20
 

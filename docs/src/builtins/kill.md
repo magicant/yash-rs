@@ -25,9 +25,10 @@ The **`-s`** or **`-n`** option specifies the signal to send. The signal name is
 
 (Since 3.3.5) The signal name may be specified with or without the `SIG` prefix; for example, `INT`, `int`, and `SIGINT` all denote the same signal.
 
-The signal may be specified as a number instead of a name. If the number
-is zero, the built-in does not send a signal, but instead checks whether
-the shell can send the signal to the target processes.
+The signal may be specified as a number instead of a name. The number must be
+written with no sign, so `+9` and `-9` are not valid signal numbers. If the
+number is zero, the built-in does not send a signal, but instead checks
+whether the shell can send the signal to the target processes.
 
 The argument to the `-s` or `-n` option may be written in the same argument
 as the option name, as in `-sTERM`, instead of a separate argument.
