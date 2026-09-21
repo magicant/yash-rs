@@ -9,6 +9,12 @@ used by other programs.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.4] - Unreleased
+
+### Fixed
+
+- The `umask` built-in now accepts `--symbolic` as the long name of the `-S` option, and the `unalias` built-in now accepts `--all` as the long name of the `-a` option. The manual described these long names, but the built-ins rejected them as unknown options.
+
 ## [3.4.3] - 2026-09-21
 
 ### Fixed
@@ -487,6 +493,7 @@ later.
 
 - Initial release of the shell
 
+[3.4.4]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.4.4
 [3.4.3]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.4.3
 [3.4.2]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.4.2
 [3.4.1]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.4.1

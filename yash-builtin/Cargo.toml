@@ -1,6 +1,6 @@
 [package]
 name = "yash-builtin"
-version = "0.24.2"
+version = "0.24.3"
 authors = ["WATANABE Yuki <magicant@wonderwand.net>"]
 edition = "2024"
 rust-version = "1.96.0"

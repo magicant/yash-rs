@@ -101,6 +101,8 @@ If no *mode* is given, the built-in prints the current file mode creation mask i
 
 It is an error if the specified *mode* is not a valid file mode creation mask.
 
+The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
+
 ## Exit status
 
 Zero if successful; non-zero if an error occurs.
@@ -130,6 +132,8 @@ If the file mode creation mask is too permissive, sensitive files may become acc
 ## Compatibility
 
 The `umask` built-in is defined in POSIX.1-2024.
+
+The long option name `--symbolic` is a non-standard extension. When the [`portable` option](../environment/options.md#portable) is set, using the long option name is rejected with an error. Use `-S` instead.
 
 POSIX does not specify the default output format used when the `-S` option is not given. Yash-rs, as well as many others, uses octal notation. In any cases, the output can be reused as *mode* to restore the previous mask.
 

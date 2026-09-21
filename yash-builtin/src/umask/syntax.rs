@@ -85,7 +85,7 @@ impl<'a> From<&'a Error> for Report<'a> {
 pub type Result = std::result::Result<Command, Error>;
 
 /// List of all options supported by the `umask` built-in
-const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('S')];
+const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('S').long("symbolic")];
 
 /// Parses command line arguments.
 pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
@@ -135,6 +135,13 @@ mod tests {
     fn symbolic_option() {
         let env = Env::new_virtual();
         let result = parse(&env, Field::dummies(["-S"]));
+        assert_eq!(result, Ok(Command::Show { symbolic: true }));
+    }
+
+    #[test]
+    fn long_symbolic_option() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["--symbolic"]));
         assert_eq!(result, Ok(Command::Show { symbolic: true }));
     }
 

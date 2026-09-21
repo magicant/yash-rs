@@ -27,7 +27,7 @@ use yash_env::source::Location;
 use yash_env::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
 
 /// List of all options supported by the `unalias` built-in
-pub const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('a')];
+pub const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('a').long("all")];
 
 /// Errors that can occur while parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -38,7 +38,7 @@ pub enum Error {
     CommonError(#[from] crate::common::syntax::ParseError<'static>),
 
     /// The `-a` option was specified with other operands.
-    #[error("`-a` cannot be used with operands")]
+    #[error("-a/--all cannot be used with operands")]
     ConflictingOptionAndOperand {
         option_location: Location,
         operand_location: Location,
@@ -59,9 +59,9 @@ impl Error {
             Self::ConflictingOptionAndOperand {
                 option_location,
                 operand_location,
-            } => ("`-a` cannot be used with operands", {
+            } => ("-a/--all cannot be used with operands", {
                 let mut snippets =
-                    Snippet::with_primary_span(option_location, "`-a` specified here".into());
+                    Snippet::with_primary_span(option_location, "-a/--all specified here".into());
                 add_span(
                     &operand_location.code,
                     Span {
@@ -116,11 +116,37 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
+
+    #[test]
+    fn conflicting_option_and_operand_report_shows_both_option_names() {
+        let error = Error::ConflictingOptionAndOperand {
+            option_location: Location::dummy("--all"),
+            operand_location: Location::dummy("foo"),
+        };
+        let report = error.to_report();
+        assert_eq!(report.title, "-a/--all cannot be used with operands");
+        assert_matches!(&report.snippets[..], [option, _operand] => {
+            assert_matches!(&option.spans[..], [span] => {
+                assert_eq!(
+                    span.role,
+                    SpanRole::Primary { label: "-a/--all specified here".into() },
+                );
+            });
+        });
+    }
 
     #[test]
     fn all_option() {
         let env = Env::new_virtual();
         let result = parse(&env, Field::dummies(["-a"]));
+        assert_eq!(result, Ok(Command::RemoveAll));
+    }
+
+    #[test]
+    fn long_all_option() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["--all"]));
         assert_eq!(result, Ok(Command::RemoveAll));
     }
 
