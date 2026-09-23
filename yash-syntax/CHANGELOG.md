@@ -13,6 +13,13 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.25.1] - Unreleased
+
+### Changed
+
+- Public dependency versions:
+    - yash-env 0.17.0 → 0.17.1
+
 ## [0.25.0] - 2026-09-06
 
 ### Changed
@@ -817,6 +824,7 @@ command.
 - Functionalities to parse POSIX shell scripts
 - Alias substitution support
 
+[0.25.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.25.1
 [0.25.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.25.0
 [0.24.0]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.24.0
 [0.23.1]: https://github.com/magicant/yash-rs/releases/tag/yash-syntax-0.23.1

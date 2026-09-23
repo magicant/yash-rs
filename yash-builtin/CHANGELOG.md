@@ -13,6 +13,14 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.24.4] - Unreleased
+
+### Changed
+
+- Public dependency versions:
+    - yash-env 0.17.0 → 0.17.1
+    - yash-semantics (optional) 0.21.0 → 0.21.1
+
 ## [0.24.3] - 2026-09-23
 
 ### Fixed
@@ -1240,6 +1248,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - Initial implementation of the `yash-builtin` crate
 
+[0.24.4]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.24.4
 [0.24.3]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.24.3
 [0.24.2]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.24.2
 [0.24.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.24.1
