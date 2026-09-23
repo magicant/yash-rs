@@ -17,6 +17,13 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- `kill::print::print` now accepts a signal name operand case-insensitively and
+  with or without the `SIG` prefix, matching the way `kill::syntax::parse_signal`
+  parses the name of the signal to send.
+- `kill::syntax::parse` now returns `Error::NonPortableListOperand` for an
+  operand to the `-l` or `-v` option that names a signal with the `SIG` prefix
+  while the `portable` shell option is on. Such an operand was previously left
+  to `kill::print::print`, which rejected it as an unrecognized operand.
 - Public dependency versions:
     - yash-env 0.17.0 → 0.17.1
     - yash-semantics (optional) 0.21.0 → 0.21.1

@@ -58,7 +58,12 @@ output to the specified signals. Each operand is one of the following:
 
 - The [exit status](../language/commands/exit_status.md#exit-status) of a process that was terminated by a signal
 - A signal number
-- A signal name without the `SIG` prefix
+- A signal name
+
+(Since 3.5.0) A signal name operand is case-insensitive and may be written with
+or without the `SIG` prefix, just like the argument to the `-s` option. The name
+is printed in the uppercase form without the prefix, whichever form the operand
+takes.
 
 Without operands, the `-l` and `-v` options list all signals.
 
@@ -142,8 +147,7 @@ Exit status 399 corresponds to SIGTERM
 The `kill` built-in is specified by POSIX.1-2024.
 
 POSIX requires the signal name to be specified without the `SIG` prefix, so
-accepting the prefix is a non-standard extension. The operands to the `-l` and
-`-v` options never accept the prefix.
+accepting the prefix is a non-standard extension.
 
 Specifying a signal number other than `0` to the `-s` option is a
 non-standard extension.
