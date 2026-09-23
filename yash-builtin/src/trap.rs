@@ -34,7 +34,7 @@ use crate::common::syntax::Mode;
 use crate::common::syntax::parse_arguments;
 use thiserror::Error;
 use yash_env::Env;
-use yash_env::option::Option::Interactive;
+use yash_env::option::Option::{Interactive, Portable};
 use yash_env::option::State::On;
 use yash_env::semantics::ExitStatus;
 use yash_env::semantics::Field;
@@ -283,12 +283,16 @@ where
         Err(error) => return report_error(env, &error).await,
     };
 
-    let command = match syntax::interpret(options, operands, &env.system) {
+    let command = match syntax::interpret(options, operands, &env.system, env.options.get(Portable))
+    {
         Ok(command) => command,
         Err(errors) => {
-            let is_soft_failure = errors
-                .iter()
-                .all(|e| matches!(e, syntax::Error::UnknownCondition(_)));
+            let is_soft_failure = errors.iter().all(|e| {
+                matches!(
+                    e,
+                    syntax::Error::UnknownCondition(_) | syntax::Error::NonPortableCondition(_)
+                )
+            });
             let report = merge_reports(&errors).unwrap();
             let mut result = report_error(env, report).await;
             if is_soft_failure {
@@ -477,6 +481,25 @@ mod tests {
             is_special: true,
         }));
         let args = Field::dummies(["echo", "FOOBAR"]);
+
+        let actual_result = main(&mut env, args).now_or_never().unwrap();
+        let expected_result =
+            Result::with_exit_status_and_divert(ExitStatus::FAILURE, Continue(()));
+        assert_eq!(actual_result, expected_result);
+        assert_stderr(&state, |stderr| assert_ne!(stderr, ""));
+    }
+
+    #[test]
+    fn non_portable_condition() {
+        let system = VirtualSystem::new();
+        let state = Rc::clone(&system.state);
+        let mut env = Env::with_system(Rc::new(Concurrent::new(system)));
+        env.options.set(Portable, On);
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
+            name: Field::dummy("trap"),
+            is_special: true,
+        }));
+        let args = Field::dummies(["echo", "SIGINT"]);
 
         let actual_result = main(&mut env, args).now_or_never().unwrap();
         let expected_result =

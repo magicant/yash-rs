@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The `kill` built-in now accepts a signal name operand to the `-l` or `-v` option case-insensitively and with or without the `SIG` prefix, as in `kill -l sigint`, and prints the name in the uppercase form without the prefix. With `portable` enabled, a signal name operand remains an error whether or not it has the prefix.
+- The `trap` built-in now accepts a condition name case-insensitively and a signal name with or without the `SIG` prefix, as in `trap '' sigint` or `trap 'echo bye' exit`. With `portable` enabled, a name in such a form is rejected as an invalid condition.
 
 ## [3.4.4] - 2026-09-23
 
