@@ -80,6 +80,9 @@ dep_events : crate -> set of workspace crates whose new version it must record
 worklist   : queue of crates whose severity rose and whose dependents are not yet fanned out
 root_before: crate -> its root requirement as it stood before Phase 3
 root_raised: crate -> whether Phase 3 raised that requirement
+cli_sources: set of crates other than yash-cli whose own change in the diff
+             implements a shell-observable behavior change
+cli_needs  : set of crates whose new version yash-cli must require   # see CLI_PATH
 log        : append-only list of (crate, severity, reason)   # the audit trail
 ```
 
@@ -95,11 +98,14 @@ later re-raise of an upstream crate cannot leave a stale version behind —
 ```
 MAIN(diff):
     severity := {} ; version := {} ; dep_events := {} ; worklist := []
-    root_before := {} ; root_raised := {} ; log := []
+    root_before := {} ; root_raised := {} ; cli_sources := {} ; cli_needs := {}
+    log := []
 
     # ---- Phase 1: seed from the diff --------------------------------------
     for each crate C that has a changed file in diff:
         RAISE(C, CLASSIFY(C, diff), "own source/manifest changed")
+        if C != "yash-cli" and C's change implements shell-observable behavior:
+            cli_sources += C
 
     if diff changes shell-observable behavior (in any crate whatsoever):
         RAISE("yash-cli", CLASSIFY("yash-cli", diff),
@@ -121,7 +127,9 @@ MAIN(diff):
     # ---- Phase 3: write the files ----------------------------------------
     for each crate C in severity:
         set `version` in C/Cargo.toml to version[C]
-        WRITE_CHANGELOG(C)                         # changelog before SYNC_ROOT: case 2 reads it
+        WRITE_CHANGELOG(C)                         # changelog before SYNC_ROOT: case 3 reads it
+    for each crate S in cli_sources:
+        cli_needs += CLI_PATH(S)                   # before SYNC_ROOT: case 2 reads it
     for each crate X in severity:
         root_before[X] := current root requirement for X
         root_raised[X] := SYNC_ROOT(X)             # ask the maintainer at most once
@@ -291,7 +299,7 @@ decided by `SYNC_ROOT` — do not conflate "does the root requirement rise" with
 "does this dependent get a changelog entry and version bump." The two are
 independent: a crate can (and often does) get a patch bump purely to record a
 dependency note even while the root requirement for that dependency stays put
-(`SYNC_ROOT` case 2).
+(`SYNC_ROOT` case 3).
 
 ### IS_PUBLIC_DEP — trust the changelog history
 
@@ -340,14 +348,20 @@ SYNC_ROOT(X) -> raised?:             # returns whether it raised the requirement
         root[X] := version[X]            # mechanical; no confirmation needed
         return true
 
-    # case 2 — Internal-only compatible bump: leave the requirement unchanged
+    # case 2 — Required by yash-cli: X implements, or lies on yash-cli's
+    # dependency path to, a change recorded in yash-cli/CHANGELOG.md
+    if X in cli_needs:
+        root[X] := version[X]            # mechanical; no confirmation needed
+        return true
+
+    # case 3 — Internal-only compatible bump: leave the requirement unchanged
     if X's Unreleased changelog entries consist ONLY of
            - a Rust / MSRV version bump, and/or
            - internal fixes that do not touch the public API, and/or
            - private-dependency version bumps:
         return false                     # mechanical; no confirmation needed
 
-    # case 3 — Public-API compatible bump: ask the maintainer (default: leave)
+    # case 4 — Public-API compatible bump: ask the maintainer (default: leave)
     if X's Unreleased changelog includes any public-API addition or change:
         if ASK_MAINTAINER("Does any dependent now require the new " + X +
                           ", so the workspace requirement should be raised?"):
@@ -359,15 +373,50 @@ SYNC_ROOT(X) -> raised?:             # returns whether it raised the requirement
 
 - Case 1 rationale: the old caret requirement excludes the new version, so
   dependents cannot build against it. **Always raise.**
-- Case 2 rationale: no dependent can depend on anything new in X, so **keep the
+- Case 2 rationale: a shell behavior change that `yash-cli/CHANGELOG.md` records
+  often lives in another crate, and `yash-cli` ships it only if Cargo resolves
+  that crate to a version containing it. With the requirement left at the old
+  minimum, a build may resolve an older version and produce a binary without
+  the change the changelog promises. Example: the `umask`/`unalias` long-option
+  fix in `yash-cli` 3.4.4 lives in `yash-builtin` 0.24.3; with the requirement
+  `yash-builtin = "0.24.1"`, `yash-cli` 3.4.4 could build against
+  `yash-builtin` 0.24.2 and lack the fix. **Always raise**, even when X's
+  change is an internal fix that case 3 would otherwise leave alone.
+- Case 3 rationale: no dependent can depend on anything new in X, so **keep the
   root requirement as is**. (A Rust/MSRV bump stays in this case **regardless of
   whether the changelog files it under "Public" or "Private dependency
   versions"** — what matters is that it adds no adoptable API. Example:
   `yash-arith 0.2.4`, whose only Unreleased change is a Rust version bump listed
   under *Public dependency versions*, still leaves the root requirement correctly
   at `0.2.3`.)
-- Case 3 rationale: a dependent *could* now adopt the addition, but this skill
+- Case 4 rationale: a dependent *could* now adopt the addition, but this skill
   cannot reliably tell from the diff whether one actually did.
+
+### CLI_PATH — crates whose requirement must rise for yash-cli to get S's change
+
+```
+CLI_PATH(S):
+    # follow [dependencies] only; [dev-dependencies] do not reach the binary
+    if yash-cli depends directly on S:
+        return {S}
+    pick one shortest chain yash-cli -> D1 -> ... -> Dn -> S
+    return {D1, ..., Dn, S}              # never includes yash-cli itself
+```
+
+When `yash-cli` depends directly on S, raising the requirement for S alone is
+enough. Cargo resolves all semver-compatible requirements on a crate to a single
+version, so no other crate on the way can pull in an older S.
+
+When `yash-cli` reaches S only through other crates, raising S alone is not
+enough. Suppose `yash-cli` depends on `yash-semantics`, which depends on
+`yash-fnmatch`, and the fix lives in `yash-fnmatch`. Raising only the
+`yash-fnmatch` requirement still lets a build pick an older `yash-semantics`
+release that asks for an older `yash-fnmatch`, so the `yash-semantics`
+requirement must rise as well, to the release that requires the new
+`yash-fnmatch`. One chain is enough for the same reason as above, and raising
+the others would push requirements above what dependents actually need. Every
+crate on the chain is already in `severity` after Phase 2, since each one is a
+direct or indirect dependent of S and Phase 2 fans out transitively.
 
 ### WRITE_CHANGELOG
 
@@ -443,12 +492,14 @@ VALIDATE():
     # C. Root table — a gap here is often CORRECT
     for each crate X in severity:                    # read the Phase 3 outcome;
         if root_raised[X]:                           # never call SYNC_ROOT again —
-            assert root entry for X == version[X]    # it is side-effecting and case 3
+            assert root entry for X == version[X]    # it is side-effecting and case 4
         else:                                        # would re-prompt the maintainer
             assert root entry for X == root_before[X]
             # the root deliberately stays at the lower caret minimum;
             # do NOT "fix" that gap (e.g. yash-arith crate 0.2.4 with root
-            # requirement 0.2.3 is correct under SYNC_ROOT case 2)
+            # requirement 0.2.3 is correct under SYNC_ROOT case 3)
+    for each crate Y in cli_needs:
+        assert Y in severity and root_raised[Y]      # SYNC_ROOT case 1 or 2 raised Y
 
     # D. Build artifacts and checks
     run `cargo build` / `cargo test`      # regenerates Cargo.lock
