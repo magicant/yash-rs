@@ -192,22 +192,41 @@ CLASSIFY(C, diff):
 
     if C == "yash-cli":                                  # classify by WHAT USERS GET
         if the release adds something a user can newly invoke
-           (a new shell option, built-in, syntax, or the like):
+           (a new shell option, built-in, syntax, accepted input form,
+            or the like) that the manual did not already promise:
                                                     return COMPATIBLE   # a minor bump
         else:                                       return PATCH
 ```
 
 For `yash-cli`, *anything else* is **patch-level**: a change or restriction of
-existing behavior, a relaxation of it, or a bug fix. **Refining existing behavior
-is patch-level**, including each new rejection added under the `portable` option.
+existing behavior, or a bug fix. **Refining existing behavior is patch-level**,
+including each new rejection added under the `portable` option.
 
 The test to apply: does the release *add* something a user can newly invoke?
 "Users can now write X" is minor; "the shell now rejects / now reports / now
-behaves differently for X" is patch. Precedents: 3.3.0 was minor because it
-introduced the `portable` option itself, while versions 3.3.1 through 3.3.4
-stayed patch-level despite carrying many new `portable` rejections. 3.4.0 was
-minor despite also carrying many such rejections, because it separately added the
-`kill -SIGINT` form users can newly write — the rejections did not earn the bump.
+behaves differently for X" is patch. A newly accepted form of input counts as
+something users can newly write, even when it extends an existing built-in or
+syntax, as long as the manual presents it as new.
+
+What decides the bump is whether the manual already promised the form, not
+whether the shell accepts more input than before. When the manual already
+described a form and the shell wrongly rejected it, accepting the form is a bug
+fix and stays patch-level.
+
+Precedents:
+
+- 3.3.0 was minor because it introduced the `portable` option itself, while
+  versions 3.3.1 through 3.3.4 stayed patch-level despite carrying many new
+  `portable` rejections.
+- 3.4.0 was minor despite also carrying many such rejections, because it
+  separately added the `kill -SIGINT` form users can newly write — the
+  rejections did not earn the bump.
+- 3.4.4 was patch-level although `umask` and `unalias` started accepting the long
+  options `--symbolic` and `--all`, because the manual already described those
+  options and the change only fixed the built-ins that rejected them.
+- 3.5.0 is minor because `kill -l` and `kill -v` now accept a signal name
+  operand in any case and with the `SIG` prefix, as in `kill -l sigint`, which
+  the manual did not describe before.
 
 `yash-cli` re-exports nothing, so only observable behavior drives its version. A
 dependency bump alone never bumps `yash-cli` (see `PROPAGATED_SEVERITY`), and
