@@ -19,3 +19,17 @@ a-b
 __IN__
 substituted
 __OUT__
+
+test_OE -e 0 'unalias long option name accepted as an extension'
+alias a='echo a'
+unalias --all
+alias
+__IN__
+
+test_O -d -e 2 'unalias long option name rejected under the portable option' -o portable
+unalias --all
+__IN__
+
+test_OE -e 0 'unalias short option name still accepted under the portable option' -o portable
+unalias -a
+__IN__

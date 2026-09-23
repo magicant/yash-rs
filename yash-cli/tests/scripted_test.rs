@@ -594,6 +594,11 @@ fn umask_builtin() {
 }
 
 #[test]
+fn umask_builtin_ex() {
+    run("umask-y.sh")
+}
+
+#[test]
 fn unset_builtin() {
     run("unset-p.sh")
 }
