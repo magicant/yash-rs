@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [3.5.0] - Unreleased
 
+### Added
+
+- The shell now prints a help message and exits when started with the `--help` option. The message summarizes the command-line syntax and lists the options available at startup. Previously, the shell accepted the option but aborted with an internal error.
+
 ### Changed
 
 - The `kill` built-in now accepts a signal name operand to the `-l` or `-v` option case-insensitively and with or without the `SIG` prefix, as in `kill -l sigint`, and prints the name in the uppercase form without the prefix. With `portable` enabled, a signal name operand remains an error whether or not it has the prefix.

@@ -42,6 +42,12 @@ The shell accepts [shell options] to control its behavior. The following options
 `--norcfile`
 : Do not execute any [rcfile].
 
+`--help`
+: (Since 3.5.0) Print a summary of the command-line syntax and options, and exit.
+
+`-V` (`--version`)
+: Print the version of the shell, and exit.
+
 ### Modes of operation
 
 The shell has three modes:

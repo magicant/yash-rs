@@ -29,11 +29,12 @@ use self::startup::args::Parse;
 use self::startup::init_file::run_rcfile;
 use self::startup::input::prepare_input;
 use std::cell::RefCell;
+use std::fmt::Write as _;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
 use yash_env::Env;
 use yash_env::RealSystem;
-use yash_env::option::{Interactive, On, Portable};
+use yash_env::option::{Interactive, Off, On, Portable};
 use yash_env::semantics::{Divert, ExitStatus, exit_or_raise};
 use yash_env::system::concurrency::WriteAll;
 use yash_env::system::resource::GetRlimit;
@@ -43,6 +44,50 @@ use yash_env::system::{
 };
 use yash_semantics::trap::run_exit_trap;
 use yash_semantics::{Runtime, interactive_read_eval_loop, read_eval_loop};
+
+async fn print_help<S>(env: &mut Env<S>)
+where
+    S: Isatty + WriteAll,
+{
+    let mut help = "\
+Usage:
+  yash3 [OPTION...] [FILE [ARGUMENT...]]
+  yash3 [OPTION...] -c COMMAND [COMMAND_NAME [ARGUMENT...]]
+  yash3 [OPTION...] -s [ARGUMENT...]
+
+Startup options:
+      --help
+  -V, --version
+      --profile=FILE
+      --noprofile
+      --rcfile=FILE
+      --norcfile
+
+Shell options:
+  Turn on an option with -o NAME or --NAME, and turn it off with +o NAME or
+  ++NAME. Prefixing NAME with \"no\" reverses the effect, as in -o noglob.
+  Each single-letter option below does the same as the -o form beside it,
+  and swapping its - or + reverses the effect.
+
+"
+    .to_owned();
+    for option in yash_env::option::Option::iter() {
+        match option.short_name() {
+            Some((name, On)) => writeln!(help, "  -{name}  -o {option}"),
+            Some((name, Off)) => writeln!(help, "  +{name}  -o {option}"),
+            None => writeln!(help, "      -o {option}"),
+        }
+        .unwrap();
+    }
+    help.push_str(concat!(
+        "\nSee <",
+        env!("CARGO_PKG_HOMEPAGE"),
+        "> for details.\n"
+    ));
+
+    let result = yash_builtin::common::output(env, &help).await;
+    env.exit_status = result.exit_status();
+}
 
 async fn print_version<S>(env: &mut Env<S>)
 where
@@ -74,7 +119,7 @@ where
 {
     // Parse the command-line arguments
     let run = match self::startup::args::parse(std::env::args()) {
-        Ok(Parse::Help) => todo!("print help"),
+        Ok(Parse::Help) => return print_help(env).await,
         Ok(Parse::Version) => return print_version(env).await,
         Ok(Parse::Run(run)) => run,
         Err(e) => {

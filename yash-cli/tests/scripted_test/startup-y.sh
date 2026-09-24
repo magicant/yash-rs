@@ -572,135 +572,51 @@ __OUT__
 # Tested in job-y.tst
 #test_oE 'job control is on by default in interactive shell'
 
-(
-# TODO not yet implemented
-test_oE -e 0 -f 'help' --help
+test_oE -e 0 'help' --help
 __IN__
-Syntax:
-	yash [option...] [filename [argument...]]
-	yash [option...] -c command [command_name [argument...]]
-	yash [option...] -s [argument...]
+Usage:
+  yash3 [OPTION...] [FILE [ARGUMENT...]]
+  yash3 [OPTION...] -c COMMAND [COMMAND_NAME [ARGUMENT...]]
+  yash3 [OPTION...] -s [ARGUMENT...]
 
-Options:
-	         --help
-	-V       --version
-	         --noprofile
-	         --norcfile
-	         --profile=...
-	         --rcfile=...
-	-a       -o allexport
-	         -o braceexpand
-	         -o caseglob
-	+C       -o clobber
-	-c       -o cmdline
-	         -o curasync
-	         -o curbg
-	         -o curstop
-	         -o dotglob
-	         -o emacs
-	         -o emptylastfield
-	-e       -o errexit
-	         -o errreturn
-	+n       -o exec
-	         -o extendedglob
-	         -o forlocal
-	+f       -o glob
-	-h       -o hashondef
-	         -o histspace
-	         -o ignoreeof
-	-i       -o interactive
-	         -o lealwaysrp
-	         -o lecompdebug
-	         -o leconvmeta
-	         -o lenoconvmeta
-	         -o lepredict
-	         -o lepredictempty
-	         -o lepromptsp
-	         -o letrimright
-	         -o levisiblebell
-	         -o log
-	-l       -o login
-	         -o markdirs
-	-m       -o monitor
-	-b       -o notify
-	         -o notifyle
-	         -o nullglob
-	         -o pipefail
-	         -o posixlycorrect
-	-s       -o stdin
-	         -o traceall
-	+u       -o unset
-	-v       -o verbose
-	         -o vi
-	-x       -o xtrace
+Startup options:
+      --help
+  -V, --version
+      --profile=FILE
+      --noprofile
+      --rcfile=FILE
+      --norcfile
 
-Try `man yash' for details.
+Shell options:
+  Turn on an option with -o NAME or --NAME, and turn it off with +o NAME or
+  ++NAME. Prefixing NAME with "no" reverses the effect, as in -o noglob.
+  Each single-letter option below does the same as the -o form beside it,
+  and swapping its - or + reverses the effect.
+
+  -a  -o allexport
+  +C  -o clobber
+  -c  -o cmdline
+  -e  -o errexit
+  +n  -o exec
+  +f  -o glob
+  -h  -o hashondefinition
+      -o ignoreeof
+  -i  -o interactive
+      -o log
+  -l  -o login
+  -m  -o monitor
+  -b  -o notify
+      -o pipefail
+      -o portable
+      -o posixlycorrect
+  -s  -o stdin
+  +u  -o unset
+  -v  -o verbose
+      -o vi
+  -x  -o xtrace
+
+See <https://magicant.github.io/yash-rs/> for details.
 __OUT__
-#'
-#`
-
-# No long options in the POSIXly-correct mode
-# TODO not yet implemented
-test_oE -e 0 -f 'help (POSIX)' --help --posixly-correct
-__IN__
-Syntax:
-	sh [option...] [filename [argument...]]
-	sh [option...] -c command [command_name [argument...]]
-	sh [option...] -s [argument...]
-
-Options:
-	-a       -o allexport
-	         -o braceexpand
-	         -o caseglob
-	+C       -o clobber
-	-c       -o cmdline
-	         -o curasync
-	         -o curbg
-	         -o curstop
-	         -o dotglob
-	         -o emacs
-	         -o emptylastfield
-	-e       -o errexit
-	         -o errreturn
-	+n       -o exec
-	         -o extendedglob
-	         -o forlocal
-	+f       -o glob
-	-h       -o hashondef
-	         -o histspace
-	         -o ignoreeof
-	-i       -o interactive
-	         -o lealwaysrp
-	         -o lecompdebug
-	         -o leconvmeta
-	         -o lenoconvmeta
-	         -o lepredict
-	         -o lepredictempty
-	         -o lepromptsp
-	         -o letrimright
-	         -o levisiblebell
-	         -o log
-	-l       -o login
-	         -o markdirs
-	-m       -o monitor
-	-b       -o notify
-	         -o notifyle
-	         -o nullglob
-	         -o pipefail
-	         -o posixlycorrect
-	-s       -o stdin
-	         -o traceall
-	+u       -o unset
-	-v       -o verbose
-	         -o vi
-	-x       -o xtrace
-
-Try `man yash' for details.
-__OUT__
-#'
-#`
-
-)
 
 test_E -e 0 'version' --version
 __IN__
