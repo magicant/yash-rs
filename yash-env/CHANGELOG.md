@@ -13,6 +13,14 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.17.1] - Unreleased
+
+### Added
+
+- `signal::canonical_name` converts a signal name to the uppercase form without
+  the `SIG` prefix that `system::Signals::str2sig` recognizes. It lets a
+  signal name be parsed case-insensitively and optionally with the prefix.
+
 ## [0.17.0] - 2026-09-06
 
 ### Changed
@@ -1506,6 +1514,7 @@ This version has been yanked due to an issue that prevents the crate from buildi
 
 - Initial implementation of the `yash-env` crate
 
+[0.17.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.17.1
 [0.17.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.17.0
 [0.16.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.16.1
 [0.16.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.16.0

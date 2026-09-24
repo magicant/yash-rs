@@ -39,6 +39,7 @@
 //!
 //! All proper signal names start with `"SIG"`. However, functions that
 //! operate on signal names usually expect names without the `"SIG"` prefix.
+//! The [`canonical_name`] function converts a signal name to that form.
 
 use crate::system::Errno;
 #[cfg(doc)]
@@ -490,4 +491,62 @@ impl std::fmt::UpperHex for Number {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
+}
+
+/// Returns the canonical form of a signal name.
+///
+/// [`Signals::str2sig`] recognizes a signal name only in the uppercase form
+/// without the `SIG` prefix, so a name the user wrote must be converted to that
+/// form first. This function uppercases the name and, if `allow_sig_prefix` is
+/// `true`, removes the `SIG` prefix, which is matched case-insensitively.
+///
+/// The result is not necessarily a valid signal name.
+#[must_use]
+pub fn canonical_name(name: &str, allow_sig_prefix: bool) -> Cow<'_, str> {
+    let name = match name.split_at_checked(3) {
+        Some((prefix, rest)) if allow_sig_prefix && prefix.eq_ignore_ascii_case("SIG") => rest,
+        _ => name,
+    };
+
+    let mut name = Cow::Borrowed(name);
+    if name.contains(|c: char| c.is_ascii_lowercase()) {
+        name.to_mut().make_ascii_uppercase();
+    }
+    name
+}
+
+#[test]
+fn canonical_name_uppercases_name() {
+    assert_eq!(canonical_name("int", false), "INT");
+    assert_eq!(canonical_name("Int", true), "INT");
+    assert_eq!(canonical_name("rtmin+1", false), "RTMIN+1");
+}
+
+#[test]
+fn canonical_name_borrows_uppercase_name() {
+    assert!(matches!(canonical_name("INT", false), Cow::Borrowed("INT")));
+    assert!(matches!(
+        canonical_name("SIGINT", true),
+        Cow::Borrowed("INT")
+    ));
+}
+
+#[test]
+fn canonical_name_removes_sig_prefix_if_allowed() {
+    assert_eq!(canonical_name("SIGINT", true), "INT");
+    assert_eq!(canonical_name("sigint", true), "INT");
+    assert_eq!(canonical_name("SigInt", true), "INT");
+}
+
+#[test]
+fn canonical_name_keeps_sig_prefix_if_not_allowed() {
+    assert_eq!(canonical_name("SIGINT", false), "SIGINT");
+    assert_eq!(canonical_name("sigint", false), "SIGINT");
+}
+
+#[test]
+fn canonical_name_keeps_short_name() {
+    assert_eq!(canonical_name("", true), "");
+    assert_eq!(canonical_name("SI", true), "SI");
+    assert_eq!(canonical_name("SIG", true), "");
 }

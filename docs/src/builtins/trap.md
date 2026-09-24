@@ -44,12 +44,13 @@ The *action* may be omitted if the first *condition* is a non-negative decimal i
 
 A ***condition*** specifies when the action is triggered. It may be one of the following:
 
-- A symbolic name of a [signal](../environment/traps.md#what-are-signals) without the `SIG` prefix (e.g. `INT`, `QUIT`, `TERM`)
-    - Signal names must be specified in uppercase. Lowercase names and the `SIG` prefix may be supported in the future.
+- A symbolic name of a [signal](../environment/traps.md#what-are-signals) (e.g. `INT`, `QUIT`, `TERM`)
 - A positive decimal integer representing a signal number
     - The number must be written with no sign, so `+2` is not a valid signal number.
 - The number `0` or the symbolic name `EXIT` representing the [termination](../termination.md) of the main shell process
     - This condition is not triggered when the shell exits due to a signal.
+
+(Since 3.5.0) Symbolic names are case-insensitive, and a signal name may be written with or without the `SIG` prefix; for example, `INT`, `int`, and `SIGINT` all denote the same signal, and `exit` denotes the same condition as `EXIT`.
 
 ## Errors
 
@@ -104,7 +105,11 @@ The `--print` long option name is a non-standard extension.
 
 (Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, using it is rejected with an error. Use `-p` instead.
 
-Portable scripts should specify signals in uppercase letters without the `SIG` prefix. Specifying signals by numbers is discouraged as signal numbers vary among systems.
+POSIX requires a symbolic name of a *condition* to be written in uppercase letters, and a signal name to be written without the `SIG` prefix. Accepting lowercase names and the prefix is a non-standard extension.
+
+(Since 3.5.0) When the [`portable` option](../environment/options.md#portable) is set, such names are rejected as invalid *conditions*.
+
+Specifying signals by numbers is discouraged as signal numbers vary among systems.
 
 The result of setting a trap to `SIGKILL` or `SIGSTOP` is undefined by POSIX.
 

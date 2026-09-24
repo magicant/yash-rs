@@ -27,7 +27,7 @@ use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::{ExitStatus, Field};
-use yash_env::signal::Number;
+use yash_env::signal::{Number, canonical_name};
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 use yash_env::system::concurrency::WriteAll;
 use yash_env::system::{Isatty, Signals};
@@ -101,16 +101,14 @@ impl<'a> From<&'a InvalidSignal<'a>> for Report<'a> {
 
 /// Converts a signal specification string to a signal name and number.
 fn to_name_and_number<'a, S: Signals>(system: &S, spec: &'a str) -> Option<(Cow<'a, str>, Number)> {
-    // TODO Skip any SIG prefix when specified by name
-    // TODO Case-insensitive comparison when specified by name
     if let Some(number) = parse_signal_number(spec) {
         // Specified by number
         ExitStatus(number).to_signal(system, /* exact = */ false)
     } else {
         // Specified by name
-        system
-            .str2sig(spec)
-            .map(|number| (Cow::Borrowed(spec), number))
+        let name = canonical_name(spec, true);
+        let number = system.str2sig(&name)?;
+        Some((name, number))
     }
 }
 
@@ -208,6 +206,35 @@ mod tests {
         // Invalid name
         let result = to_name_and_number(&system, "FOO");
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn to_name_and_number_from_name_with_sig_prefix() {
+        let system = VirtualSystem::new();
+
+        let result = to_name_and_number(&system, "SIGTERM");
+        assert_eq!(
+            result,
+            Some((Cow::Borrowed("TERM"), VirtualSystem::SIGTERM))
+        );
+
+        // The prefix alone is not a signal name.
+        assert_eq!(to_name_and_number(&system, "SIG"), None);
+        assert_eq!(to_name_and_number(&system, "SIGSIGTERM"), None);
+    }
+
+    #[test]
+    fn to_name_and_number_from_name_case_insensitively() {
+        let system = VirtualSystem::new();
+
+        assert_eq!(
+            to_name_and_number(&system, "Int"),
+            Some((Cow::Borrowed("INT"), VirtualSystem::SIGINT))
+        );
+        assert_eq!(
+            to_name_and_number(&system, "sigquit"),
+            Some((Cow::Borrowed("QUIT"), VirtualSystem::SIGQUIT))
+        );
     }
 
     #[test]

@@ -13,6 +13,30 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.25.0] - Unreleased
+
+### Added
+
+- `trap::syntax::Error::NonPortableCondition`, returned by
+  `trap::syntax::interpret` for a condition name that is not in uppercase or
+  that has the `SIG` prefix while the `portable` shell option is on.
+
+### Changed
+
+- `trap::syntax::interpret` now takes an `option::State` parameter that tells
+  whether the `portable` shell option is on. It now parses a condition name
+  case-insensitively and a signal name with or without the `SIG` prefix.
+- `kill::print::print` now accepts a signal name operand case-insensitively and
+  with or without the `SIG` prefix, matching the way `kill::syntax::parse_signal`
+  parses the name of the signal to send.
+- `kill::syntax::parse` now returns `Error::NonPortableListOperand` for an
+  operand to the `-l` or `-v` option that names a signal with the `SIG` prefix
+  while the `portable` shell option is on. Such an operand was previously left
+  to `kill::print::print`, which rejected it as an unrecognized operand.
+- Public dependency versions:
+    - yash-env 0.17.0 → 0.17.1
+    - yash-semantics (optional) 0.21.0 → 0.21.1
+
 ## [0.24.3] - 2026-09-23
 
 ### Fixed
@@ -1240,6 +1264,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - Initial implementation of the `yash-builtin` crate
 
+[0.25.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.25.0
 [0.24.3]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.24.3
 [0.24.2]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.24.2
 [0.24.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.24.1

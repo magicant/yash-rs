@@ -92,6 +92,19 @@ __IN__
 TERM
 __OUT__
 
+test_oE -e 0 'SIG prefix accepted in an operand to -l'
+kill -l SIGTERM
+__IN__
+TERM
+__OUT__
+
+test_oE -e 0 'signal name operand to -l matched case-insensitively'
+kill -l int sigQuit
+__IN__
+INT
+QUIT
+__OUT__
+
 test_O -d -e 2 'signal name operand to -l rejected under the portable option' -o portable
 kill -l TERM
 __IN__

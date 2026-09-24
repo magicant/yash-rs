@@ -128,18 +128,64 @@ trap -- 'echo X' USR1
 trap -- - TERM
 __OUT__
 
-# TODO not implemented yet
-test_oE -e 0 -f 'specifying signal with SIG-prefix'
+test_oE -e 0 'specifying signal with SIG-prefix'
 trap 'echo trapped' SIGUSR1 && kill -s USR1 $$
 __IN__
 trapped
 __OUT__
 
-# TODO not implemented yet
-test_oE -e 0 -f 'signal name is case-insensitive'
+test_oE -e 0 'signal name is case-insensitive'
 trap 'echo trapped' uSr1 && kill -s USR1 $$
 __IN__
 trapped
+__OUT__
+
+test_oE -e 0 'signal name is case-insensitive with SIG-prefix'
+trap 'echo trapped' sigusr1 && kill -s USR1 $$
+__IN__
+trapped
+__OUT__
+
+test_oE -e 0 'EXIT is case-insensitive'
+trap 'echo exiting' exit
+__IN__
+exiting
+__OUT__
+
+test_oE -e 0 'printing trap specified with non-canonical name'
+trap 'echo X' sigusr1
+trap -p Usr1
+__IN__
+trap -- 'echo X' USR1
+__OUT__
+
+test_oE -e 0 'uppercase names accepted under the portable option' -o portable
+trap 'echo trapped' USR1 && kill -s USR1 $$
+trap 'echo exiting' EXIT
+__IN__
+trapped
+exiting
+__OUT__
+
+test_o -d 'lowercase signal name rejected under the portable option' -o portable
+trap - usr1
+echo $?
+__IN__
+1
+__OUT__
+
+test_o -d 'SIG-prefix rejected under the portable option' -o portable
+trap - SIGUSR1
+echo $?
+__IN__
+1
+__OUT__
+
+test_o -d 'lowercase EXIT rejected under the portable option' -o portable
+trap - exit
+echo $?
+__IN__
+1
 __OUT__
 
 test_oE 'return jumps out of function outside trap'
@@ -180,6 +226,10 @@ __IN__
 
 test_O -d -e 1 'invalid signal name'
 trap - NOSUCHSIGNAL
+__IN__
+
+test_O -d -e 1 'SIG-prefix not allowed for EXIT'
+trap - SIGEXIT
 __IN__
 
 test_O -d -e 1 'invalid signal number'

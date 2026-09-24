@@ -22,12 +22,11 @@
 //! signal-specifying option.
 
 use super::Command;
-use std::borrow::Cow;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::option::{Portable, State::On};
 use yash_env::semantics::Field;
-use yash_env::signal::{Number, RawNumber};
+use yash_env::signal::{Number, RawNumber, canonical_name};
 use yash_env::source::Location;
 use yash_env::source::pretty::{
     Footnote, FootnoteType, Report, ReportType, Snippet, Span, SpanRole, add_span,
@@ -302,7 +301,7 @@ impl Error {
                 // appeared, so it is suggested regardless of the form used. It
                 // also resolves the attachment of `-sSIGINT`, which is not
                 // portable either.
-                let name = portable_signal_name(&field.value[*name_index..]);
+                let name = canonical_name(&field.value[*name_index..], true);
                 report.footnotes.push(Footnote {
                     r#type: FootnoteType::Suggestion,
                     label: format!("use `-s {}` instead", quoted(&name)).into(),
@@ -355,19 +354,8 @@ fn parse_signal_name<S: Signals>(
     signal_spec: &str,
     allow_sig_prefix: bool,
 ) -> Option<RawNumber> {
-    // Make the string uppercase for case-insensitive comparison
-    let mut signal_spec = Cow::Borrowed(signal_spec);
-    if signal_spec.contains(|c: char| c.is_ascii_lowercase()) {
-        signal_spec.to_mut().make_ascii_uppercase();
-    }
-
-    // Remove the SIG prefix if allowed
-    let signal_name = allow_sig_prefix
-        .then(|| signal_spec.strip_prefix("SIG"))
-        .flatten()
-        .unwrap_or(&signal_spec);
-
-    system.str2sig(signal_name).map(Number::as_raw)
+    let signal_name = canonical_name(signal_spec, allow_sig_prefix);
+    system.str2sig(&signal_name).map(Number::as_raw)
 }
 
 /// Converts a string to a signal.
@@ -402,18 +390,6 @@ fn non_portable_signal_number(signal_spec: &str) -> Option<RawNumber> {
     parse_signal_number(signal_spec).filter(|&number| number != 0)
 }
 
-/// Returns the portable form of a signal name that has the `SIG` prefix.
-///
-/// The name is uppercased and the `SIG` prefix is removed.
-#[must_use]
-fn portable_signal_name(signal_spec: &str) -> String {
-    let mut uppercase = signal_spec.to_ascii_uppercase();
-    if uppercase.starts_with("SIG") {
-        uppercase.drain(..3);
-    }
-    uppercase
-}
-
 /// Checks that a signal specification does not have the non-portable `SIG`
 /// prefix.
 ///
@@ -441,14 +417,11 @@ fn check_portable_signal_prefix<S: Signals>(
 /// Checks that the operands to the `-l` or `-v` option are portable.
 ///
 /// POSIX allows at most one operand, which must be an exit status or a signal
-/// number.
-fn check_portable_list_operands<S: Signals>(
-    system: &S,
-    operands: &[Field],
-    allow_sig_prefix: bool,
-) -> Result<(), Error> {
+/// number. A signal name is non-portable whether or not it has the `SIG`
+/// prefix, so the prefix is allowed when the operand is examined.
+fn check_portable_list_operands<S: Signals>(system: &S, operands: &[Field]) -> Result<(), Error> {
     if let Some(first) = operands.first()
-        && parse_signal_name(system, &first.value, allow_sig_prefix).is_some()
+        && parse_signal_name(system, &first.value, true).is_some()
     {
         return Err(Error::NonPortableListOperand(first.clone()));
     }
@@ -640,7 +613,7 @@ pub fn parse<S: Signals>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Erro
     }?;
 
     if portable && let Command::Print { signals, .. } = &command {
-        check_portable_list_operands(&env.system, signals, allow_sig_prefix)?;
+        check_portable_list_operands(&env.system, signals)?;
     }
 
     Ok(command)
@@ -1436,6 +1409,16 @@ mod tests {
         assert_eq!(
             result,
             Err(Error::NonPortableListOperand(Field::dummy("TERM")))
+        );
+    }
+
+    #[test]
+    fn signal_name_list_operand_with_sig_prefix_rejected_under_portable() {
+        let env = portable_env();
+        let result = parse(&env, Field::dummies(["-l", "SIGTERM"]));
+        assert_eq!(
+            result,
+            Err(Error::NonPortableListOperand(Field::dummy("SIGTERM")))
         );
     }
 
