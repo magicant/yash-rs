@@ -70,6 +70,7 @@ pub mod export;
 pub mod r#false;
 pub mod fg;
 pub mod getopts;
+pub mod help;
 pub mod jobs;
 pub mod kill;
 pub mod pwd;
@@ -226,6 +227,10 @@ where
             Builtin::new(Mandatory, |env, args| Box::pin(getopts::main(env, args))),
         ),
         (
+            "help",
+            Builtin::new(Elective, |env, args| Box::pin(help::main(env, args))),
+        ),
+        (
             "jobs",
             Builtin::new(Mandatory, |env, args| Box::pin(jobs::main(env, args))),
         ),
@@ -233,10 +238,12 @@ where
             "kill",
             Builtin::new(Mandatory, |env, args| Box::pin(kill::main(env, args))),
         ),
-        (
-            "pwd",
-            Builtin::new(Substitutive, |env, args| Box::pin(pwd::main(env, args))),
-        ),
+        ("pwd", {
+            let mut builtin =
+                Builtin::new(Substitutive, |env, args| Box::pin(pwd::main(env, args)));
+            builtin.help = Some(&pwd::HELP);
+            builtin
+        }),
         (
             "read",
             Builtin::new(Mandatory, |env, args| Box::pin(read::main(env, args))),

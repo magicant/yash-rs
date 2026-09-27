@@ -24,6 +24,7 @@
 //!
 //! The result for the `-P` option is obtained with [`GetCwd::getcwd`].
 
+use crate::common::help::BuiltinHelp;
 use crate::common::output;
 use crate::common::report::{report_error, report_failure};
 use yash_env::Env;
@@ -51,6 +52,14 @@ pub enum Mode {
 pub mod semantics;
 pub mod syntax;
 
+/// Help information of the `pwd` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "print the working directory path",
+    usage: &["pwd [-L|-P]"],
+    options: syntax::OPTION_SPECS,
+    page: "pwd",
+};
+
 /// Entry point for executing the `pwd` built-in
 ///
 /// This function uses the [`syntax`] and [`semantics`] modules to execute the built-in.
@@ -59,7 +68,8 @@ where
     S: Fstat + GetCwd + Isatty + WriteAll,
 {
     match syntax::parse(env, args) {
-        Ok(mode) => match semantics::compute(env, mode) {
+        Ok(syntax::Command::Help) => crate::common::help::print(env, &HELP).await,
+        Ok(syntax::Command::Print(mode)) => match semantics::compute(env, mode) {
             Ok(result) => output(env, &result).await,
             Err(e) => report_failure(env, &e).await,
         },
