@@ -24,12 +24,26 @@ use super::output;
 use super::syntax::OptionSpec;
 use std::fmt::Write as _;
 use yash_env::Env;
-use yash_env::builtin::Help;
 use yash_env::system::Isatty;
 use yash_env::system::concurrency::WriteAll;
 
 /// Base URL of the manual pages of the built-ins
 const MANUAL_BASE_URL: &str = "https://magicant.github.io/yash-rs/builtins/";
+
+/// Help information of a built-in
+///
+/// An implementation of this trait is registered with
+/// [`register`](crate::help::register) so that the shell can print a help
+/// message for the built-in.
+pub trait Help {
+    /// Returns a one-line summary of the built-in.
+    fn summary(&self) -> &str;
+
+    /// Returns the full help message of the built-in.
+    ///
+    /// The message should end with a newline.
+    fn message(&self) -> String;
+}
 
 /// Spec of the `--help` option
 ///

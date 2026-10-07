@@ -238,12 +238,10 @@ where
             "kill",
             Builtin::new(Mandatory, |env, args| Box::pin(kill::main(env, args))),
         ),
-        ("pwd", {
-            let mut builtin =
-                Builtin::new(Substitutive, |env, args| Box::pin(pwd::main(env, args)));
-            builtin.help = Some(&pwd::HELP);
-            builtin
-        }),
+        (
+            "pwd",
+            Builtin::new(Substitutive, |env, args| Box::pin(pwd::main(env, args))),
+        ),
         (
             "read",
             Builtin::new(Mandatory, |env, args| Box::pin(read::main(env, args))),

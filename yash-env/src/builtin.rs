@@ -261,20 +261,6 @@ impl From<ExitStatus> for Result {
 /// (not including the leading command name word).
 pub type Main<S> = fn(&mut Env<S>, Vec<Field>) -> Pin<Box<dyn Future<Output = Result> + '_>>;
 
-/// Help information of a built-in
-///
-/// A built-in may provide an implementation of this trait through
-/// [`Builtin::help`] so that the shell can print a help message for it.
-pub trait Help {
-    /// Returns a one-line summary of the built-in.
-    fn summary(&self) -> &str;
-
-    /// Returns the full help message of the built-in.
-    ///
-    /// The message should end with a newline.
-    fn message(&self) -> String;
-}
-
 /// Built-in utility definition
 ///
 /// # Notes on equality
@@ -323,11 +309,6 @@ pub struct Builtin<S> {
     /// Set this field to `true` for built-ins that handle signals themselves
     /// (like `fg`, `wait`, `eval`, and `source`), to prevent double-processing.
     pub handles_signals_internally: bool,
-
-    /// Help information of the built-in
-    ///
-    /// This is `None` if the built-in does not provide help information.
-    pub help: Option<&'static dyn Help>,
 }
 
 // Not derived automatically because S may not implement Clone or Copy.
@@ -349,7 +330,6 @@ impl<S> Debug for Builtin<S> {
                 "handles_signals_internally",
                 &self.handles_signals_internally,
             )
-            .field("help", &self.help.map(|help| help.summary()))
             .finish()
     }
 }
@@ -361,11 +341,6 @@ impl<S> PartialEq for Builtin<S> {
             && std::ptr::fn_addr_eq(self.execute, other.execute)
             && self.is_declaration_utility == other.is_declaration_utility
             && self.handles_signals_internally == other.handles_signals_internally
-            && match (self.help, other.help) {
-                (Some(a), Some(b)) => std::ptr::addr_eq(a, b),
-                (None, None) => true,
-                _ => false,
-            }
     }
 }
 
@@ -377,9 +352,6 @@ impl<S> std::hash::Hash for Builtin<S> {
         self.execute.hash(state);
         self.is_declaration_utility.hash(state);
         self.handles_signals_internally.hash(state);
-        self.help
-            .map(|help| std::ptr::from_ref(help).cast::<()>())
-            .hash(state);
     }
 }
 
@@ -390,15 +362,13 @@ impl<S> Builtin<S> {
     /// The `is_declaration_utility` field is set to `Some(false)`, indicating
     /// that the built-in is not a declaration utility. The
     /// `handles_signals_internally` field is set to `false`, meaning that
-    /// the built-in does not handle signals internally by default. The `help`
-    /// field is set to `None`.
+    /// the built-in does not handle signals internally by default.
     pub const fn new(r#type: Type, execute: Main<S>) -> Self {
         Self {
             r#type,
             execute,
             is_declaration_utility: Some(false),
             handles_signals_internally: false,
-            help: None,
         }
     }
 }
