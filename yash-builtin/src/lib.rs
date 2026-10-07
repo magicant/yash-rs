@@ -34,6 +34,11 @@
 //! [stack](Env::stack) should contain a [built-in frame](Frame::Builtin) so
 //! that `Stack::current_builtin` provides the correct command word.
 //!
+//! In particular, built-ins that accept the `--help` option use the command
+//! word to find the help to print, so they **panic** if `--help` is given
+//! without a built-in frame in the stack. See
+//! [`print_if_requested`](common::help::print_if_requested) for details.
+//!
 //! # Dependencies to be injected
 //!
 //! Some built-ins in this crate require certain dependencies to be injected

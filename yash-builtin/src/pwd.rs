@@ -24,7 +24,7 @@
 //!
 //! The result for the `-P` option is obtained with [`GetCwd::getcwd`].
 
-use crate::common::help::BuiltinHelp;
+use crate::common::help::{BuiltinHelp, print_if_requested};
 use crate::common::output;
 use crate::common::report::{report_error, report_failure};
 use yash_env::Env;
@@ -67,9 +67,12 @@ pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
     S: Fstat + GetCwd + Isatty + WriteAll,
 {
+    if let Some(result) = print_if_requested(env, syntax::OPTION_SPECS, &args).await {
+        return result;
+    }
+
     match syntax::parse(env, args) {
-        Ok(syntax::Command::Help) => crate::common::help::print(env, &HELP).await,
-        Ok(syntax::Command::Print(mode)) => match semantics::compute(env, mode) {
+        Ok(mode) => match semantics::compute(env, mode) {
             Ok(result) => output(env, &result).await,
             Err(e) => report_failure(env, &e).await,
         },

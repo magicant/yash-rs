@@ -17,7 +17,7 @@
 //! Command line argument parser for the pwd built-in
 
 use super::Mode;
-use crate::common::help::{HELP_OPTION, is_help_option};
+use crate::common::help::HELP_OPTION;
 use crate::common::syntax::OptionOccurrence;
 use crate::common::syntax::OptionSpec;
 use crate::common::syntax::parse_arguments;
@@ -84,17 +84,8 @@ impl<'a> From<&'a Error> for Report<'a> {
     }
 }
 
-/// What the built-in should do, as specified by the command line arguments
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum Command {
-    /// Print the working directory path in the given mode.
-    Print(Mode),
-    /// Print the help message.
-    Help,
-}
-
 /// Result of parsing command line arguments
-pub type Result = std::result::Result<Command, Error>;
+pub type Result = std::result::Result<Mode, Error>;
 
 pub(super) const OPTION_SPECS: &[OptionSpec] = &[
     OptionSpec::new()
@@ -121,16 +112,11 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
     let parser_mode = crate::common::syntax::Mode::with_env(env);
     let (options, operands) = parse_arguments(OPTION_SPECS, parser_mode, args)?;
 
-    if options.iter().any(|option| is_help_option(option.spec)) {
-        return Ok(Command::Help);
-    }
-
     if !operands.is_empty() {
         return Err(Error::UnexpectedOperands(operands));
     }
 
-    let mode = options.last().map(mode_for_option).unwrap_or_default();
-    Ok(Command::Print(mode))
+    Ok(options.last().map(mode_for_option).unwrap_or_default())
 }
 
 #[cfg(test)]
@@ -144,21 +130,21 @@ mod tests {
     fn no_arguments() {
         let env = Env::new_virtual();
         let result = parse(&env, vec![]);
-        assert_eq!(result, Ok(Command::Print(Mode::Logical)));
+        assert_eq!(result, Ok(Mode::Logical));
     }
 
     #[test]
     fn logical_option() {
         let env = Env::new_virtual();
         let result = parse(&env, Field::dummies(["-L"]));
-        assert_eq!(result, Ok(Command::Print(Mode::Logical)));
+        assert_eq!(result, Ok(Mode::Logical));
     }
 
     #[test]
     fn physical_option() {
         let env = Env::new_virtual();
         let result = parse(&env, Field::dummies(["-P"]));
-        assert_eq!(result, Ok(Command::Print(Mode::Physical)));
+        assert_eq!(result, Ok(Mode::Physical));
     }
 
     #[test]
@@ -166,23 +152,26 @@ mod tests {
         let env = Env::new_virtual();
 
         let result = parse(&env, Field::dummies(["-L", "-P"]));
-        assert_eq!(result, Ok(Command::Print(Mode::Physical)));
+        assert_eq!(result, Ok(Mode::Physical));
 
         let result = parse(&env, Field::dummies(["-P", "-L"]));
-        assert_eq!(result, Ok(Command::Print(Mode::Logical)));
+        assert_eq!(result, Ok(Mode::Logical));
 
         let result = parse(&env, Field::dummies(["-LPL"]));
-        assert_eq!(result, Ok(Command::Print(Mode::Logical)));
+        assert_eq!(result, Ok(Mode::Logical));
 
         let result = parse(&env, Field::dummies(["-PLP"]));
-        assert_eq!(result, Ok(Command::Print(Mode::Physical)));
+        assert_eq!(result, Ok(Mode::Physical));
     }
 
     #[test]
-    fn help_option() {
+    fn help_option_with_other_arguments() {
         let env = Env::new_virtual();
-        let result = parse(&env, Field::dummies(["-P", "--help", "foo"]));
-        assert_eq!(result, Ok(Command::Help));
+        let result = parse(&env, Field::dummies(["-P", "--help"]));
+        assert_matches!(
+            result,
+            Err(Error::CommonError(ParseError::HelpWithOtherArguments(..)))
+        );
     }
 
     #[test]

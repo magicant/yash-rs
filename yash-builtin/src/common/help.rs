@@ -21,10 +21,11 @@
 //! specs the built-in's parser uses.
 
 use super::output;
-use super::syntax::OptionSpec;
+use super::syntax::{Mode, OptionSpec, parse_arguments};
 use std::borrow::Cow;
 use std::fmt::Write as _;
 use yash_env::Env;
+use yash_env::semantics::Field;
 use yash_env::system::Isatty;
 use yash_env::system::concurrency::WriteAll;
 
@@ -49,18 +50,11 @@ pub trait Help {
 /// Spec of the `--help` option
 ///
 /// A built-in that accepts `--help` includes this spec in its option spec
-/// list so that the option is recognized by the parser and listed in the help
-/// message.
+/// list and calls [`print_if_requested`] before parsing its arguments.
 pub const HELP_OPTION: OptionSpec<'static> = OptionSpec::new()
     .long("help")
     .extension(true)
     .description("print this help");
-
-/// Returns whether the option spec is [`HELP_OPTION`].
-#[must_use]
-pub fn is_help_option(spec: &OptionSpec) -> bool {
-    *spec == HELP_OPTION
-}
 
 /// Help information of a built-in
 ///
@@ -127,9 +121,128 @@ where
     output(env, &help.message()).await
 }
 
+/// Runs `help` for the current built-in if `--help` is requested.
+///
+/// If `args` consist of [`HELP_OPTION`] only, this function runs the `help`
+/// built-in with the name of the current built-in as the operand and returns
+/// its result. Otherwise, this function returns `None` and the built-in should
+/// parse `args` as usual. The option is recognized with `option_specs` so that
+/// it can be abbreviated and is rejected in the same way as in
+/// [`parse_arguments`].
+///
+/// The name of the current built-in is taken from
+/// [`Stack::current_builtin`](yash_env::stack::Stack::current_builtin).
+///
+/// # Panics
+///
+/// If `--help` is requested but there is no built-in in the stack.
+pub async fn print_if_requested<S>(
+    env: &mut Env<S>,
+    option_specs: &[OptionSpec<'_>],
+    args: &[Field],
+) -> Option<yash_env::builtin::Result>
+where
+    S: Isatty + WriteAll,
+{
+    let [arg] = args else { return None };
+    // Avoid cloning the argument if it cannot be a long option
+    if !arg.value.starts_with("--") {
+        return None;
+    }
+    let (options, _) =
+        parse_arguments(option_specs, Mode::with_env(env), vec![arg.clone()]).ok()?;
+    if !matches!(options.as_slice(), [option] if *option.spec == HELP_OPTION) {
+        return None;
+    }
+
+    let name = env
+        .stack
+        .current_builtin()
+        .expect("a built-in frame should be in the stack to tell which built-in --help is for")
+        .name
+        .clone();
+    Some(crate::help::main(env, vec![name]).await)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures_util::FutureExt as _;
+    use std::rc::Rc;
+    use yash_env::VirtualSystem;
+    use yash_env::option::{On, Portable};
+    use yash_env::stack::{Builtin, Frame};
+    use yash_env::system::Concurrent;
+    use yash_env::test_helper::assert_stdout;
+
+    fn env() -> (Env<Rc<Concurrent<VirtualSystem>>>, VirtualSystem) {
+        let system = VirtualSystem::new();
+        let env = Env::with_system(Rc::new(Concurrent::new(system.clone())));
+        (env, system)
+    }
+
+    fn pwd_frame() -> Frame {
+        Frame::Builtin(Builtin {
+            name: Field::dummy("pwd"),
+            is_special: false,
+        })
+    }
+
+    #[test]
+    fn print_if_requested_prints_help_of_current_builtin() {
+        let (mut env, system) = env();
+        let mut env = env.push_frame(pwd_frame());
+        let args = Field::dummies(["--hel"]);
+
+        let result = print_if_requested(&mut env, &[HELP_OPTION], &args)
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, Some(yash_env::builtin::Result::default()));
+        assert_stdout(&system.state, |stdout| {
+            assert_eq!(stdout, crate::pwd::HELP.message())
+        });
+    }
+
+    #[test]
+    fn print_if_requested_ignores_other_arguments() {
+        let (mut env, system) = env();
+        let mut env = env.push_frame(pwd_frame());
+        let specs = &[OptionSpec::new().long("foo"), HELP_OPTION];
+
+        for args in [&[][..], &["--foo"], &["--"], &["-x"], &["--help", "--help"]] {
+            let args = Field::dummies(args.iter().copied());
+            let result = print_if_requested(&mut env, specs, &args)
+                .now_or_never()
+                .unwrap();
+            assert_eq!(result, None, "args = {args:?}");
+        }
+        assert_stdout(&system.state, |stdout| assert_eq!(stdout, ""));
+    }
+
+    #[test]
+    #[should_panic = "a built-in frame should be in the stack"]
+    fn print_if_requested_panics_without_builtin_frame() {
+        let (mut env, _) = env();
+        let args = Field::dummies(["--help"]);
+
+        _ = print_if_requested(&mut env, &[HELP_OPTION], &args).now_or_never();
+    }
+
+    #[test]
+    fn print_if_requested_ignores_help_option_in_portable_mode() {
+        let (mut env, system) = env();
+        let mut env = env.push_frame(pwd_frame());
+        env.options.set(Portable, On);
+        let args = Field::dummies(["--help"]);
+
+        let result = print_if_requested(&mut env, &[HELP_OPTION], &args)
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, None);
+        assert_stdout(&system.state, |stdout| assert_eq!(stdout, ""));
+    }
 
     #[test]
     fn message_without_options() {
