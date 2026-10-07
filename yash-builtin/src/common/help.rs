@@ -22,6 +22,7 @@
 
 use super::output;
 use super::syntax::OptionSpec;
+use std::borrow::Cow;
 use std::fmt::Write as _;
 use yash_env::Env;
 use yash_env::system::Isatty;
@@ -37,12 +38,12 @@ const MANUAL_BASE_URL: &str = "https://magicant.github.io/yash-rs/builtins/";
 /// message for the built-in.
 pub trait Help {
     /// Returns a one-line summary of the built-in.
-    fn summary(&self) -> &str;
+    fn summary(&self) -> Cow<'_, str>;
 
     /// Returns the full help message of the built-in.
     ///
     /// The message should end with a newline.
-    fn message(&self) -> String;
+    fn message(&self) -> Cow<'_, str>;
 }
 
 /// Spec of the `--help` option
@@ -89,11 +90,11 @@ fn option_name(spec: &OptionSpec) -> String {
 }
 
 impl Help for BuiltinHelp {
-    fn summary(&self) -> &str {
-        self.summary
+    fn summary(&self) -> Cow<'_, str> {
+        Cow::Borrowed(self.summary)
     }
 
-    fn message(&self) -> String {
+    fn message(&self) -> Cow<'_, str> {
         let mut message = format!("{}\n\nUsage:\n", self.summary);
         for usage in self.usage {
             writeln!(message, "  {usage}").unwrap();
@@ -114,7 +115,7 @@ impl Help for BuiltinHelp {
             self.page
         )
         .unwrap();
-        message
+        Cow::Owned(message)
     }
 }
 

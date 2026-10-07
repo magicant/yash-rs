@@ -83,6 +83,7 @@ where
 mod tests {
     use super::*;
     use futures_util::FutureExt as _;
+    use std::borrow::Cow;
     use std::rc::Rc;
     use yash_env::VirtualSystem;
     use yash_env::system::Concurrent;
@@ -97,12 +98,12 @@ mod tests {
     struct DummyHelp;
 
     impl Help for DummyHelp {
-        fn summary(&self) -> &str {
-            "dummy"
+        fn summary(&self) -> Cow<'_, str> {
+            Cow::Borrowed("dummy")
         }
 
-        fn message(&self) -> String {
-            "dummy help\n".to_string()
+        fn message(&self) -> Cow<'_, str> {
+            Cow::Borrowed("dummy help\n")
         }
     }
 
