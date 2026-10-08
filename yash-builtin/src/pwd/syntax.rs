@@ -107,11 +107,10 @@ fn mode_for_option(option: &OptionOccurrence) -> Mode {
     }
 }
 
-/// Parses command line arguments for the pwd built-in.
-pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
-    let parser_mode = crate::common::syntax::Mode::with_env(env);
-    let (options, operands) = parse_arguments(OPTION_SPECS, parser_mode, args)?;
-
+/// Interprets the options and operands parsed from the command line arguments.
+///
+/// The options must not contain [`HELP_OPTION`].
+pub fn interpret(options: Vec<OptionOccurrence>, operands: Vec<Field>) -> Result {
     if !operands.is_empty() {
         return Err(Error::UnexpectedOperands(operands));
     }
@@ -119,31 +118,49 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
     Ok(options.last().map(mode_for_option).unwrap_or_default())
 }
 
+/// Parses command line arguments for the pwd built-in.
+///
+/// This function does not recognize [`HELP_OPTION`], which is reported as an
+/// unknown option.
+#[deprecated(note = "use `parse_or_print_help` and `interpret` instead")]
+pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
+    // Exclude HELP_OPTION, which is the last spec
+    let option_specs = &OPTION_SPECS[..OPTION_SPECS.len() - 1];
+    let parser_mode = crate::common::syntax::Mode::with_env(env);
+    let (options, operands) = parse_arguments(option_specs, parser_mode, args)?;
+    interpret(options, operands)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::common::syntax::ParseError;
     use assert_matches::assert_matches;
-    use yash_env::option::{On, Portable};
+
+    fn parse_args<S>(env: &Env<S>, args: Vec<Field>) -> Result {
+        let parser_mode = crate::common::syntax::Mode::with_env(env);
+        let (options, operands) = parse_arguments(OPTION_SPECS, parser_mode, args)?;
+        interpret(options, operands)
+    }
 
     #[test]
     fn no_arguments() {
         let env = Env::new_virtual();
-        let result = parse(&env, vec![]);
+        let result = parse_args(&env, vec![]);
         assert_eq!(result, Ok(Mode::Logical));
     }
 
     #[test]
     fn logical_option() {
         let env = Env::new_virtual();
-        let result = parse(&env, Field::dummies(["-L"]));
+        let result = parse_args(&env, Field::dummies(["-L"]));
         assert_eq!(result, Ok(Mode::Logical));
     }
 
     #[test]
     fn physical_option() {
         let env = Env::new_virtual();
-        let result = parse(&env, Field::dummies(["-P"]));
+        let result = parse_args(&env, Field::dummies(["-P"]));
         assert_eq!(result, Ok(Mode::Physical));
     }
 
@@ -151,37 +168,27 @@ mod tests {
     fn last_option_wins() {
         let env = Env::new_virtual();
 
-        let result = parse(&env, Field::dummies(["-L", "-P"]));
+        let result = parse_args(&env, Field::dummies(["-L", "-P"]));
         assert_eq!(result, Ok(Mode::Physical));
 
-        let result = parse(&env, Field::dummies(["-P", "-L"]));
+        let result = parse_args(&env, Field::dummies(["-P", "-L"]));
         assert_eq!(result, Ok(Mode::Logical));
 
-        let result = parse(&env, Field::dummies(["-LPL"]));
+        let result = parse_args(&env, Field::dummies(["-LPL"]));
         assert_eq!(result, Ok(Mode::Logical));
 
-        let result = parse(&env, Field::dummies(["-PLP"]));
+        let result = parse_args(&env, Field::dummies(["-PLP"]));
         assert_eq!(result, Ok(Mode::Physical));
     }
 
     #[test]
-    fn help_option_with_other_arguments() {
+    fn deprecated_parse_rejects_help_option() {
         let env = Env::new_virtual();
-        let result = parse(&env, Field::dummies(["-P", "--help"]));
-        assert_matches!(
-            result,
-            Err(Error::CommonError(ParseError::HelpWithOtherArguments(..)))
-        );
-    }
-
-    #[test]
-    fn help_option_under_portable_option() {
-        let mut env = Env::new_virtual();
-        env.options.set(Portable, On);
+        #[expect(deprecated, reason = "testing the deprecated function")]
         let result = parse(&env, Field::dummies(["--help"]));
         assert_matches!(
             result,
-            Err(Error::CommonError(ParseError::NonPortableLongOption(..)))
+            Err(Error::CommonError(ParseError::UnknownLongOption(..)))
         );
     }
 
@@ -189,7 +196,7 @@ mod tests {
     fn unexpected_operand() {
         let env = Env::new_virtual();
         let args = Field::dummies(["foo"]);
-        let result = parse(&env, args.clone());
+        let result = parse_args(&env, args.clone());
         assert_eq!(result, Err(Error::UnexpectedOperands(args)));
     }
 
@@ -198,7 +205,7 @@ mod tests {
         let env = Env::new_virtual();
         let args = Field::dummies(["-LP", "-L", "--", "one", "two"]);
         let operands = args[3..].to_vec();
-        let result = parse(&env, args);
+        let result = parse_args(&env, args);
         assert_eq!(result, Err(Error::UnexpectedOperands(operands)));
     }
 }

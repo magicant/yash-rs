@@ -37,7 +37,7 @@
 //! In particular, built-ins that accept the `--help` option use the command
 //! word to find the help to print, so they **panic** if `--help` is given
 //! without a built-in frame in the stack. See
-//! [`print_if_requested`](common::help::print_if_requested) for details.
+//! [`parse_or_print_help`](common::help::parse_or_print_help) for details.
 //!
 //! # Dependencies to be injected
 //!
