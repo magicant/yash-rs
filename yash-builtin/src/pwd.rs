@@ -24,8 +24,10 @@
 //!
 //! The result for the `-P` option is obtained with [`GetCwd::getcwd`].
 
+use crate::common::help::{BuiltinHelp, parse_or_print_help};
 use crate::common::output;
 use crate::common::report::{report_error, report_failure};
+use std::ops::ControlFlow;
 use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
@@ -51,6 +53,14 @@ pub enum Mode {
 pub mod semantics;
 pub mod syntax;
 
+/// Help information of the `pwd` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "print the working directory path",
+    usage: &["pwd [-L|-P]"],
+    options: syntax::OPTION_SPECS,
+    page: "pwd",
+};
+
 /// Entry point for executing the `pwd` built-in
 ///
 /// This function uses the [`syntax`] and [`semantics`] modules to execute the built-in.
@@ -58,7 +68,16 @@ pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
     S: Fstat + GetCwd + Isatty + WriteAll,
 {
-    match syntax::parse(env, args) {
+    let parser_mode = crate::common::syntax::Mode::with_env(env);
+    let parsed = match parse_or_print_help(env, syntax::OPTION_SPECS, parser_mode, args).await {
+        ControlFlow::Break(result) => return result,
+        ControlFlow::Continue(parsed) => parsed,
+    };
+
+    let mode = parsed
+        .map_err(syntax::Error::from)
+        .and_then(|(options, operands)| syntax::interpret(options, operands));
+    match mode {
         Ok(mode) => match semantics::compute(env, mode) {
             Ok(result) => output(env, &result).await,
             Err(e) => report_failure(env, &e).await,

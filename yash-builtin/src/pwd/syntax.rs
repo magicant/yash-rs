@@ -17,11 +17,10 @@
 //! Command line argument parser for the pwd built-in
 
 use super::Mode;
+use crate::common::help::HELP_OPTION;
 use crate::common::syntax::OptionOccurrence;
 use crate::common::syntax::OptionSpec;
-use crate::common::syntax::parse_arguments;
 use thiserror::Error;
-use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::Report;
 use yash_env::source::pretty::ReportType;
@@ -86,9 +85,16 @@ impl<'a> From<&'a Error> for Report<'a> {
 /// Result of parsing command line arguments
 pub type Result = std::result::Result<Mode, Error>;
 
-const OPTION_SPECS: &[OptionSpec] = &[
-    OptionSpec::new().short('L').long("logical"),
-    OptionSpec::new().short('P').long("physical"),
+pub(super) const OPTION_SPECS: &[OptionSpec] = &[
+    OptionSpec::new()
+        .short('L')
+        .long("logical")
+        .description("print $PWD if it is correct (default)"),
+    OptionSpec::new()
+        .short('P')
+        .long("physical")
+        .description("print the path without symbolic links"),
+    HELP_OPTION,
 ];
 
 fn mode_for_option(option: &OptionOccurrence) -> Mode {
@@ -99,11 +105,10 @@ fn mode_for_option(option: &OptionOccurrence) -> Mode {
     }
 }
 
-/// Parses command line arguments for the pwd built-in.
-pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
-    let parser_mode = crate::common::syntax::Mode::with_env(env);
-    let (options, operands) = parse_arguments(OPTION_SPECS, parser_mode, args)?;
-
+/// Interprets the options and operands parsed from the command line arguments.
+///
+/// The options must not contain [`HELP_OPTION`].
+pub fn interpret(options: Vec<OptionOccurrence>, operands: Vec<Field>) -> Result {
     if !operands.is_empty() {
         return Err(Error::UnexpectedOperands(operands));
     }
@@ -114,6 +119,14 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::syntax::parse_arguments;
+    use yash_env::Env;
+
+    fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
+        let parser_mode = crate::common::syntax::Mode::with_env(env);
+        let (options, operands) = parse_arguments(OPTION_SPECS, parser_mode, args)?;
+        interpret(options, operands)
+    }
 
     #[test]
     fn no_arguments() {
