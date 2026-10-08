@@ -20,9 +20,7 @@ use super::Mode;
 use crate::common::help::HELP_OPTION;
 use crate::common::syntax::OptionOccurrence;
 use crate::common::syntax::OptionSpec;
-use crate::common::syntax::parse_arguments;
 use thiserror::Error;
-use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::Report;
 use yash_env::source::pretty::ReportType;
@@ -107,11 +105,10 @@ fn mode_for_option(option: &OptionOccurrence) -> Mode {
     }
 }
 
-/// Parses command line arguments for the pwd built-in.
-pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
-    let parser_mode = crate::common::syntax::Mode::with_env(env);
-    let (options, operands) = parse_arguments(OPTION_SPECS, parser_mode, args)?;
-
+/// Interprets the options and operands parsed from the command line arguments.
+///
+/// The options must not contain [`HELP_OPTION`].
+pub fn interpret(options: Vec<OptionOccurrence>, operands: Vec<Field>) -> Result {
     if !operands.is_empty() {
         return Err(Error::UnexpectedOperands(operands));
     }
@@ -122,9 +119,14 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::common::syntax::ParseError;
-    use assert_matches::assert_matches;
-    use yash_env::option::{On, Portable};
+    use crate::common::syntax::parse_arguments;
+    use yash_env::Env;
+
+    fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
+        let parser_mode = crate::common::syntax::Mode::with_env(env);
+        let (options, operands) = parse_arguments(OPTION_SPECS, parser_mode, args)?;
+        interpret(options, operands)
+    }
 
     #[test]
     fn no_arguments() {
@@ -162,27 +164,6 @@ mod tests {
 
         let result = parse(&env, Field::dummies(["-PLP"]));
         assert_eq!(result, Ok(Mode::Physical));
-    }
-
-    #[test]
-    fn help_option_with_other_arguments() {
-        let env = Env::new_virtual();
-        let result = parse(&env, Field::dummies(["-P", "--help"]));
-        assert_matches!(
-            result,
-            Err(Error::CommonError(ParseError::HelpWithOtherArguments(..)))
-        );
-    }
-
-    #[test]
-    fn help_option_under_portable_option() {
-        let mut env = Env::new_virtual();
-        env.options.set(Portable, On);
-        let result = parse(&env, Field::dummies(["--help"]));
-        assert_matches!(
-            result,
-            Err(Error::CommonError(ParseError::NonPortableLongOption(..)))
-        );
     }
 
     #[test]

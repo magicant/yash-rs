@@ -62,7 +62,6 @@
 //! assert_eq!(operands, Field::dummies(["-a", "foo"]));
 //! ```
 
-use super::help::HELP_OPTION;
 use std::iter::Peekable;
 use thiserror::Error;
 use yash_env::source::pretty::{Footnote, FootnoteType, Report, ReportType, Snippet};
@@ -470,8 +469,13 @@ pub enum ParseError<'a> {
     #[error("option {:?} with an unexpected argument", .0.value)]
     UnexpectedOptionArgument(Field, &'a OptionSpec<'a>),
 
-    /// [`HELP_OPTION`] given with other arguments
-    #[error("option {:?} must be the only argument", .0.value)]
+    /// [`HELP_OPTION`](super::help::HELP_OPTION) given with other arguments
+    ///
+    /// This error is not returned by [`parse_arguments`] but by
+    /// [`parse_or_print_help`](super::help::parse_or_print_help). The field
+    /// value is the canonical option name, and the field origin is the location
+    /// of the option as written in the command line.
+    #[error("option {:?} cannot be used with other options or operands", .0.value)]
     HelpWithOtherArguments(Field),
 }
 
@@ -652,12 +656,9 @@ fn long_match<'a>(
 /// it if it is a long option. If the option requires an argument and the field
 /// does not include a delimiting `=` sign, the following field is consumed as
 /// the argument.
-///
-/// If `rejects_help` is true, [`HELP_OPTION`] is rejected as an error.
 fn parse_long_option<'a, I: Iterator<Item = Field>>(
     option_specs: &'a [OptionSpec<'a>],
     mode: Mode,
-    rejects_help: bool,
     arguments: &mut Peekable<I>,
 ) -> Result<Option<OptionOccurrence<'a>>, ParseError<'a>> {
     fn starts_with_double_hyphen(field: &Field) -> bool {
@@ -693,10 +694,6 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
         }
     };
 
-    if rejects_help && *spec == HELP_OPTION {
-        return Err(ParseError::HelpWithOtherArguments(field));
-    }
-
     let location = field.origin.clone();
 
     let argument = match (spec.get_argument(), equal) {
@@ -731,15 +728,11 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
 /// The arguments should not include a leading command name field.
 ///
 /// If successful, returns a pair of option occurrences and operands.
-///
-/// [`HELP_OPTION`] is accepted only if it is the only argument. Otherwise,
-/// this function returns [`ParseError::HelpWithOtherArguments`].
 pub fn parse_arguments<'a>(
     option_specs: &'a [OptionSpec<'a>],
     mode: Mode,
     arguments: Vec<Field>,
 ) -> Result<(Vec<OptionOccurrence<'a>>, Vec<Field>), ParseError<'a>> {
-    let rejects_help = arguments.len() > 1;
     let mut arguments = arguments.into_iter().peekable();
 
     let mut option_occurrences = vec![];
@@ -747,9 +740,7 @@ pub fn parse_arguments<'a>(
         if parse_short_options(option_specs, mode, &mut arguments, &mut option_occurrences)? {
             continue;
         }
-        if let Some(occurrence) =
-            parse_long_option(option_specs, mode, rejects_help, &mut arguments)?
-        {
+        if let Some(occurrence) = parse_long_option(option_specs, mode, &mut arguments)? {
             option_occurrences.push(occurrence);
             continue;
         }
@@ -1295,35 +1286,6 @@ mod tests {
         assert_eq!(options[1].spec.get_long(), Some("foo"));
         assert_eq!(options[2].spec.get_long(), Some("bar"));
         assert_eq!(operands, []);
-    }
-
-    #[test]
-    fn help_option_alone() {
-        let specs = &[OptionSpec::new().long("min"), HELP_OPTION];
-
-        let arguments = Field::dummies(["--he"]);
-        let (options, operands) =
-            parse_arguments(specs, Mode::with_extensions(), arguments).unwrap();
-        assert_eq!(options.len(), 1, "options = {options:?}");
-        assert_eq!(*options[0].spec, HELP_OPTION);
-        assert_eq!(operands, []);
-    }
-
-    #[test]
-    fn help_option_with_other_arguments() {
-        let specs = &[OptionSpec::new().long("min"), HELP_OPTION];
-
-        let arguments = Field::dummies(["--min", "--help"]);
-        let error = parse_arguments(specs, Mode::with_extensions(), arguments).unwrap_err();
-        assert_matches!(error, ParseError::HelpWithOtherArguments(field) => {
-            assert_eq!(field.value, "--help");
-        });
-
-        let arguments = Field::dummies(["--help", "foo"]);
-        let error = parse_arguments(specs, Mode::with_extensions(), arguments).unwrap_err();
-        assert_matches!(error, ParseError::HelpWithOtherArguments(field) => {
-            assert_eq!(field.value, "--help");
-        });
     }
 
     #[test]
