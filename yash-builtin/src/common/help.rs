@@ -21,10 +21,13 @@
 //! specs the built-in's parser uses.
 
 use super::output;
-use super::syntax::{Mode, OptionOccurrence, OptionSpec, ParseError, parse_arguments};
+use super::syntax::{
+    Mode, OptionArgumentSpec, OptionOccurrence, OptionSpec, ParseError, parse_arguments,
+};
 use std::borrow::Cow;
 use std::fmt::Write as _;
 use std::ops::ControlFlow;
+use std::ops::Deref;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::system::Isatty;
@@ -50,12 +53,84 @@ pub trait Help {
 
 /// Spec of the `--help` option
 ///
-/// A built-in that accepts `--help` includes this spec in its option spec
-/// list and parses its arguments with [`parse_or_print_help`].
+/// A built-in that accepts `--help` includes this spec at the end of its
+/// [`OptionSpecsWithHelp`] and parses its arguments with
+/// [`parse_or_print_help`].
 pub const HELP_OPTION: OptionSpec<'static> = OptionSpec::new()
     .long("help")
     .extension(true)
     .description("print this help");
+
+const fn str_eq(a: &str, b: &str) -> bool {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut i = 0;
+    while i < a.len() {
+        if a[i] != b[i] {
+            return false;
+        }
+        i += 1;
+    }
+    true
+}
+
+/// Const version of `*spec == HELP_OPTION`
+const fn is_help_option(spec: &OptionSpec) -> bool {
+    // HELP_OPTION has no short name and takes no argument.
+    let Some(long) = spec.get_long() else {
+        return false;
+    };
+    spec.get_short().is_none()
+        && str_eq(long, "help")
+        && matches!(spec.get_argument(), OptionArgumentSpec::None)
+        && spec.is_extension() == HELP_OPTION.is_extension()
+        && str_eq(spec.get_description(), HELP_OPTION.get_description())
+}
+
+/// Option specs of a built-in that accepts `--help`
+///
+/// This is a list of option specs whose last element is [`HELP_OPTION`].
+/// [`new`](Self::new) ensures this condition, so a built-in defining the
+/// option specs in a `const` item fails to compile if it forgets to include
+/// `HELP_OPTION`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct OptionSpecsWithHelp<'a>(&'a [OptionSpec<'a>]);
+
+impl<'a> OptionSpecsWithHelp<'a> {
+    /// Creates a new instance.
+    ///
+    /// # Panics
+    ///
+    /// If the last element of `specs` is not [`HELP_OPTION`]. When evaluated
+    /// in a const context, this is a compile-time error.
+    #[must_use]
+    pub const fn new(specs: &'a [OptionSpec<'a>]) -> Self {
+        assert!(
+            matches!(specs.last(), Some(last) if is_help_option(last)),
+            "the last option spec should be HELP_OPTION"
+        );
+        Self(specs)
+    }
+
+    /// Returns the option specs, including [`HELP_OPTION`].
+    ///
+    /// This is a const version of [`deref`](Self::deref). Unlike `deref`, the
+    /// returned slice is not bound to the lifetime of `self`.
+    #[must_use]
+    pub const fn get(&self) -> &'a [OptionSpec<'a>] {
+        self.0
+    }
+}
+
+impl<'a> Deref for OptionSpecsWithHelp<'a> {
+    type Target = [OptionSpec<'a>];
+
+    fn deref(&self) -> &[OptionSpec<'a>] {
+        self.0
+    }
+}
 
 /// Help information of a built-in
 ///
@@ -69,7 +144,7 @@ pub struct BuiltinHelp {
     /// Usage lines, each showing a form of the command line
     pub usage: &'static [&'static str],
     /// Option specs of the built-in
-    pub options: &'static [OptionSpec<'static>],
+    pub options: OptionSpecsWithHelp<'static>,
     /// Name of the manual page without the `.html` extension
     pub page: &'static str,
 }
@@ -95,13 +170,11 @@ impl Help for BuiltinHelp {
             writeln!(message, "  {usage}").unwrap();
         }
 
-        if !self.options.is_empty() {
-            message.push_str("\nOptions:\n");
-            let names = self.options.iter().map(option_name).collect::<Vec<_>>();
-            let width = names.iter().map(String::len).max().unwrap_or(0);
-            for (name, spec) in names.iter().zip(self.options) {
-                writeln!(message, "  {name:width$}  {}", spec.get_description()).unwrap();
-            }
+        message.push_str("\nOptions:\n");
+        let names = self.options.iter().map(option_name).collect::<Vec<_>>();
+        let width = names.iter().map(String::len).max().unwrap_or(0);
+        for (name, spec) in names.iter().zip(self.options.iter()) {
+            writeln!(message, "  {name:width$}  {}", spec.get_description()).unwrap();
         }
 
         writeln!(
@@ -143,7 +216,7 @@ where
 /// If `--help` is requested but there is no built-in in the stack.
 pub async fn parse_or_print_help<'a, S>(
     env: &mut Env<S>,
-    option_specs: &'a [OptionSpec<'a>],
+    option_specs: OptionSpecsWithHelp<'a>,
     mode: Mode,
     args: Vec<Field>,
 ) -> ControlFlow<
@@ -153,7 +226,7 @@ pub async fn parse_or_print_help<'a, S>(
 where
     S: Isatty + WriteAll,
 {
-    let (options, operands) = match parse_arguments(option_specs, mode, args) {
+    let (options, operands) = match parse_arguments(option_specs.get(), mode, args) {
         Ok(parsed) => parsed,
         Err(error) => return ControlFlow::Continue(Err(error)),
     };
@@ -194,6 +267,10 @@ mod tests {
         (env, system)
     }
 
+    const ONLY_HELP: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION]);
+    const FOO_AND_HELP: OptionSpecsWithHelp =
+        OptionSpecsWithHelp::new(&[OptionSpec::new().long("foo"), HELP_OPTION]);
+
     fn pwd_frame() -> Frame {
         Frame::Builtin(Builtin {
             name: Field::dummy("pwd"),
@@ -207,7 +284,7 @@ mod tests {
         let mut env = env.push_frame(pwd_frame());
         let args = Field::dummies(["--hel"]);
 
-        let result = parse_or_print_help(&mut env, &[HELP_OPTION], Mode::with_extensions(), args)
+        let result = parse_or_print_help(&mut env, ONLY_HELP, Mode::with_extensions(), args)
             .now_or_never()
             .unwrap();
 
@@ -223,7 +300,7 @@ mod tests {
         let mut env = env.push_frame(pwd_frame());
         let args = Field::dummies(["--help", "--"]);
 
-        let result = parse_or_print_help(&mut env, &[HELP_OPTION], Mode::with_extensions(), args)
+        let result = parse_or_print_help(&mut env, ONLY_HELP, Mode::with_extensions(), args)
             .now_or_never()
             .unwrap();
 
@@ -237,16 +314,15 @@ mod tests {
     fn parse_or_print_help_returns_parsed_arguments() {
         let (mut env, system) = env();
         let mut env = env.push_frame(pwd_frame());
-        let specs = &[OptionSpec::new().long("foo"), HELP_OPTION];
         let args = Field::dummies(["--foo", "bar"]);
 
-        let result = parse_or_print_help(&mut env, specs, Mode::with_extensions(), args)
+        let result = parse_or_print_help(&mut env, FOO_AND_HELP, Mode::with_extensions(), args)
             .now_or_never()
             .unwrap();
 
         assert_matches!(result, ControlFlow::Continue(Ok((options, operands))) => {
             assert_eq!(options.len(), 1, "options = {options:?}");
-            assert_eq!(*options[0].spec, specs[0]);
+            assert_eq!(options[0].spec.get_long(), Some("foo"));
             assert_eq!(operands, Field::dummies(["bar"]));
         });
         assert_stdout(&system.state, |stdout| assert_eq!(stdout, ""));
@@ -256,7 +332,6 @@ mod tests {
     fn parse_or_print_help_rejects_help_option_with_other_arguments() {
         let (mut env, system) = env();
         let mut env = env.push_frame(pwd_frame());
-        let specs = &[OptionSpec::new().long("foo"), HELP_OPTION];
 
         for args in [
             &["--foo", "--hel"][..],
@@ -270,7 +345,7 @@ mod tests {
                 .unwrap()
                 .origin
                 .clone();
-            let result = parse_or_print_help(&mut env, specs, Mode::with_extensions(), args)
+            let result = parse_or_print_help(&mut env, FOO_AND_HELP, Mode::with_extensions(), args)
                 .now_or_never()
                 .unwrap();
             assert_matches!(
@@ -290,42 +365,43 @@ mod tests {
         let (mut env, _) = env();
         let args = Field::dummies(["--help"]);
 
-        _ = parse_or_print_help(&mut env, &[HELP_OPTION], Mode::with_extensions(), args)
-            .now_or_never();
+        _ = parse_or_print_help(&mut env, ONLY_HELP, Mode::with_extensions(), args).now_or_never();
     }
 
     #[test]
-    fn message_without_options() {
-        let help = BuiltinHelp {
-            summary: "do nothing",
-            usage: &["foo", "foo bar"],
-            options: &[],
-            page: "foo",
-        };
+    fn option_specs_with_help_accepts_help_option_at_end() {
+        let specs = &[OptionSpec::new().short('a'), HELP_OPTION];
+        assert_eq!(*OptionSpecsWithHelp::new(specs), *specs);
+    }
 
-        assert_eq!(
-            help.message(),
-            "do nothing
+    #[test]
+    #[should_panic = "the last option spec should be HELP_OPTION"]
+    fn option_specs_with_help_rejects_empty_specs() {
+        _ = OptionSpecsWithHelp::new(&[]);
+    }
 
-Usage:
-  foo
-  foo bar
+    #[test]
+    #[should_panic = "the last option spec should be HELP_OPTION"]
+    fn option_specs_with_help_rejects_help_option_not_at_end() {
+        _ = OptionSpecsWithHelp::new(&[HELP_OPTION, OptionSpec::new().short('a')]);
+    }
 
-See <https://magicant.github.io/yash-rs/builtins/foo.html> for details.
-"
-        );
+    #[test]
+    #[should_panic = "the last option spec should be HELP_OPTION"]
+    fn option_specs_with_help_rejects_other_help_option() {
+        _ = OptionSpecsWithHelp::new(&[OptionSpec::new().long("help")]);
     }
 
     #[test]
     fn message_with_options() {
-        const OPTIONS: &[OptionSpec] = &[
+        const OPTIONS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
             OptionSpec::new().short('a').description("do A"),
             OptionSpec::new()
                 .short('b')
                 .long("bravo")
                 .description("do B"),
             HELP_OPTION,
-        ];
+        ]);
         let help = BuiltinHelp {
             summary: "do something",
             usage: &["foo [-a|-b]"],

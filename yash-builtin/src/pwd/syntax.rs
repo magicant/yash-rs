@@ -17,7 +17,7 @@
 //! Command line argument parser for the pwd built-in
 
 use super::Mode;
-use crate::common::help::HELP_OPTION;
+use crate::common::help::{HELP_OPTION, OptionSpecsWithHelp};
 use crate::common::syntax::OptionOccurrence;
 use crate::common::syntax::OptionSpec;
 use crate::common::syntax::parse_arguments;
@@ -87,7 +87,7 @@ impl<'a> From<&'a Error> for Report<'a> {
 /// Result of parsing command line arguments
 pub type Result = std::result::Result<Mode, Error>;
 
-pub(super) const OPTION_SPECS: &[OptionSpec] = &[
+pub(super) const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
     OptionSpec::new()
         .short('L')
         .long("logical")
@@ -97,7 +97,7 @@ pub(super) const OPTION_SPECS: &[OptionSpec] = &[
         .long("physical")
         .description("print the path without symbolic links"),
     HELP_OPTION,
-];
+]);
 
 fn mode_for_option(option: &OptionOccurrence) -> Mode {
     match option.spec.get_short() {
@@ -125,7 +125,7 @@ pub fn interpret(options: Vec<OptionOccurrence>, operands: Vec<Field>) -> Result
 #[deprecated(note = "use `parse_or_print_help` and `interpret` instead")]
 pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
     // Exclude HELP_OPTION, which is the last spec
-    let option_specs = &OPTION_SPECS[..OPTION_SPECS.len() - 1];
+    let option_specs = OPTION_SPECS.split_last().unwrap().1;
     let parser_mode = crate::common::syntax::Mode::with_env(env);
     let (options, operands) = parse_arguments(option_specs, parser_mode, args)?;
     interpret(options, operands)
@@ -139,7 +139,7 @@ mod tests {
 
     fn parse_args<S>(env: &Env<S>, args: Vec<Field>) -> Result {
         let parser_mode = crate::common::syntax::Mode::with_env(env);
-        let (options, operands) = parse_arguments(OPTION_SPECS, parser_mode, args)?;
+        let (options, operands) = parse_arguments(&OPTION_SPECS, parser_mode, args)?;
         interpret(options, operands)
     }
 
