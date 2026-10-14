@@ -24,14 +24,17 @@
 //! defined in this crate. Built-ins defined outside this crate can be given
 //! help with [`register`].
 
-use crate::common::help::{HELP_OPTION, Help, print};
-use crate::common::report::report_error;
+use crate::common::help::{HELP_OPTION, Help};
+use crate::common::output;
+use crate::common::report::{merge_reports, report_error, report_failure};
 use crate::common::syntax::{Mode, OptionSpec, parse_arguments};
 use std::collections::HashMap;
 use yash_env::Env;
 use yash_env::semantics::Field;
+use yash_env::source::pretty::{Footnote, FootnoteType, Report, ReportType, Snippet};
 use yash_env::system::Isatty;
 use yash_env::system::concurrency::WriteAll;
+use yash_quote::quoted;
 
 const OPTION_SPECS: &[OptionSpec] = &[HELP_OPTION];
 
@@ -57,6 +60,37 @@ pub fn register<S>(env: &mut Env<S>, name: &'static str, help: &'static dyn Help
     table(env).insert(name, help);
 }
 
+/// Appends the help message of a built-in to `message`.
+///
+/// The message begins with a line consisting of `name` and the summary,
+/// followed by an empty line and the [body](Help::message).
+fn append_message(message: &mut String, name: &str, help: &dyn Help) {
+    message.push_str(name);
+    message.push_str(": ");
+    message.push_str(&help.summary());
+    message.push_str("\n\n");
+    message.push_str(&help.message());
+}
+
+fn no_help_report(operand: &Field) -> Report<'_> {
+    let mut report = Report::new();
+    report.r#type = ReportType::Error;
+    report.title = "no help available".into();
+    report.snippets = Snippet::with_primary_span(
+        &operand.origin,
+        format!("{}: not a built-in or has no help", operand.value).into(),
+    );
+    report.footnotes.push(Footnote {
+        r#type: FootnoteType::Suggestion,
+        label: format!(
+            "try `man -k {}` to search the manual pages",
+            quoted(&operand.value)
+        )
+        .into(),
+    });
+    report
+}
+
 /// Entry point of the `help` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
@@ -70,13 +104,31 @@ where
     if !options.is_empty() {
         todo!("help --help");
     }
-    let [operand] = operands.as_slice() else {
-        todo!("help with no or multiple operands");
+    if operands.is_empty() {
+        todo!("help with no operand");
+    }
+
+    let table = table(env);
+    let mut message = String::new();
+    let mut reports = Vec::new();
+    for operand in &operands {
+        match table.get(operand.value.as_str()) {
+            Some(&help) => {
+                if !message.is_empty() {
+                    message.push('\n');
+                }
+                append_message(&mut message, &operand.value, help);
+            }
+            None => reports.push(no_help_report(operand)),
+        }
+    }
+
+    let output_result = output(env, &message).await;
+    let error_result = match merge_reports(reports) {
+        Some(report) => report_failure(env, report).await,
+        None => crate::Result::default(),
     };
-    let Some(&help) = table(env).get(operand.value.as_str()) else {
-        todo!("help for a name without help");
-    };
-    print(env, &operand.value, help).await
+    output_result.max(error_result)
 }
 
 #[cfg(test)]
@@ -86,8 +138,9 @@ mod tests {
     use std::borrow::Cow;
     use std::rc::Rc;
     use yash_env::VirtualSystem;
+    use yash_env::semantics::ExitStatus;
     use yash_env::system::Concurrent;
-    use yash_env::test_helper::assert_stdout;
+    use yash_env::test_helper::{assert_stderr, assert_stdout};
 
     fn env() -> (Env<Rc<Concurrent<VirtualSystem>>>, VirtualSystem) {
         let system = VirtualSystem::new();
@@ -147,6 +200,63 @@ mod tests {
         assert_eq!(result, crate::Result::default());
         assert_stdout(&system.state, |stdout| {
             assert_eq!(stdout, "pwd: dummy\n\ndummy help\n")
+        });
+    }
+
+    #[test]
+    fn separates_messages_of_multiple_operands_with_empty_line() {
+        let (mut env, system) = env();
+        register(&mut env, "foo", &DummyHelp);
+        register(&mut env, "bar", &DummyHelp);
+
+        let result = main(&mut env, Field::dummies(["foo", "bar"]))
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, crate::Result::default());
+        assert_stdout(&system.state, |stdout| {
+            assert_eq!(
+                stdout,
+                "foo: dummy\n\ndummy help\n\nbar: dummy\n\ndummy help\n"
+            )
+        });
+    }
+
+    #[test]
+    fn reports_operand_without_help() {
+        let (mut env, system) = env();
+
+        let result = main(&mut env, Field::dummies(["foo"]))
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, crate::Result::from(ExitStatus::FAILURE));
+        assert_stdout(&system.state, |stdout| assert_eq!(stdout, ""));
+        assert_stderr(&system.state, |stderr| {
+            assert!(stderr.contains("foo"), "stderr = {stderr:?}");
+            assert!(stderr.contains("man -k foo"), "stderr = {stderr:?}");
+        });
+    }
+
+    #[test]
+    fn prints_help_of_other_operands_after_operand_without_help() {
+        let (mut env, system) = env();
+        register(&mut env, "foo", &DummyHelp);
+        register(&mut env, "bar", &DummyHelp);
+
+        let result = main(&mut env, Field::dummies(["foo", "baz", "bar"]))
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, crate::Result::from(ExitStatus::FAILURE));
+        assert_stdout(&system.state, |stdout| {
+            assert_eq!(
+                stdout,
+                "foo: dummy\n\ndummy help\n\nbar: dummy\n\ndummy help\n"
+            )
+        });
+        assert_stderr(&system.state, |stderr| {
+            assert!(stderr.contains("man -k baz"), "stderr = {stderr:?}");
         });
     }
 }

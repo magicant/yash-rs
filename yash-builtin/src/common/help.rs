@@ -20,7 +20,6 @@
 //! generates the help message from structured data, including the option
 //! specs the built-in's parser uses.
 
-use super::output;
 use super::syntax::{
     Mode, OptionArgumentSpec, OptionOccurrence, OptionSpec, ParseError, parse_arguments,
 };
@@ -187,18 +186,6 @@ impl Help for BuiltinHelp {
         .unwrap();
         Cow::Owned(message)
     }
-}
-
-/// Prints the help message to the standard output.
-///
-/// The message begins with a line consisting of `name` and the summary,
-/// followed by an empty line and the [body](Help::message).
-pub async fn print<S>(env: &mut Env<S>, name: &str, help: &dyn Help) -> yash_env::builtin::Result
-where
-    S: Isatty + WriteAll,
-{
-    let message = format!("{name}: {}\n\n{}", help.summary(), help.message());
-    output(env, &message).await
 }
 
 /// Parses arguments, or runs `help` for the current built-in if `--help` is
