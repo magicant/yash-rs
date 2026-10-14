@@ -45,9 +45,11 @@ pub trait Help {
     /// Returns a one-line summary of the built-in.
     fn summary(&self) -> Cow<'_, str>;
 
-    /// Returns the full help message of the built-in.
+    /// Returns the body of the help message of the built-in.
     ///
-    /// The message should end with a newline.
+    /// The `help` built-in prints the body after a line consisting of the
+    /// name of the built-in and the [summary](Self::summary), so the body
+    /// should not repeat them. The body should end with a newline.
     fn message(&self) -> Cow<'_, str>;
 }
 
@@ -134,8 +136,8 @@ impl<'a> Deref for OptionSpecsWithHelp<'a> {
 
 /// Help information of a built-in
 ///
-/// The help message consists of the summary, the usage lines, the option
-/// list, and a link to the manual page. The option list is generated from
+/// The body of the help message consists of the usage lines, the option list,
+/// and a link to the manual page. The option list is generated from
 /// the option specs so that it stays in sync with the parser.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BuiltinHelp {
@@ -165,7 +167,7 @@ impl Help for BuiltinHelp {
     }
 
     fn message(&self) -> Cow<'_, str> {
-        let mut message = format!("{}\n\nUsage:\n", self.summary);
+        let mut message = String::from("Usage:\n");
         for usage in self.usage {
             writeln!(message, "  {usage}").unwrap();
         }
@@ -188,11 +190,15 @@ impl Help for BuiltinHelp {
 }
 
 /// Prints the help message to the standard output.
-pub async fn print<S>(env: &mut Env<S>, help: &dyn Help) -> yash_env::builtin::Result
+///
+/// The message begins with a line consisting of `name` and the summary,
+/// followed by an empty line and the [body](Help::message).
+pub async fn print<S>(env: &mut Env<S>, name: &str, help: &dyn Help) -> yash_env::builtin::Result
 where
     S: Isatty + WriteAll,
 {
-    output(env, &help.message()).await
+    let message = format!("{name}: {}\n\n{}", help.summary(), help.message());
+    output(env, &message).await
 }
 
 /// Parses arguments, or runs `help` for the current built-in if `--help` is
@@ -290,7 +296,7 @@ mod tests {
 
         assert_eq!(result, ControlFlow::Break(Default::default()));
         assert_stdout(&system.state, |stdout| {
-            assert_eq!(stdout, crate::pwd::HELP.message())
+            assert!(stdout.starts_with("pwd: print the working directory path\n\nUsage:\n"))
         });
     }
 
@@ -306,7 +312,7 @@ mod tests {
 
         assert_eq!(result, ControlFlow::Break(Default::default()));
         assert_stdout(&system.state, |stdout| {
-            assert_eq!(stdout, crate::pwd::HELP.message())
+            assert!(stdout.starts_with("pwd: print the working directory path\n\nUsage:\n"))
         });
     }
 
@@ -411,9 +417,7 @@ mod tests {
 
         assert_eq!(
             help.message(),
-            "do something
-
-Usage:
+            "Usage:
   foo [-a|-b]
 
 Options:

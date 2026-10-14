@@ -76,7 +76,7 @@ where
     let Some(&help) = table(env).get(operand.value.as_str()) else {
         todo!("help for a name without help");
     };
-    print(env, help).await
+    print(env, &operand.value, help).await
 }
 
 #[cfg(test)]
@@ -117,7 +117,7 @@ mod tests {
 
         assert_eq!(result, crate::Result::default());
         assert_stdout(&system.state, |stdout| {
-            assert_eq!(stdout, crate::pwd::HELP.message())
+            assert!(stdout.starts_with("pwd: print the working directory path\n\nUsage:\n"))
         });
     }
     #[test]
@@ -130,7 +130,9 @@ mod tests {
             .unwrap();
 
         assert_eq!(result, crate::Result::default());
-        assert_stdout(&system.state, |stdout| assert_eq!(stdout, "dummy help\n"));
+        assert_stdout(&system.state, |stdout| {
+            assert_eq!(stdout, "dummy: dummy\n\ndummy help\n")
+        });
     }
 
     #[test]
@@ -143,6 +145,8 @@ mod tests {
             .unwrap();
 
         assert_eq!(result, crate::Result::default());
-        assert_stdout(&system.state, |stdout| assert_eq!(stdout, "dummy help\n"));
+        assert_stdout(&system.state, |stdout| {
+            assert_eq!(stdout, "pwd: dummy\n\ndummy help\n")
+        });
     }
 }
