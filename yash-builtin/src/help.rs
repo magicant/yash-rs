@@ -161,6 +161,16 @@ mod tests {
     }
 
     #[test]
+    fn default_table_has_help_only_for_builtins_in_iter() {
+        let names: Vec<&str> = crate::iter::<Rc<Concurrent<VirtualSystem>>>()
+            .map(|(name, _)| name)
+            .collect();
+        for name in HelpTable::default().0.keys() {
+            assert!(names.contains(name), "{name:?} is not in crate::iter");
+        }
+    }
+
+    #[test]
     fn prints_help_of_operand() {
         let (mut env, system) = env();
 
