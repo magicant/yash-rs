@@ -58,7 +58,7 @@ pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "print the working directory path",
     usage: &["pwd [-L|-P]"],
     options: syntax::OPTION_SPECS,
-    page: "pwd",
+    manual_page_name: "pwd",
 };
 
 /// Entry point for executing the `pwd` built-in

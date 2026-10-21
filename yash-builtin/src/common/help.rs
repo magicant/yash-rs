@@ -147,7 +147,7 @@ pub struct BuiltinHelp {
     /// Option specs of the built-in
     pub options: OptionSpecsWithHelp<'static>,
     /// Name of the manual page without the `.html` extension
-    pub page: &'static str,
+    pub manual_page_name: &'static str,
 }
 
 fn option_name(spec: &OptionSpec) -> String {
@@ -181,7 +181,7 @@ impl Help for BuiltinHelp {
         writeln!(
             message,
             "\nSee <{MANUAL_BASE_URL}{}.html> for details.",
-            self.page
+            self.manual_page_name
         )
         .unwrap();
         Cow::Owned(message)
@@ -399,7 +399,7 @@ mod tests {
             summary: "do something",
             usage: &["foo [-a|-b]"],
             options: OPTIONS,
-            page: "foo",
+            manual_page_name: "foo",
         };
 
         assert_eq!(
