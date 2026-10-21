@@ -28,7 +28,7 @@ use crate::common::help::{
     BuiltinHelp, HELP_OPTION, Help, OptionSpecsWithHelp, parse_or_print_help,
 };
 use crate::common::output;
-use crate::common::report::{merge_reports, report_error, report_failure};
+use crate::common::report::{merge_reports, report_error, report_failure, report_simple_error};
 use crate::common::syntax::Mode;
 use std::collections::HashMap;
 use std::ops::ControlFlow;
@@ -117,7 +117,8 @@ where
         ControlFlow::Continue(Err(error)) => return report_error(env, &error).await,
     };
     if operands.is_empty() {
-        todo!("help with no operand");
+        // TODO: List the built-ins with their summaries
+        return report_simple_error(env, "listing built-ins is not implemented yet").await;
     }
     print(env, &operands).await
 }
@@ -190,6 +191,19 @@ mod tests {
         for name in HelpTable::default().0.keys() {
             assert!(names.contains(name), "{name:?} is not in crate::iter");
         }
+    }
+
+    #[test]
+    fn reports_unimplemented_listing_without_operand() {
+        let (mut env, system) = env();
+
+        let result = main(&mut env, vec![]).now_or_never().unwrap();
+
+        assert_eq!(result, crate::Result::from(ExitStatus::ERROR));
+        assert_stdout(&system.state, |stdout| assert_eq!(stdout, ""));
+        assert_stderr(&system.state, |stderr| {
+            assert!(stderr.contains("not implemented"), "stderr = {stderr:?}");
+        });
     }
 
     #[test]
