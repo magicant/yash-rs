@@ -34,6 +34,11 @@
 //! [stack](Env::stack) should contain a [built-in frame](Frame::Builtin) so
 //! that `Stack::current_builtin` provides the correct command word.
 //!
+//! In particular, built-ins that accept the `--help` option use the command
+//! word to find the help to print, so they **panic** if `--help` is given
+//! without a built-in frame in the stack. See
+//! [`parse_or_print_help`](common::help::parse_or_print_help) for details.
+//!
 //! # Dependencies to be injected
 //!
 //! Some built-ins in this crate require certain dependencies to be injected
@@ -70,6 +75,7 @@ pub mod export;
 pub mod r#false;
 pub mod fg;
 pub mod getopts;
+pub mod help;
 pub mod jobs;
 pub mod kill;
 pub mod pwd;
@@ -224,6 +230,10 @@ where
         (
             "getopts",
             Builtin::new(Mandatory, |env, args| Box::pin(getopts::main(env, args))),
+        ),
+        (
+            "help",
+            Builtin::new(Elective, |env, args| Box::pin(help::main(env, args))),
         ),
         (
             "jobs",
