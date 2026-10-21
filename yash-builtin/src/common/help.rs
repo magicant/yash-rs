@@ -240,7 +240,7 @@ where
         .expect("a built-in frame should be in the stack to tell which built-in --help is for")
         .name
         .clone();
-    ControlFlow::Break(crate::help::main(env, vec![name]).await)
+    ControlFlow::Break(crate::help::print(env, &[name]).await)
 }
 
 #[cfg(test)]

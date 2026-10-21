@@ -24,11 +24,14 @@
 //! defined in this crate. Built-ins defined outside this crate can be given
 //! help with [`register`].
 
-use crate::common::help::{HELP_OPTION, Help};
+use crate::common::help::{
+    BuiltinHelp, HELP_OPTION, Help, OptionSpecsWithHelp, parse_or_print_help,
+};
 use crate::common::output;
 use crate::common::report::{merge_reports, report_error, report_failure};
-use crate::common::syntax::{Mode, OptionSpec, parse_arguments};
+use crate::common::syntax::Mode;
 use std::collections::HashMap;
+use std::ops::ControlFlow;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::{Footnote, FootnoteType, Report, ReportType, Snippet};
@@ -36,7 +39,15 @@ use yash_env::system::Isatty;
 use yash_env::system::concurrency::WriteAll;
 use yash_quote::quoted;
 
-const OPTION_SPECS: &[OptionSpec] = &[HELP_OPTION];
+const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION]);
+
+/// Help information of the `help` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "print the help of built-ins",
+    usage: &["help [name...]"],
+    options: OPTION_SPECS,
+    manual_page_name: "help",
+};
 
 /// Table of help information keyed by the name of the built-in
 #[derive(Clone)]
@@ -44,7 +55,10 @@ struct HelpTable(HashMap<&'static str, &'static dyn Help>);
 
 impl Default for HelpTable {
     fn default() -> Self {
-        Self(HashMap::from([("pwd", &crate::pwd::HELP as &dyn Help)]))
+        Self(HashMap::from([
+            ("help", &HELP as &dyn Help),
+            ("pwd", &crate::pwd::HELP),
+        ]))
     }
 }
 
@@ -96,22 +110,29 @@ pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
     S: Isatty + WriteAll,
 {
-    let (options, operands) = match parse_arguments(OPTION_SPECS, Mode::with_env(env), args) {
-        Ok(result) => result,
-        Err(error) => return report_error(env, &error).await,
+    let mode = Mode::with_env(env);
+    let operands = match parse_or_print_help(env, OPTION_SPECS, mode, args).await {
+        ControlFlow::Break(result) => return result,
+        ControlFlow::Continue(Ok((_, operands))) => operands,
+        ControlFlow::Continue(Err(error)) => return report_error(env, &error).await,
     };
-
-    if !options.is_empty() {
-        todo!("help --help");
-    }
     if operands.is_empty() {
         todo!("help with no operand");
     }
+    print(env, &operands).await
+}
 
+/// Prints the help of the built-ins named by `operands`.
+///
+/// This function reports an error for each operand that has no help.
+pub(crate) async fn print<S>(env: &mut Env<S>, operands: &[Field]) -> crate::Result
+where
+    S: Isatty + WriteAll,
+{
     let table = table(env);
     let mut message = String::new();
     let mut reports = Vec::new();
-    for operand in &operands {
+    for operand in operands {
         match table.get(operand.value.as_str()) {
             Some(&help) => {
                 if !message.is_empty() {
@@ -139,6 +160,7 @@ mod tests {
     use std::rc::Rc;
     use yash_env::VirtualSystem;
     use yash_env::semantics::ExitStatus;
+    use yash_env::stack::{Builtin, Frame};
     use yash_env::system::Concurrent;
     use yash_env::test_helper::{assert_stderr, assert_stdout};
 
@@ -228,6 +250,28 @@ mod tests {
             assert_eq!(
                 stdout,
                 "foo: dummy\n\ndummy help\n\nbar: dummy\n\ndummy help\n"
+            )
+        });
+    }
+
+    #[test]
+    fn prints_own_help_for_help_option() {
+        let (mut env, system) = env();
+        let mut env = env.push_frame(Frame::Builtin(Builtin {
+            name: Field::dummy("help"),
+            is_special: false,
+        }));
+
+        let result = main(&mut env, Field::dummies(["--help"]))
+            .now_or_never()
+            .unwrap();
+
+        assert_eq!(result, crate::Result::default());
+        assert_stdout(&system.state, |stdout| {
+            assert!(
+                stdout
+                    .starts_with("help: print the help of built-ins\n\nUsage:\n  help [name...]\n"),
+                "stdout = {stdout:?}"
             )
         });
     }
