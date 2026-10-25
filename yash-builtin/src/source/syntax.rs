@@ -17,10 +17,10 @@
 //! Parsing command line arguments to the source built-in
 
 use super::Command;
+use crate::common::help::{HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help};
 use crate::common::report::report_error;
 use crate::common::syntax::Mode;
 use crate::common::syntax::ParseError;
-use crate::common::syntax::parse_arguments;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::option::Option::Portable;
@@ -107,14 +107,20 @@ impl<'a> From<&'a Error> for Report<'a> {
     }
 }
 
+pub(super) const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION]);
+
 /// Parses command line arguments to the source built-in.
 ///
 /// While the [`Portable`] shell option is on, an operand after the file is
 /// rejected with [`Error::NonPortableOperand`], since POSIX specifies the
 /// syntax as `. file`.
-pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
+pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<WithHelp<Command>, Error> {
     let mode = Mode::with_env(env);
-    let (_options, mut operands) = parse_arguments(&[], mode, args)?;
+    let WithHelp::Main((_options, mut operands)) =
+        parse_arguments_with_help(OPTION_SPECS, mode, args)?
+    else {
+        return Ok(WithHelp::Help);
+    };
     if operands.is_empty() {
         return Err(Error::MissingFile);
     }
@@ -125,7 +131,7 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
         return Err(Error::NonPortableOperand(params));
     }
 
-    Ok(Command { file, params })
+    Ok(WithHelp::Main(Command { file, params }))
 }
 
 #[cfg(test)]
@@ -139,10 +145,10 @@ mod tests {
         let args = Field::dummies(["my/file", "foo", "bar"]);
         assert_eq!(
             parse(&env, args),
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 file: Field::dummy("my/file"),
                 params: Field::dummies(["foo", "bar"]),
-            })
+            }))
         );
     }
 
@@ -153,10 +159,10 @@ mod tests {
         let args = vec![Field::dummy("foo")];
         assert_eq!(
             parse(&env, args),
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 file: Field::dummy("foo"),
                 params: vec![],
-            })
+            }))
         );
     }
 
@@ -188,6 +194,23 @@ mod tests {
                 '@',
                 Field::dummy("-@"),
             ))),
+        );
+    }
+
+    #[test]
+    fn help_option() {
+        let env = Env::new_virtual();
+        let args = Field::dummies(["--help"]);
+        assert_eq!(parse(&env, args), Ok(WithHelp::Help));
+    }
+
+    #[test]
+    fn help_option_with_other_arguments() {
+        let env = Env::new_virtual();
+        let args = Field::dummies(["--help", "foo"]);
+        assert_matches!(
+            parse(&env, args),
+            Err(Error::CommonError(ParseError::HelpWithOtherArguments(_)))
         );
     }
 

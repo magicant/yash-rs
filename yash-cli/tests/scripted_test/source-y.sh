@@ -49,3 +49,43 @@ echo reached
 __IN__
 reached
 __OUT__
+
+test_oE -e 0 'help option of . prints help without exiting the shell'
+. --help
+echo $?
+__IN__
+.: execute commands in a file
+
+Usage:
+  . file [argument...]
+  source file [argument...]
+
+Options:
+      --help  print this help
+
+See <https://magicant.github.io/yash-rs/builtins/source.html> for details.
+0
+__OUT__
+
+test_O -d -e 2 'help option of . with another operand'
+. --help foo
+__IN__
+
+test_oE -e 0 'help option of source prints help'
+source --help
+__IN__
+source: execute commands in a file
+
+Usage:
+  . file [argument...]
+  source file [argument...]
+
+Options:
+      --help  print this help
+
+See <https://magicant.github.io/yash-rs/builtins/source.html> for details.
+__OUT__
+
+test_O -d -e 2 'help option of source with another operand'
+source --help foo
+__IN__

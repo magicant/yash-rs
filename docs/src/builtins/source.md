@@ -28,7 +28,7 @@ If there are no operands, the positional parameters are not changed and the scri
 
 ## Options
 
-None.
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
 
 <!-- TODO: non-portable options -->
 
@@ -62,6 +62,8 @@ See [Reading and executing files](../dynamic_evaluation.md#reading-and-executing
 ## Compatibility
 
 The `.` built-in is specified in the POSIX standard. The built-in name `source` is a non-standard extension that is also available in some other shells. (Since 3.3.4) When the [`portable` option](../environment/options.md#portable) is set, invoking the built-in under the name `source` is rejected with an error; use `.` instead, which is unaffected.
+
+The `--help` option is a non-standard extension.
 
 POSIX defines no options for the `.` built-in, but previous versions of yash supported additional options, which are not yet implemented in yash-rs.
 

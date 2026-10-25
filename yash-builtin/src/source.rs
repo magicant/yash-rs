@@ -34,6 +34,7 @@
 //! [`RunReadEvalLoop`]: yash_env::semantics::RunReadEvalLoop
 
 use crate::Result;
+use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
 use yash_env::Env;
 #[cfg(doc)]
 use yash_env::semantics::ExitStatus;
@@ -59,13 +60,22 @@ pub struct Command {
     pub params: Vec<Field>,
 }
 
+/// Help information of the `.` (`source`) built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "execute commands in a file",
+    usage: &[". file [argument...]", "source file [argument...]"],
+    options: syntax::OPTION_SPECS.get(),
+    manual_page_name: "source",
+};
+
 /// Entry point of the `.` built-in execution
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
     S: Clone + Close + Dup + Isatty + Open + Read + WriteAll + 'static,
 {
     match syntax::parse(env, args) {
-        Ok(command) => command.execute(env).await,
+        Ok(WithHelp::Main(command)) => command.execute(env).await,
+        Ok(WithHelp::Help) => print_help_of_current_builtin(env).await,
         Err(error) => error.report(env).await,
     }
 }
