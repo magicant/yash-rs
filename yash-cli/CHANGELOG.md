@@ -18,8 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   built-ins that accept the `--help` option have help so far.
 - The `.`, `alias`, `bg`, `break`, `cd`, `continue`, `eval`, `exec`, `exit`,
   `fg`, `getopts`, `help`, `jobs`, `pwd`, `return`, `shift`, `source`, `times`,
-  `type`, `ulimit`, `umask`, `unalias`, `unset`, and `wait` built-ins print
-  their help when invoked with the `--help` option as the only argument.
+  `trap`, `type`, `ulimit`, `umask`, `unalias`, `unset`, and `wait` built-ins
+  print their help when invoked with the `--help` option as the only argument.
 
 ## [3.5.0] - 2026-10-06
 

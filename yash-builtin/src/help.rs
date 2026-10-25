@@ -79,6 +79,7 @@ impl Default for HelpTable {
             ("shift", &crate::shift::HELP),
             ("source", &crate::source::HELP),
             ("times", &crate::times::HELP),
+            ("trap", &crate::trap::HELP),
             ("type", &crate::r#type::HELP),
             ("ulimit", &crate::ulimit::HELP),
             ("umask", &crate::umask::HELP),
