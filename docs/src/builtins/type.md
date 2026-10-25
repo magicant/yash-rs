@@ -14,7 +14,7 @@ The `type` built-in prints the description of the specified command names.
 
 ## Options
 
-None.
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
 
 <!-- TODO: Non-standard options -->
 
@@ -53,6 +53,8 @@ env: external utility at /usr/bin/env
 ## Compatibility
 
 The `type` built-in is specified by POSIX.1-2024.
+
+The `--help` option is a non-standard extension.
 
 POSIX defines no options for the `type` built-in, but previous versions of yash supported additional options, which are not yet implemented in yash-rs.
 

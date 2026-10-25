@@ -40,7 +40,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   `parse_arguments_with_help` if `--help` is given with other options or
   operands.
 - `HELP` in the `alias`, `bg`, `eval`, `exec`, `exit`, `fg`, `getopts`, `jobs`,
-  `pwd`, `return`, and `shift` modules, the help of the respective built-ins.
+  `pwd`, `return`, `shift`, and `type` modules, the help of the respective
+  built-ins.
 - `common::syntax::OptionSpec::description` and
   `common::syntax::OptionSpec::get_description` set and get the description of
   an option shown in the help.
@@ -49,8 +50,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - `iter` now includes the `help` built-in as an elective built-in.
 - `main` in the `alias`, `bg`, `eval`, `exec`, `exit`, `fg`, `getopts`, `jobs`,
-  `pwd`, `return`, and `shift` modules now prints the help of the respective
-  built-in if `--help` is the only argument.
+  `pwd`, `return`, `shift`, and `type` modules now prints the help of the
+  respective built-in if `--help` is the only argument.
 - `pwd::syntax::parse` now recognizes `--help` and returns
   `Result<WithHelp<Mode>, Error>`. The `pwd::syntax::Result` type alias is
   changed accordingly.

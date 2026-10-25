@@ -254,3 +254,21 @@ __IN__
 if: keyword
 then: keyword
 __OUT__
+
+test_oE -e 0 'help option prints help'
+type --help
+__IN__
+type: identify the type of commands
+
+Usage:
+  type [name...]
+
+Options:
+      --help  print this help
+
+See <https://magicant.github.io/yash-rs/builtins/type.html> for details.
+__OUT__
+
+test_O -d -e 2 'help option with another operand'
+type --help ls
+__IN__
