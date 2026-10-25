@@ -77,6 +77,7 @@ impl Default for HelpTable {
             ("shift", &crate::shift::HELP),
             ("times", &crate::times::HELP),
             ("type", &crate::r#type::HELP),
+            ("wait", &crate::wait::HELP),
         ]))
     }
 }

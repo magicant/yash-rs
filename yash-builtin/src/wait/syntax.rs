@@ -24,7 +24,8 @@ use yash_env::job::Pid;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::{Report, ReportType, Snippet};
 
-use crate::common::syntax::{Mode, ParseError, parse_arguments};
+use crate::common::help::{HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help};
+use crate::common::syntax::{Mode, ParseError};
 
 /// Errors that may occur while parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -89,14 +90,20 @@ impl TryFrom<Field> for JobSpec {
     }
 }
 
+pub(super) const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION]);
+
 /// Parses command line arguments for the wait built-in.
-pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
-    let (_, operands) = parse_arguments(&[], Mode::with_env(env), args)?;
+pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<WithHelp<Command>, Error> {
+    let WithHelp::Main((_, operands)) =
+        parse_arguments_with_help(OPTION_SPECS, Mode::with_env(env), args)?
+    else {
+        return Ok(WithHelp::Help);
+    };
     let jobs = operands
         .into_iter()
         .map(JobSpec::try_from)
         .collect::<Result<Vec<JobSpec>, Error>>()?;
-    Ok(Command { jobs })
+    Ok(WithHelp::Main(Command { jobs }))
 }
 
 #[cfg(test)]
@@ -136,6 +143,23 @@ mod tests {
             assert_eq!(field, Field::dummy(""));
             assert_eq!(error.kind(), &IntErrorKind::Empty);
         });
+    }
+
+    #[test]
+    fn help_option() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["--help"]));
+        assert_eq!(result, Ok(WithHelp::Help));
+    }
+
+    #[test]
+    fn help_option_with_other_arguments() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["--help", "%1"]));
+        assert_matches!(
+            result,
+            Err(Error::CommonError(ParseError::HelpWithOtherArguments(_)))
+        );
     }
 
     #[test]
