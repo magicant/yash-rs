@@ -65,6 +65,7 @@ impl Default for HelpTable {
             ("alias", &crate::alias::HELP),
             ("bg", &crate::bg::HELP),
             ("break", &crate::r#break::HELP),
+            ("cd", &crate::cd::HELP),
             ("continue", &crate::r#continue::HELP),
             ("eval", &crate::eval::HELP),
             ("exec", &crate::exec::HELP),

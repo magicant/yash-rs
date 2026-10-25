@@ -18,8 +18,8 @@
 
 use super::Command;
 use super::Mode;
+use crate::common::help::{HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help};
 use crate::common::syntax::OptionSpec;
-use crate::common::syntax::parse_arguments;
 use std::collections::VecDeque;
 use thiserror::Error;
 use yash_env::Env;
@@ -84,18 +84,32 @@ impl<'a> From<&'a Error> for Report<'a> {
 }
 
 /// Result of parsing command line arguments
-pub type Result = std::result::Result<Command, Error>;
+pub type Result = std::result::Result<WithHelp<Command>, Error>;
 
-const OPTION_SPECS: &[OptionSpec] = &[
-    OptionSpec::new().short('e').long("ensure-pwd"),
-    OptionSpec::new().short('L').long("logical"),
-    OptionSpec::new().short('P').long("physical"),
-];
+pub(super) const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
+    OptionSpec::new()
+        .short('L')
+        .long("logical")
+        .description("keep symbolic links in $PWD (default)"),
+    OptionSpec::new()
+        .short('P')
+        .long("physical")
+        .description("resolve symbolic links in the path"),
+    OptionSpec::new()
+        .short('e')
+        .long("ensure-pwd")
+        .description("with -P, fail if $PWD cannot be updated"),
+    HELP_OPTION,
+]);
 
 /// Parses command line arguments for the cd built-in.
 pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
     let parser_mode = crate::common::syntax::Mode::with_env(env);
-    let (options, operands) = parse_arguments(OPTION_SPECS, parser_mode, args)?;
+    let WithHelp::Main((options, operands)) =
+        parse_arguments_with_help(OPTION_SPECS, parser_mode, args)?
+    else {
+        return Ok(WithHelp::Help);
+    };
 
     let mut ensure_pwd_option_location = None;
     let mut mode = Mode::default();
@@ -124,16 +138,18 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
         Some(operand) if operand.value.is_empty() => return Err(Error::EmptyOperand(operand)),
         operand => operand,
     };
-    Ok(Command {
+    Ok(WithHelp::Main(Command {
         mode,
         ensure_pwd,
         operand,
-    })
+    }))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::syntax::ParseError;
+    use assert_matches::assert_matches;
 
     #[test]
     fn no_arguments() {
@@ -141,11 +157,11 @@ mod tests {
         let result = parse(&env, vec![]);
         assert_eq!(
             result,
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 mode: Mode::Logical,
                 ensure_pwd: false,
                 operand: None,
-            })
+            }))
         );
     }
 
@@ -155,11 +171,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-L"]));
         assert_eq!(
             result,
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 mode: Mode::Logical,
                 ensure_pwd: false,
                 operand: None,
-            })
+            }))
         );
     }
 
@@ -169,11 +185,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-P"]));
         assert_eq!(
             result,
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 mode: Mode::Physical,
                 ensure_pwd: false,
                 operand: None,
-            })
+            }))
         );
     }
 
@@ -182,16 +198,40 @@ mod tests {
         let env = Env::new_virtual();
 
         let result = parse(&env, Field::dummies(["-L", "-P"]));
-        assert_eq!(result.unwrap().mode, Mode::Physical);
+        assert_matches!(
+            result,
+            Ok(WithHelp::Main(Command {
+                mode: Mode::Physical,
+                ..
+            }))
+        );
 
         let result = parse(&env, Field::dummies(["-P", "-L"]));
-        assert_eq!(result.unwrap().mode, Mode::Logical);
+        assert_matches!(
+            result,
+            Ok(WithHelp::Main(Command {
+                mode: Mode::Logical,
+                ..
+            }))
+        );
 
         let result = parse(&env, Field::dummies(["-L", "-P", "-L"]));
-        assert_eq!(result.unwrap().mode, Mode::Logical);
+        assert_matches!(
+            result,
+            Ok(WithHelp::Main(Command {
+                mode: Mode::Logical,
+                ..
+            }))
+        );
 
         let result = parse(&env, Field::dummies(["-PLP"]));
-        assert_eq!(result.unwrap().mode, Mode::Physical);
+        assert_matches!(
+            result,
+            Ok(WithHelp::Main(Command {
+                mode: Mode::Physical,
+                ..
+            }))
+        );
     }
 
     #[test]
@@ -199,13 +239,48 @@ mod tests {
         let env = Env::new_virtual();
 
         let result = parse(&env, Field::dummies(["-e", "-P"]));
-        assert!(result.unwrap().ensure_pwd);
+        assert_matches!(
+            result,
+            Ok(WithHelp::Main(Command {
+                ensure_pwd: true,
+                ..
+            }))
+        );
 
         let result = parse(&env, Field::dummies(["-P", "-e"]));
-        assert!(result.unwrap().ensure_pwd);
+        assert_matches!(
+            result,
+            Ok(WithHelp::Main(Command {
+                ensure_pwd: true,
+                ..
+            }))
+        );
 
         let result = parse(&env, Field::dummies(["-eLP"]));
-        assert!(result.unwrap().ensure_pwd);
+        assert_matches!(
+            result,
+            Ok(WithHelp::Main(Command {
+                ensure_pwd: true,
+                ..
+            }))
+        );
+    }
+
+    #[test]
+    fn help_option() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["--help"]));
+        assert_eq!(result, Ok(WithHelp::Help));
+    }
+
+    #[test]
+    fn help_option_with_other_arguments() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["-P", "--help"]));
+        assert_matches!(
+            result,
+            Err(Error::CommonError(ParseError::HelpWithOtherArguments(_)))
+        );
     }
 
     #[test]
@@ -215,11 +290,11 @@ mod tests {
         let result = parse(&env, vec![operand.clone()]);
         assert_eq!(
             result,
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 mode: Mode::default(),
                 ensure_pwd: false,
                 operand: Some(operand),
-            })
+            }))
         );
     }
 
@@ -231,11 +306,11 @@ mod tests {
         let result = parse(&env, args);
         assert_eq!(
             result,
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 mode: Mode::Logical,
                 ensure_pwd: false,
                 operand: Some(operand),
-            })
+            }))
         );
     }
 
