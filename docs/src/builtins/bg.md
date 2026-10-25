@@ -16,7 +16,7 @@ The (last) resumed job's process ID is set to the `!` [special parameter](../lan
 
 ## Options
 
-None.
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
 
 ## Operands
 
@@ -47,6 +47,8 @@ See [Job control](../interactive/job_control.md).
 ## Compatibility
 
 (Since 3.4.1) When the [`portable` option](../environment/options.md#portable) is set, the lone `%` is rejected as a [job ID](../interactive/job_control.md#job-ids).
+
+The `--help` option is a non-standard extension.
 
 Many implementations allow omitting the leading `%` from job IDs, though it is not required by POSIX.
 Previous versions of yash allowed it, but this is not yet supported in yash-rs.

@@ -34,10 +34,13 @@
 //!
 //! [expected state]: yash_env::job::Job::expected_state
 
+use crate::common::help::{
+    BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+    print_help_of_current_builtin,
+};
 use crate::common::report::job;
 use crate::common::report::{merge_reports, report, report_error, report_simple_failure};
 use crate::common::syntax::Mode;
-use crate::common::syntax::parse_arguments;
 use itertools::Itertools as _;
 use std::fmt::Display;
 use thiserror::Error;
@@ -223,13 +226,25 @@ where
     report(env, merged, exit_status).await
 }
 
+const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION]);
+
+/// Help information of the `bg` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "resume jobs in the background",
+    usage: &["bg [job_id...]"],
+    options: OPTION_SPECS.get(),
+    manual_page_name: "bg",
+};
+
 /// Entry point of the `bg` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
     S: Signals + SendSignal + Isatty + WriteAll,
 {
-    let (options, operands) = match parse_arguments(&[], Mode::with_env(env), args) {
-        Ok(result) => result,
+    let mode = Mode::with_env(env);
+    let (options, operands) = match parse_arguments_with_help(OPTION_SPECS, mode, args) {
+        Ok(WithHelp::Main(result)) => result,
+        Ok(WithHelp::Help) => return print_help_of_current_builtin(env).await,
         Err(error) => return report_error(env, &error).await,
     };
     debug_assert_eq!(options, []);

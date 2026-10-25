@@ -62,6 +62,7 @@ impl Default for HelpTable {
     fn default() -> Self {
         Self(HashMap::from([
             ("alias", &crate::alias::HELP as &dyn Help),
+            ("bg", &crate::bg::HELP),
             ("help", &HELP),
             ("pwd", &crate::pwd::HELP),
         ]))
