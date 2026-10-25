@@ -20,6 +20,8 @@ Either of the following options may be used to select what to unset:
   This is the default behavior.
 - The **`-f`** (**`--functions`**) option unsets functions.
 
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
+
 <!-- TODO: The `-l` (`--local`) option causes the built-in to unset local variables only. -->
 
 ## Operands
@@ -47,7 +49,7 @@ See [Removing variables](../language/parameters/variables.md#removing-variables)
 
 The `unset` built-in is specified by POSIX.1-2024.
 
-The long option names (`--functions`, `--variables`) are a non-standard extension.
+The long option names (`--functions`, `--variables`) and the `--help` option are a non-standard extension.
 
 (Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, using a long option name is rejected with an error. Use the corresponding short option instead.
 

@@ -44,3 +44,25 @@ __IN__
 test_OE -e 0 'unset accepts missing operand without the portable option'
 unset
 __IN__
+
+test_oE -e 0 'help option prints help without exiting the shell'
+unset --help
+echo $?
+__IN__
+unset: unset variables or functions
+
+Usage:
+  unset [-f|-v] name...
+
+Options:
+  -f, --functions  unset functions
+  -v, --variables  unset variables (default)
+      --help       print this help
+
+See <https://magicant.github.io/yash-rs/builtins/unset.html> for details.
+0
+__OUT__
+
+test_O -d -e 2 'help option with another operand'
+unset --help foo
+__IN__
