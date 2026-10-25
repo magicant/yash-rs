@@ -66,6 +66,7 @@ impl Default for HelpTable {
             ("eval", &crate::eval::HELP),
             ("exec", &crate::exec::HELP),
             ("fg", &crate::fg::HELP),
+            ("getopts", &crate::getopts::HELP),
             ("help", &HELP),
             ("pwd", &crate::pwd::HELP),
             ("shift", &crate::shift::HELP),

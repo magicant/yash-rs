@@ -27,9 +27,12 @@
 //! built-in is invoked with the same arguments and `$OPTIND` as the previous
 //! invocation.
 
+use crate::common::help::{
+    BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+    print_help_of_current_builtin,
+};
 use crate::common::report::{report_error, report_simple_error};
 use crate::common::syntax::Mode;
-use crate::common::syntax::parse_arguments;
 use either::Either::{Left, Right};
 use std::num::NonZeroUsize;
 use yash_env::Env;
@@ -62,14 +65,26 @@ fn indexes_to_optind(arg_index: NonZeroUsize, char_index: NonZeroUsize) -> Strin
     }
 }
 
+const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION]);
+
+/// Help information of the `getopts` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "parse options in shell scripts",
+    usage: &["getopts option_spec variable_name [argument...]"],
+    options: OPTION_SPECS.get(),
+    manual_page_name: "getopts",
+};
+
 /// Entry point of the getopts built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
     S: Isatty + WriteAll,
 {
     // Parse arguments
-    let operands = match parse_arguments(&[], Mode::with_env(env), args) {
-        Ok((_, operands)) => operands,
+    let mode = Mode::with_env(env);
+    let operands = match parse_arguments_with_help(OPTION_SPECS, mode, args) {
+        Ok(WithHelp::Main((_, operands))) => operands,
+        Ok(WithHelp::Help) => return print_help_of_current_builtin(env).await,
         Err(error) => return report_error(env, &error).await,
     };
     if operands.len() < 2 {
