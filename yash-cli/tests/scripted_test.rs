@@ -242,6 +242,11 @@ fn eval_builtin() {
 }
 
 #[test]
+fn eval_builtin_ex() {
+    run("eval-y.sh")
+}
+
+#[test]
 fn exec_builtin() {
     run("exec-p.sh")
 }

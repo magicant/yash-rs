@@ -14,7 +14,7 @@ This built-in parses and executes the argument as a shell script in the current 
 
 ## Options
 
-None.
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
 
 ## Operands
 
@@ -45,6 +45,8 @@ The `eval` built-in can be dangerous if used with untrusted input, as it can exe
 ## Compatibility
 
 The `eval` built-in is specified by POSIX.1-2024.
+
+The `--help` option is a non-standard extension.
 
 In some shells, the `eval` built-in lacks support for the [`--` separator](index.html#separators), treating it as an operand.
 
