@@ -41,8 +41,8 @@ A _private dependency_ is used internally and not visible to downstream users.
   operands.
 - `HELP` in the `alias`, `bg`, `break`, `cd`, `continue`, `eval`, `exec`,
   `exit`, `fg`, `getopts`, `jobs`, `pwd`, `return`, `shift`, `source`, `times`,
-  `type`, `umask`, `unset`, and `wait` modules, the help of the respective
-  built-ins.
+  `type`, `umask`, `unalias`, `unset`, and `wait` modules, the help of the
+  respective built-ins.
 - `common::syntax::OptionSpec::description` and
   `common::syntax::OptionSpec::get_description` set and get the description of
   an option shown in the help.
@@ -52,12 +52,15 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `iter` now includes the `help` built-in as an elective built-in.
 - `main` in the `alias`, `bg`, `break`, `cd`, `continue`, `eval`, `exec`,
   `exit`, `fg`, `getopts`, `jobs`, `pwd`, `return`, `shift`, `source`, `times`,
-  `type`, `umask`, `unset`, and `wait` modules now prints the help of the
-  respective built-in if `--help` is the only argument.
+  `type`, `umask`, `unalias`, `unset`, and `wait` modules now prints the help of
+  the respective built-in if `--help` is the only argument.
 - `parse` in the `break::syntax`, `cd::syntax`, `pwd::syntax`, `source::syntax`,
-  `umask::syntax`, `unset::syntax`, and `wait::syntax` modules now recognizes
-  `--help` and returns its previous result wrapped in `WithHelp`. The `Result`
-  type alias in each of these modules, if any, is changed accordingly.
+  `umask::syntax`, `unalias::syntax`, `unset::syntax`, and `wait::syntax`
+  modules now recognizes `--help` and returns its previous result wrapped in
+  `WithHelp`. The `Result` type alias in each of these modules, if any, is
+  changed accordingly.
+- `unalias::syntax::OPTION_SPECS` is now `OptionSpecsWithHelp` including
+  `common::help::HELP_OPTION` and has a description for each option.
 
 ## [0.25.0] - 2026-10-06
 

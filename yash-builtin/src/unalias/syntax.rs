@@ -17,9 +17,9 @@
 //! Command line argument parsing for the `unalias` built-in
 
 use super::Command;
+use crate::common::help::{HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help};
 use crate::common::syntax::Mode;
 use crate::common::syntax::OptionSpec;
-use crate::common::syntax::parse_arguments;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
@@ -27,7 +27,13 @@ use yash_env::source::Location;
 use yash_env::source::pretty::{Report, ReportType, Snippet, Span, SpanRole, add_span};
 
 /// List of all options supported by the `unalias` built-in
-pub const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('a').long("all")];
+pub const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
+    OptionSpec::new()
+        .short('a')
+        .long("all")
+        .description("remove all aliases"),
+    HELP_OPTION,
+]);
 
 /// Errors that can occur while parsing command line arguments
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -94,9 +100,13 @@ impl<'a> From<&'a Error> for Report<'a> {
 }
 
 /// Parses command line arguments for the `unalias` built-in.
-pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
+pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<WithHelp<Command>, Error> {
     let mode = Mode::with_env(env);
-    let (mut options, operands) = parse_arguments(OPTION_SPECS, mode, args)?;
+    let WithHelp::Main((mut options, operands)) =
+        parse_arguments_with_help(OPTION_SPECS, mode, args)?
+    else {
+        return Ok(WithHelp::Help);
+    };
 
     for option in &options {
         debug_assert_eq!(option.spec.get_short(), Some('a'));
@@ -104,8 +114,8 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
 
     match (options.pop(), operands.is_empty()) {
         (None, true) => Err(Error::MissingArgument),
-        (None, false) => Ok(Command::Remove(operands)),
-        (Some(_), true) => Ok(Command::RemoveAll),
+        (None, false) => Ok(WithHelp::Main(Command::Remove(operands))),
+        (Some(_), true) => Ok(WithHelp::Main(Command::RemoveAll)),
         (Some(option), false) => Err(Error::ConflictingOptionAndOperand {
             option_location: option.location,
             operand_location: { operands }.swap_remove(0).origin,
@@ -116,6 +126,7 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::syntax::ParseError;
     use assert_matches::assert_matches;
 
     #[test]
@@ -140,14 +151,14 @@ mod tests {
     fn all_option() {
         let env = Env::new_virtual();
         let result = parse(&env, Field::dummies(["-a"]));
-        assert_eq!(result, Ok(Command::RemoveAll));
+        assert_eq!(result, Ok(WithHelp::Main(Command::RemoveAll)));
     }
 
     #[test]
     fn long_all_option() {
         let env = Env::new_virtual();
         let result = parse(&env, Field::dummies(["--all"]));
-        assert_eq!(result, Ok(Command::RemoveAll));
+        assert_eq!(result, Ok(WithHelp::Main(Command::RemoveAll)));
     }
 
     #[test]
@@ -155,7 +166,24 @@ mod tests {
         let env = Env::new_virtual();
         let operands = Field::dummies(["foo", "bar"]);
         let result = parse(&env, operands.clone());
-        assert_eq!(result, Ok(Command::Remove(operands)));
+        assert_eq!(result, Ok(WithHelp::Main(Command::Remove(operands))));
+    }
+
+    #[test]
+    fn help_option() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["--help"]));
+        assert_eq!(result, Ok(WithHelp::Help));
+    }
+
+    #[test]
+    fn help_option_with_other_arguments() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["-a", "--help"]));
+        assert_matches!(
+            result,
+            Err(Error::CommonError(ParseError::HelpWithOtherArguments(_)))
+        );
     }
 
     #[test]

@@ -81,6 +81,7 @@ impl Default for HelpTable {
             ("times", &crate::times::HELP),
             ("type", &crate::r#type::HELP),
             ("umask", &crate::umask::HELP),
+            ("unalias", &crate::unalias::HELP),
             ("unset", &crate::unset::HELP),
             ("wait", &crate::wait::HELP),
         ]))
