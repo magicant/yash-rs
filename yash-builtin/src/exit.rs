@@ -58,8 +58,12 @@
 //! [`yash_env::input::EofGuard`] for the `ignore-eof` option behavior and is
 //! not consulted by this built-in.
 
+use crate::common::help::{
+    BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+    print_help_of_current_builtin,
+};
 use crate::common::report::{report_error, syntax_error};
-use crate::common::syntax::{Mode, OptionSpec, parse_arguments};
+use crate::common::syntax::{Mode, OptionSpec};
 use std::num::ParseIntError;
 use std::ops::ControlFlow::Break;
 use yash_env::Env;
@@ -74,7 +78,22 @@ use yash_env::source::Location;
 use yash_env::system::Isatty;
 use yash_env::system::concurrency::WriteAll;
 
-const OPTIONS: &[OptionSpec] = &[OptionSpec::new().short('f').long("force").extension(true)];
+const OPTIONS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
+    OptionSpec::new()
+        .short('f')
+        .long("force")
+        .extension(true)
+        .description("exit even if there are suspended jobs"),
+    HELP_OPTION,
+]);
+
+/// Help information of the `exit` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "exit the shell",
+    usage: &["exit [-f] [exit_status]"],
+    options: OPTIONS.get(),
+    manual_page_name: "exit",
+};
 
 // TODO Split into syntax and semantics submodules
 
@@ -93,8 +112,10 @@ pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
     S: Isatty + WriteAll,
 {
-    let (options, args) = match parse_arguments(OPTIONS, Mode::with_env(env), args) {
-        Ok(result) => result,
+    let mode = Mode::with_env(env);
+    let (options, args) = match parse_arguments_with_help(OPTIONS, mode, args) {
+        Ok(WithHelp::Main(result)) => result,
+        Ok(WithHelp::Help) => return print_help_of_current_builtin(env).await,
         Err(error) => return report_error(env, &error).await,
     };
     let force = options.iter().any(|o| o.spec.get_short() == Some('f'));
