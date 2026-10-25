@@ -49,6 +49,8 @@ The **`-l`** (**`--verbose`**) option displays additional details by inserting t
 
 The two options are mutually exclusive. (Since 3.3.5) Specifying both is an error.
 
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
+
 <!--
 ### Filtering
 
@@ -95,7 +97,7 @@ $ jobs -p %2
 
 ## Compatibility
 
-The long option names (`--verbose`, `--pgid-only`) are a non-standard extension.
+The long option names (`--verbose`, `--pgid-only`) and the `--help` option are a non-standard extension.
 
 (Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, using a long option name is rejected with an error. Use the corresponding short option instead.
 
