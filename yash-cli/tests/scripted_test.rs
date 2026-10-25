@@ -528,6 +528,11 @@ fn shift_builtin() {
 }
 
 #[test]
+fn shift_builtin_ex() {
+    run("shift-y.sh")
+}
+
+#[test]
 fn simple_command() {
     run("simple-p.sh")
 }

@@ -68,6 +68,7 @@ impl Default for HelpTable {
             ("fg", &crate::fg::HELP),
             ("help", &HELP),
             ("pwd", &crate::pwd::HELP),
+            ("shift", &crate::shift::HELP),
         ]))
     }
 }

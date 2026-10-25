@@ -15,7 +15,7 @@ positional parameters. If *n* is omitted, it is assumed to be `1`.
 
 ## Options
 
-None.
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
 
 ## Operands
 
@@ -39,5 +39,7 @@ Zero if successful, non-zero if an error occurred.
 ## Compatibility
 
 The `shift` built-in is part of POSIX.1-2024.
+
+The `--help` option is a non-standard extension.
 
 In some shells, the `shift` built-in lacks support for the [`--` separator](index.html#separators).
