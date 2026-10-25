@@ -16,9 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `help` built-in prints the help of built-ins, which summarizes the usage
   and options of each built-in and links to its manual page. Only the
   built-ins that accept the `--help` option have help so far.
-- The `alias`, `bg`, `eval`, `exec`, `exit`, `fg`, `getopts`, `help`, `jobs`,
-  `pwd`, `return`, `shift`, and `type` built-ins print their help when invoked
-  with the `--help` option as the only argument.
+- The `alias`, `bg`, `break`, `continue`, `eval`, `exec`, `exit`, `fg`,
+  `getopts`, `help`, `jobs`, `pwd`, `return`, `shift`, and `type` built-ins
+  print their help when invoked with the `--help` option as the only argument.
 
 ## [3.5.0] - 2026-10-06
 

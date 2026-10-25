@@ -162,6 +162,11 @@ fn break_builtin() {
 }
 
 #[test]
+fn break_builtin_ex() {
+    run("break-y.sh")
+}
+
+#[test]
 fn builtins() {
     run("builtins-p.sh")
 }
@@ -209,6 +214,11 @@ fn comment() {
 #[test]
 fn continue_builtin() {
     run("continue-p.sh")
+}
+
+#[test]
+fn continue_builtin_ex() {
+    run("continue-y.sh")
 }
 
 #[test]

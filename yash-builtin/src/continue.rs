@@ -31,6 +31,7 @@
 //! break built-in implementation.
 //! This module re-exports [`super::break::syntax`].
 
+use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
 use crate::common::report::{report_error, report_simple_failure};
 use yash_env::Env;
 use yash_env::builtin::Result;
@@ -42,6 +43,14 @@ use yash_env::system::concurrency::WriteAll;
 pub mod semantics;
 pub use super::r#break::syntax;
 
+/// Help information of the `continue` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "resume the next iteration of loops",
+    usage: &["continue [n]"],
+    options: syntax::OPTION_SPECS.get(),
+    manual_page_name: "continue",
+};
+
 /// Entry point for executing the `continue` built-in
 ///
 /// This function uses the [`syntax`] and [`semantics`] modules to execute the built-in.
@@ -50,10 +59,11 @@ where
     S: Isatty + WriteAll,
 {
     match syntax::parse(env, args) {
-        Ok(count) => match semantics::run(&env.stack, count) {
+        Ok(WithHelp::Main(count)) => match semantics::run(&env.stack, count) {
             Ok(result) => result,
             Err(e) => report_simple_failure(env, &format!("cannot continue: {e}")).await,
         },
+        Ok(WithHelp::Help) => print_help_of_current_builtin(env).await,
         Err(e) => report_error(env, &e).await,
     }
 }

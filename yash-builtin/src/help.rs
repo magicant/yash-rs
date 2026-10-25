@@ -63,6 +63,8 @@ impl Default for HelpTable {
         Self(HashMap::from([
             ("alias", &crate::alias::HELP as &dyn Help),
             ("bg", &crate::bg::HELP),
+            ("break", &crate::r#break::HELP),
+            ("continue", &crate::r#continue::HELP),
             ("eval", &crate::eval::HELP),
             ("exec", &crate::exec::HELP),
             ("exit", &crate::exit::HELP),

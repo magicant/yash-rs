@@ -29,6 +29,7 @@
 //!
 //! [`break` built-in]: https://magicant.github.io/yash-rs/builtins/break.html
 
+use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
 use crate::common::report::{report_error, report_simple_failure};
 use yash_env::Env;
 use yash_env::builtin::Result;
@@ -40,6 +41,14 @@ use yash_env::system::concurrency::WriteAll;
 pub mod semantics;
 pub mod syntax;
 
+/// Help information of the `break` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "exit from loops",
+    usage: &["break [n]"],
+    options: syntax::OPTION_SPECS.get(),
+    manual_page_name: "break",
+};
+
 /// Entry point for executing the `break` built-in
 ///
 /// This function uses the [`syntax`] and [`semantics`] modules to execute the built-in.
@@ -48,10 +57,11 @@ where
     S: Isatty + WriteAll,
 {
     match syntax::parse(env, args) {
-        Ok(count) => match semantics::run(&env.stack, count) {
+        Ok(WithHelp::Main(count)) => match semantics::run(&env.stack, count) {
             Ok(result) => result,
             Err(e) => report_simple_failure(env, &format!("cannot break: {e}")).await,
         },
+        Ok(WithHelp::Help) => print_help_of_current_builtin(env).await,
         Err(e) => report_error(env, &e).await,
     }
 }
