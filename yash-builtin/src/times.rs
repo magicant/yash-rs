@@ -21,6 +21,7 @@
 //!
 //! [`times` built-in]: https://magicant.github.io/yash-rs/builtins/times.html
 
+use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
 use crate::common::output;
 use crate::common::report::report_error;
 use crate::common::report::report_simple_failure;
@@ -32,13 +33,21 @@ use yash_env::system::{Isatty, Times};
 mod format;
 mod syntax;
 
+/// Help information of the `times` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "print accumulated user and system times",
+    usage: &["times"],
+    options: syntax::OPTION_SPECS.get(),
+    manual_page_name: "times",
+};
+
 /// Entry point of the `times` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
     S: Times + Isatty + WriteAll,
 {
     match syntax::parse(env, args) {
-        Ok(()) => match env.system.times() {
+        Ok(WithHelp::Main(())) => match env.system.times() {
             Ok(times) => {
                 let result = format::format(&times);
                 output(env, &result).await
@@ -47,6 +56,7 @@ where
                 report_simple_failure(env, &format!("cannot obtain times: {error}")).await
             }
         },
+        Ok(WithHelp::Help) => print_help_of_current_builtin(env).await,
         Err(error) => report_error(env, &error).await,
     }
 }

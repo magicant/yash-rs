@@ -579,6 +579,11 @@ fn tilde_expansion() {
 
 // This test case also covers the behavior of the trap execution.
 #[test]
+fn times_builtin_ex() {
+    run("times-y.sh")
+}
+
+#[test]
 fn trap_builtin() {
     run("trap-p.sh")
 }
