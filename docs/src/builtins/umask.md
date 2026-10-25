@@ -41,6 +41,8 @@ Note that execute permissions are not granted for the text files created by the 
 
 The **`-S`** (**`--symbolic`**) option causes the built-in to show the current file mode creation mask in symbolic notation. Without this option, the mask is shown in octal notation.
 
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
+
 ## Operands
 
 *mode* is an octal integer or a symbolic notation that represents the file mode creation mask. The octal number is the bitwise OR of the file mode bits to be turned off when creating a file. The symbolic notation specifies the file mode bits to be kept on when creating a file.
@@ -133,7 +135,7 @@ If the file mode creation mask is too permissive, sensitive files may become acc
 
 The `umask` built-in is defined in POSIX.1-2024.
 
-The long option name `--symbolic` is a non-standard extension. When the [`portable` option](../environment/options.md#portable) is set, using the long option name is rejected with an error. Use `-S` instead.
+The long option name `--symbolic` and the `--help` option are a non-standard extension. When the [`portable` option](../environment/options.md#portable) is set, using the long option name is rejected with an error. Use `-S` instead.
 
 POSIX does not specify the default output format used when the `-S` option is not given. Yash-rs, as well as many others, uses octal notation. In any cases, the output can be reused as *mode* to restore the previous mask.
 
