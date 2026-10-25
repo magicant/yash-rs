@@ -35,6 +35,8 @@ If neither `-S` nor `-H` is specified:
 
 Specifying both `-S` and `-H` together sets both limits. However, when displaying limits, using both options is an error.
 
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
+
 ### Resource selection
 
 Specify a resource to set or display using one of the following options. Supported resources may vary by platform, so not all options are available everywhere:
@@ -189,7 +191,7 @@ The `ulimit` built-in is specified by POSIX.1-2024, but some behaviors are imple
 
 Only these options are required by POSIX: `-H`, `-S`, `-a`, `-c`, `-d`, `-f`, `-n`, `-s`, `-t`, and `-v`. Other options are extensions.
 
-The long option names (such as `--hard` and `--soft`) are a non-standard extension.
+The long option names (such as `--hard` and `--soft`) and the `--help` option are a non-standard extension.
 
 (Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, using a long option name is rejected with an error; use the corresponding short option instead. However, the options that are themselves extensions (`-b`, `-e`, `-i`, `-k`, `-l`, `-m`, `-q`, `-r`, `-R`, `-u`, `-w`, and `-x`) are rejected under `portable` regardless of whether they are spelled as a short or long option, because POSIX does not define them at all.
 

@@ -143,3 +143,44 @@ __IN__
 test_O -d -e 1 'printing to closed output stream'
 ulimit >&-
 __IN__
+
+test_oE -e 0 'help option prints help'
+ulimit --help
+__IN__
+ulimit: show or set resource limits
+
+Usage:
+  ulimit [-HS] [resource_option] [limit]
+  ulimit [-H|-S] -a
+
+Options:
+  -H, --hard        set or show the hard limit
+  -S, --soft        set or show the soft limit
+  -a, --all         show all limits
+  -v, --as          virtual address space size (KiB)
+  -c, --core        core dump size (512-byte blocks)
+  -t, --cpu         CPU time (seconds)
+  -d, --data        data segment size (KiB)
+  -f, --fsize       file size (512-byte blocks)
+  -k, --kqueues     number of kqueues
+  -x, --locks       number of file locks
+  -l, --memlock     locked memory size (KiB)
+  -q, --msgqueue    message queue size (bytes)
+  -e, --nice        process priority (20 - nice)
+  -n, --nofile      number of open files
+  -u, --nproc       number of processes
+  -m, --rss         resident set size (KiB)
+  -r, --rtprio      real-time priority
+  -R, --rttime      real-time timeout (microseconds)
+  -b, --sbsize      socket buffer size (bytes)
+  -i, --sigpending  number of pending signals
+  -s, --stack       stack size (KiB)
+  -w, --swap        swap space size (KiB)
+      --help        print this help
+
+See <https://magicant.github.io/yash-rs/builtins/ulimit.html> for details.
+__OUT__
+
+test_O -d -e 2 'help option with another option'
+ulimit --help -f
+__IN__

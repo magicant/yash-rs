@@ -26,6 +26,7 @@
 //! See the source code for [`Resource::as_raw_type`] to see which resources are
 //! supported on which platforms.
 
+use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
 use crate::common::output;
 use crate::common::report::{report_error, report_simple_failure};
 use yash_env::Env;
@@ -131,6 +132,17 @@ impl Command {
     }
 }
 
+/// Help information of the `ulimit` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "show or set resource limits",
+    usage: &[
+        "ulimit [-HS] [resource_option] [limit]",
+        "ulimit [-H|-S] -a",
+    ],
+    options: syntax::OPTION_SPECS.get(),
+    manual_page_name: "ulimit",
+};
+
 /// Executes the `ulimit` built-in.
 ///
 /// This is the main entry point for the `ulimit` built-in.
@@ -139,10 +151,11 @@ where
     S: GetRlimit + SetRlimit + Isatty + WriteAll,
 {
     match syntax::parse(env, args) {
-        Ok(command) => match command.execute(env).await {
+        Ok(WithHelp::Main(command)) => match command.execute(env).await {
             Ok(result) => output(env, &result).await,
             Err(e) => report_simple_failure(env, &e.to_string()).await,
         },
+        Ok(WithHelp::Help) => print_help_of_current_builtin(env).await,
         Err(e) => report_error(env, &e).await,
     }
 }
