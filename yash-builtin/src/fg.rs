@@ -40,9 +40,12 @@ use crate::bg::OperandError;
 use crate::bg::OperandErrorKind;
 use crate::bg::ResumeError;
 use crate::bg::report_operand_errors;
+use crate::common::help::{
+    BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+    print_help_of_current_builtin,
+};
 use crate::common::report::{report_error, report_simple_failure};
 use crate::common::syntax::Mode;
-use crate::common::syntax::parse_arguments;
 use std::ops::ControlFlow::Break;
 use yash_env::Env;
 use yash_env::io::Fd;
@@ -183,6 +186,16 @@ fn should_interrupt<S: Signals>(env: &Env<S>, result: &ProcessResult) -> bool {
     false
 }
 
+const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION]);
+
+/// Help information of the `fg` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "resume a job in the foreground",
+    usage: &["fg [job_id]"],
+    options: OPTION_SPECS.get(),
+    manual_page_name: "fg",
+};
+
 /// Entry point of the `fg` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
@@ -198,8 +211,10 @@ where
         + WaitForSignals
         + WriteAll,
 {
-    let (options, operands) = match parse_arguments(&[], Mode::with_env(env), args) {
-        Ok(result) => result,
+    let mode = Mode::with_env(env);
+    let (options, operands) = match parse_arguments_with_help(OPTION_SPECS, mode, args) {
+        Ok(WithHelp::Main(result)) => result,
+        Ok(WithHelp::Help) => return print_help_of_current_builtin(env).await,
         Err(error) => return report_error(env, &error).await,
     };
     debug_assert_eq!(options, []);
