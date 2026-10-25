@@ -94,6 +94,8 @@ pub enum OptionArgumentSpec {
 /// - Short option name (a single character)
 /// - Long option name (a string)
 /// - Whether this option takes an argument
+/// - Whether this option is a non-portable extension
+/// - Description of this option shown in the help message
 ///
 /// All of these are optional, but either or both of the short and long names
 /// should be set for the option spec to have meaningful effect.
@@ -103,6 +105,7 @@ pub struct OptionSpec<'a> {
     long: Option<&'a str>,
     argument: OptionArgumentSpec,
     extension: bool,
+    description: &'a str,
 }
 
 impl OptionSpec<'static> {
@@ -113,6 +116,7 @@ impl OptionSpec<'static> {
             long: None,
             argument: OptionArgumentSpec::None,
             extension: false,
+            description: "",
         }
     }
 }
@@ -200,6 +204,22 @@ impl OptionSpec<'_> {
     /// Chained version of [`set_extension`](Self::set_extension)
     pub const fn extension(mut self, extension: bool) -> Self {
         self.extension = extension;
+        self
+    }
+}
+
+impl<'a> OptionSpec<'a> {
+    /// Returns the description of this option.
+    pub const fn get_description(&self) -> &'a str {
+        self.description
+    }
+
+    /// Chained version for setting the description of this option
+    ///
+    /// The description is a short phrase shown in the help message of the
+    /// built-in.
+    pub const fn description(mut self, description: &'a str) -> Self {
+        self.description = description;
         self
     }
 }
@@ -448,6 +468,15 @@ pub enum ParseError<'a> {
     /// Long option having an unexpected argument
     #[error("option {:?} with an unexpected argument", .0.value)]
     UnexpectedOptionArgument(Field, &'a OptionSpec<'a>),
+
+    /// [`HELP_OPTION`](super::help::HELP_OPTION) given with other arguments
+    ///
+    /// This error is not returned by [`parse_arguments`] but by
+    /// [`parse_or_print_help`](super::help::parse_or_print_help). The field
+    /// value is the canonical option name, and the field origin is the location
+    /// of the option as written in the command line.
+    #[error("option {:?} cannot be used with other options or operands", .0.value)]
+    HelpWithOtherArguments(Field),
 }
 
 fn long_option_name(field: &Field) -> &str {
@@ -470,6 +499,7 @@ impl ParseError<'_> {
             MissingOptionArgument(field, _spec) => field,
             UnseparatedOptionArgument(field, _spec) => field,
             UnexpectedOptionArgument(field, _spec) => field,
+            HelpWithOtherArguments(field) => field,
         }
     }
 

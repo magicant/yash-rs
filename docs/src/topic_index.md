@@ -68,6 +68,7 @@
 - [grouping](language/commands/grouping.md)
 - [hard limit](builtins/ulimit.md#hard-limit)
 - [`hashondefinition` shell option](environment/options.md#hashondefinition--h)
+- [`help` built-in](builtins/help.md)
 - [here-document](language/redirections/here_documents.md)
 - [`HOME` variable](language/parameters/variables.md#home)
 - [if command](language/commands/exit_status.md#if-commands)

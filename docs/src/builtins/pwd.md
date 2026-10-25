@@ -20,6 +20,8 @@ With the **`-P`** (**`--physical`**) option (or if `PWD` is not correct), the bu
 
 These two options are mutually exclusive. The last specified one applies if given both. The default is `-L`.
 
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
+
 ## Operands
 
 None.
@@ -42,7 +44,7 @@ Zero if the path was successfully printed; non-zero otherwise.
 
 POSIX-1.2024 defines the `pwd` utility with the `-L` and `-P` options.
 
-The long option names (`--logical`, `--physical`) are a non-standard extension.
+The long option names (`--logical`, `--physical`) and the `--help` option are a non-standard extension.
 
 (Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, using a long option name is rejected with an error. Use the corresponding short option instead.
 
