@@ -13,6 +13,23 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.25.1] - Unreleased
+
+### Added
+
+- The `common::help` module, which describes the help of built-ins:
+    - The `Help` trait abstracts the help of a built-in as a one-line summary
+      and a message body.
+    - `BuiltinHelp` implements `Help` by generating the message from the usage
+      lines, the option specs, and the name of the manual page.
+    - `HELP_OPTION` is the option spec of `--help`.
+    - `OptionSpecsWithHelp` is a list of option specs that ends with
+      `HELP_OPTION`. Its `const fn new` makes a built-in fail to compile if its
+      option specs lack `HELP_OPTION`.
+- `common::syntax::OptionSpec::description` and
+  `common::syntax::OptionSpec::get_description` set and get the description of
+  an option shown in the help.
+
 ## [0.25.0] - 2026-10-06
 
 ### Added
@@ -1264,6 +1281,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - Initial implementation of the `yash-builtin` crate
 
+[0.25.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.25.1
 [0.25.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.25.0
 [0.24.3]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.24.3
 [0.24.2]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.24.2
