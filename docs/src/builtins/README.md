@@ -288,9 +288,24 @@ Specifying options after operands may be supported in the future.
 
 ### Help option
 
-(Since 3.6.0) Some built-ins accept the **`--help`** option, which prints the help of the built-in to the standard output instead of performing the usual operation. The help is the same as what the [`help` built-in](help.md) prints for the built-in.
+(Since 3.6.0) Some built-ins accept the **`--help`** option, which prints the help of the built-in to the standard output instead of performing the usual operation. The help is the same as what the [`help` built-in](help.md) prints for the built-in:
 
-The `--help` option cannot be combined with other options or operands. Like other long options, it can be abbreviated, as in `help --h`.
+```shell
+$ pwd --help
+pwd: print the working directory path
+
+Usage:
+  pwd [-L|-P]
+
+Options:
+  -L, --logical   print $PWD if it is correct (default)
+  -P, --physical  print the path without symbolic links
+      --help      print this help
+
+See <https://magicant.github.io/yash-rs/builtins/pwd.html> for details.
+```
+
+The `--help` option cannot be combined with other options or operands. Like other long options, it can be abbreviated, as in `pwd --h`.
 
 The pages of the built-ins that accept the `--help` option list it in their Options sections. Other built-ins will support it in the future.
 

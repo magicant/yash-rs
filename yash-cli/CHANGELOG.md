@@ -14,11 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - The `help` built-in prints the help of built-ins, which summarizes the usage
-  and options of each built-in and links to its manual page. Only a few
-  built-ins have help so far. Listing all built-ins with `help` and no operand
-  is not yet implemented.
-- Built-ins that have help print it when invoked with the `--help` option as
-  the only argument.
+  and options of each built-in and links to its manual page. Only the `help`
+  and `pwd` built-ins have help so far.
+- The `help` and `pwd` built-ins print their help when invoked with the
+  `--help` option as the only argument.
 
 ## [3.5.0] - 2026-10-06
 

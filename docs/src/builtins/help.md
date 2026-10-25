@@ -38,6 +38,23 @@ The [`portable` option](../environment/options.md#portable) causes additional er
 
 Zero if the help of all the operands was printed successfully; non-zero otherwise.
 
+## Examples
+
+```shell
+$ help pwd
+pwd: print the working directory path
+
+Usage:
+  pwd [-L|-P]
+
+Options:
+  -L, --logical   print $PWD if it is correct (default)
+  -P, --physical  print the path without symbolic links
+      --help      print this help
+
+See <https://magicant.github.io/yash-rs/builtins/pwd.html> for details.
+```
+
 ## Compatibility
 
 The `help` built-in is not specified by POSIX. POSIX.1-2024 reserves the name `help` for a shell-specific built-in, and other shells implement it differently. For example, bash treats each operand as a pattern matching the names of built-ins.

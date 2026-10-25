@@ -34,6 +34,9 @@ A _private dependency_ is used internally and not visible to downstream users.
   and prints its help if `--help` is the only argument.
 - `common::syntax::ParseError::HelpWithOtherArguments`, returned by
   `parse_or_print_help` if `--help` is given with other options or operands.
+- `pwd::HELP`, the help of the `pwd` built-in.
+- `pwd::syntax::interpret`, which interprets the options and operands parsed
+  from the arguments of the `pwd` built-in.
 - `common::syntax::OptionSpec::description` and
   `common::syntax::OptionSpec::get_description` set and get the description of
   an option shown in the help.
@@ -41,6 +44,14 @@ A _private dependency_ is used internally and not visible to downstream users.
 ### Changed
 
 - `iter` now includes the `help` built-in as an elective built-in.
+- `pwd::main` now prints the help of the `pwd` built-in if `--help` is the
+  only argument.
+
+### Deprecated
+
+- `pwd::syntax::parse` is deprecated in favor of
+  `common::help::parse_or_print_help` and `pwd::syntax::interpret`. It does not
+  recognize `--help`, which it reports as an unknown option.
 
 ## [0.25.0] - 2026-10-06
 

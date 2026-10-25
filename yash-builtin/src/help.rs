@@ -60,7 +60,10 @@ struct HelpTable(HashMap<&'static str, &'static dyn Help>);
 
 impl Default for HelpTable {
     fn default() -> Self {
-        Self(HashMap::from([("help", &HELP as &dyn Help)]))
+        Self(HashMap::from([
+            ("help", &HELP as &dyn Help),
+            ("pwd", &crate::pwd::HELP),
+        ]))
     }
 }
 
