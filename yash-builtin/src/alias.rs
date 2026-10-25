@@ -21,13 +21,14 @@
 //!
 //! [`alias` built-in]: https://magicant.github.io/yash-rs/builtins/alias.html
 
+use crate::common::help::{BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp};
+use crate::common::help::{parse_arguments_with_help, print_help_of_current_builtin};
 use crate::common::output;
 use crate::common::report::group_errors_by_kind;
 use crate::common::report::merge_reports;
 use crate::common::report::report_error;
 use crate::common::report::report_failure;
 use crate::common::syntax::Mode;
-use crate::common::syntax::parse_arguments;
 use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
@@ -44,15 +45,25 @@ pub struct Command {
 
 pub mod semantics;
 
+// TODO support options
+const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION]);
+
+/// Help information of the `alias` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "define or print aliases",
+    usage: &["alias [name[=value]...]"],
+    options: OPTION_SPECS.get(),
+    manual_page_name: "alias",
+};
+
 /// Entry point for executing the `alias` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
     S: Isatty + WriteAll,
 {
     let mode = Mode::with_env(env);
-    // TODO support options
-    match parse_arguments(&[], mode, args) {
-        Ok((_options, operands)) => {
+    match parse_arguments_with_help(OPTION_SPECS, mode, args) {
+        Ok(WithHelp::Main((_options, operands))) => {
             let command = Command { operands };
             let (output_string, errors) = command.execute(env).await;
             let mut result = output(env, &output_string).await;
@@ -64,6 +75,7 @@ where
             result
         }
 
+        Ok(WithHelp::Help) => print_help_of_current_builtin(env).await,
         Err(e) => report_error(env, &e).await,
     }
 }
