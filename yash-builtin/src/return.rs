@@ -37,8 +37,12 @@
 //!   built-in is invoked in a trap executed in the function or script, the
 //!   caller should use the value of `$?` before entering trap.
 
+use crate::common::help::{
+    BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+    print_help_of_current_builtin,
+};
 use crate::common::report::{report_error, syntax_error};
-use crate::common::syntax::{Mode, OptionSpec, parse_arguments};
+use crate::common::syntax::{Mode, OptionSpec};
 use std::num::ParseIntError;
 use std::ops::ControlFlow::Break;
 use yash_env::Env;
@@ -52,10 +56,22 @@ use yash_env::system::concurrency::WriteAll;
 
 // TODO Split into syntax and semantics submodules
 
-const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new()
-    .short('n')
-    .long("no-return")
-    .extension(true)];
+const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
+    OptionSpec::new()
+        .short('n')
+        .long("no-return")
+        .extension(true)
+        .description("set the exit status without returning"),
+    HELP_OPTION,
+]);
+
+/// Help information of the `return` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "return from a function or script",
+    usage: &["return [-n] [exit_status]"],
+    options: OPTION_SPECS.get(),
+    manual_page_name: "return",
+};
 
 async fn operand_parse_error<S>(
     env: &mut Env<S>,
@@ -75,8 +91,10 @@ pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
     S: Isatty + WriteAll,
 {
-    let (options, operands) = match parse_arguments(OPTION_SPECS, Mode::with_env(env), args) {
-        Ok(result) => result,
+    let mode = Mode::with_env(env);
+    let (options, operands) = match parse_arguments_with_help(OPTION_SPECS, mode, args) {
+        Ok(WithHelp::Main(result)) => result,
+        Ok(WithHelp::Help) => return print_help_of_current_builtin(env).await,
         Err(error) => return report_error(env, &error).await,
     };
 
@@ -87,7 +105,7 @@ where
     for option in options {
         match option.spec.get_short() {
             Some('n') => no_return = true,
-            _ => unreachable!("parse_arguments() returned an unknown option"),
+            _ => unreachable!("parse_arguments_with_help() returned an unknown option"),
         }
     }
 

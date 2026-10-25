@@ -70,6 +70,7 @@ impl Default for HelpTable {
             ("getopts", &crate::getopts::HELP),
             ("help", &HELP),
             ("pwd", &crate::pwd::HELP),
+            ("return", &crate::r#return::HELP),
             ("shift", &crate::shift::HELP),
         ]))
     }
