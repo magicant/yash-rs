@@ -337,6 +337,11 @@ fn grouping_ex() {
 }
 
 #[test]
+fn help_builtin_ex() {
+    run("help-y.sh")
+}
+
+#[test]
 fn if_command() {
     run("if-p.sh")
 }

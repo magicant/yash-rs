@@ -9,6 +9,17 @@ used by other programs.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.0] - Unreleased
+
+### Added
+
+- The `help` built-in prints the help of built-ins, which summarizes the usage
+  and options of each built-in and links to its manual page. Only a few
+  built-ins have help so far. Listing all built-ins with `help` and no operand
+  is not yet implemented.
+- Built-ins that have help print it when invoked with the `--help` option as
+  the only argument.
+
 ## [3.5.0] - 2026-10-06
 
 ### Added
@@ -504,6 +515,7 @@ later.
 
 - Initial release of the shell
 
+[3.6.0]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.6.0
 [3.5.0]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.5.0
 [3.4.4]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.4.4
 [3.4.3]: https://github.com/magicant/yash-rs/releases/tag/yash-cli-3.4.3

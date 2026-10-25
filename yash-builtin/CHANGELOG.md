@@ -17,6 +17,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Added
 
+- The `help` module, which implements the `help` built-in. The built-in prints
+  the help registered in a table stored in `Env::any`. The table initially
+  contains the help of the built-ins in this crate, and `help::register` adds
+  help for other built-ins.
 - The `common::help` module, which describes the help of built-ins:
     - The `Help` trait abstracts the help of a built-in as a one-line summary
       and a message body.
@@ -26,9 +30,17 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `OptionSpecsWithHelp` is a list of option specs that ends with
       `HELP_OPTION`. Its `const fn new` makes a built-in fail to compile if its
       option specs lack `HELP_OPTION`.
+- `common::help::parse_or_print_help`, which parses the arguments of a built-in
+  and prints its help if `--help` is the only argument.
+- `common::syntax::ParseError::HelpWithOtherArguments`, returned by
+  `parse_or_print_help` if `--help` is given with other options or operands.
 - `common::syntax::OptionSpec::description` and
   `common::syntax::OptionSpec::get_description` set and get the description of
   an option shown in the help.
+
+### Changed
+
+- `iter` now includes the `help` built-in as an elective built-in.
 
 ## [0.25.0] - 2026-10-06
 

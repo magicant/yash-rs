@@ -64,6 +64,7 @@
     - [false](builtins/false.md)
     - [fg](builtins/fg.md)
     - [getopts](builtins/getopts.md)
+    - [help](builtins/help.md)
     - [jobs](builtins/jobs.md)
     - [kill](builtins/kill.md)
     - [pwd](builtins/pwd.md)

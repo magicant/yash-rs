@@ -468,6 +468,15 @@ pub enum ParseError<'a> {
     /// Long option having an unexpected argument
     #[error("option {:?} with an unexpected argument", .0.value)]
     UnexpectedOptionArgument(Field, &'a OptionSpec<'a>),
+
+    /// [`HELP_OPTION`](super::help::HELP_OPTION) given with other arguments
+    ///
+    /// This error is not returned by [`parse_arguments`] but by
+    /// [`parse_or_print_help`](super::help::parse_or_print_help). The field
+    /// value is the canonical option name, and the field origin is the location
+    /// of the option as written in the command line.
+    #[error("option {:?} cannot be used with other options or operands", .0.value)]
+    HelpWithOtherArguments(Field),
 }
 
 fn long_option_name(field: &Field) -> &str {
@@ -490,6 +499,7 @@ impl ParseError<'_> {
             MissingOptionArgument(field, _spec) => field,
             UnseparatedOptionArgument(field, _spec) => field,
             UnexpectedOptionArgument(field, _spec) => field,
+            HelpWithOtherArguments(field) => field,
         }
     }
 
