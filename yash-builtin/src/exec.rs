@@ -31,10 +31,13 @@
 //! This implementation uses [`Result::retain_redirs`] to flag redirections to
 //! be made permanent.
 
+use crate::common::help::{
+    BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+    print_help_of_current_builtin,
+};
 use crate::common::report::report_error;
 use crate::common::report::report_failure;
 use crate::common::syntax::Mode;
-use crate::common::syntax::parse_arguments;
 use std::ffi::CString;
 use std::ops::ControlFlow::Break;
 use yash_env::Env;
@@ -50,14 +53,26 @@ use yash_env::trap::SignalSystem;
 
 // TODO Split into syntax and semantics submodules
 
+// TODO Support non-POSIX options
+const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION]);
+
+/// Help information of the `exec` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "replace the shell process with a utility",
+    usage: &["exec [name [argument...]]"],
+    options: OPTION_SPECS.get(),
+    manual_page_name: "exec",
+};
+
 /// Entry point for executing the `exec` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
     S: Exec + IsExecutableFile + Isatty + ShellPath + SignalSystem + WriteAll,
 {
-    // TODO Support non-POSIX options
-    let args = match parse_arguments(&[], Mode::with_env(env), args) {
-        Ok((_options, operands)) => operands,
+    let mode = Mode::with_env(env);
+    let args = match parse_arguments_with_help(OPTION_SPECS, mode, args) {
+        Ok(WithHelp::Main((_options, operands))) => operands,
+        Ok(WithHelp::Help) => return print_help_of_current_builtin(env).await,
         Err(error) => return report_error(env, &error).await,
     };
 

@@ -18,13 +18,14 @@ Without operands, the built-in does not start any utility. Instead, it makes any
 
 POSIX defines no options for the `exec` built-in.
 
-The following non-portable options are yet to be implemented:
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
+
+The following other non-portable options are yet to be implemented:
 
 - `--as`
 - `--clear`
 - `--cloexec`
 - `--force`
-- `--help`
 
 ## Operands
 
@@ -66,3 +67,5 @@ See [Persistent redirections](../language/redirections/index.html#persistent-red
 ## Compatibility
 
 The `exec` built-in is part of POSIX.1-2024.
+
+The `--help` option is a non-standard extension.

@@ -252,6 +252,11 @@ fn exec_builtin() {
 }
 
 #[test]
+fn exec_builtin_ex() {
+    run("exec-y.sh")
+}
+
+#[test]
 fn exit_builtin() {
     run("exit-p.sh")
 }
