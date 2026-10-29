@@ -24,19 +24,19 @@
 //! defined in this crate. Built-ins defined outside this crate can be given
 //! help with [`register`].
 //!
-//! The same table is used by [`parse_or_print_help`], which prints the help of
-//! a built-in invoked with the `--help` option. See the
+//! The same table is used by [`print_help_of_current_builtin`], which prints the
+//! help of a built-in invoked with the `--help` option. See the
 //! [`common::help`](crate::common::help) module for how to give a built-in
 //! help.
 
 use crate::common::help::{
-    BuiltinHelp, HELP_OPTION, Help, OptionSpecsWithHelp, parse_or_print_help,
+    BuiltinHelp, HELP_OPTION, Help, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+    print_help_of_current_builtin,
 };
 use crate::common::output;
 use crate::common::report::{merge_reports, report_error, report_failure, report_simple_error};
 use crate::common::syntax::Mode;
 use std::collections::HashMap;
-use std::ops::ControlFlow;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::{Footnote, FootnoteType, Report, ReportType, Snippet};
@@ -122,10 +122,10 @@ where
     S: Isatty + WriteAll,
 {
     let mode = Mode::with_env(env);
-    let operands = match parse_or_print_help(env, OPTION_SPECS, mode, args).await {
-        ControlFlow::Break(result) => return result,
-        ControlFlow::Continue(Ok((_, operands))) => operands,
-        ControlFlow::Continue(Err(error)) => return report_error(env, &error).await,
+    let operands = match parse_arguments_with_help(OPTION_SPECS, mode, args) {
+        Ok(WithHelp::Main((_, operands))) => operands,
+        Ok(WithHelp::Help) => return print_help_of_current_builtin(env).await,
+        Err(error) => return report_error(env, &error).await,
     };
     if operands.is_empty() {
         // TODO: List the built-ins with their summaries
