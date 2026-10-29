@@ -472,9 +472,9 @@ pub enum ParseError<'a> {
     /// [`HELP_OPTION`](super::help::HELP_OPTION) given with other arguments
     ///
     /// This error is not returned by [`parse_arguments`] but by
-    /// [`parse_or_print_help`](super::help::parse_or_print_help). The field
-    /// value is the canonical option name, and the field origin is the location
-    /// of the option as written in the command line.
+    /// [`parse_arguments_with_help`](super::help::parse_arguments_with_help).
+    /// The field value is the canonical option name, and the field origin is
+    /// the location of the option as written in the command line.
     #[error("option {:?} cannot be used with other options or operands", .0.value)]
     HelpWithOtherArguments(Field),
 }

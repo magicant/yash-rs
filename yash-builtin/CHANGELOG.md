@@ -13,7 +13,7 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
-## [0.25.1] - Unreleased
+## [0.26.0] - Unreleased
 
 ### Added
 
@@ -30,13 +30,16 @@ A _private dependency_ is used internally and not visible to downstream users.
     - `OptionSpecsWithHelp` is a list of option specs that ends with
       `HELP_OPTION`. Its `const fn new` makes a built-in fail to compile if its
       option specs lack `HELP_OPTION`.
-- `common::help::parse_or_print_help`, which parses the arguments of a built-in
-  and prints its help if `--help` is the only argument.
+    - `WithHelp` is the result of parsing the arguments of a built-in that
+      accepts `--help`. It tells whether the built-in should print its help or
+      perform its main operation.
+    - `parse_arguments_with_help` parses the arguments of a built-in and
+      returns `WithHelp::Help` if `--help` is the only argument.
+    - `print_help_of_current_builtin` prints the help of the current built-in.
 - `common::syntax::ParseError::HelpWithOtherArguments`, returned by
-  `parse_or_print_help` if `--help` is given with other options or operands.
+  `parse_arguments_with_help` if `--help` is given with other options or
+  operands.
 - `pwd::HELP`, the help of the `pwd` built-in.
-- `pwd::syntax::interpret`, which interprets the options and operands parsed
-  from the arguments of the `pwd` built-in.
 - `common::syntax::OptionSpec::description` and
   `common::syntax::OptionSpec::get_description` set and get the description of
   an option shown in the help.
@@ -46,12 +49,9 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `iter` now includes the `help` built-in as an elective built-in.
 - `pwd::main` now prints the help of the `pwd` built-in if `--help` is the
   only argument.
-
-### Deprecated
-
-- `pwd::syntax::parse` is deprecated in favor of
-  `common::help::parse_or_print_help` and `pwd::syntax::interpret`. It does not
-  recognize `--help`, which it reports as an unknown option.
+- `pwd::syntax::parse` now recognizes `--help` and returns
+  `Result<WithHelp<Mode>, Error>`. The `pwd::syntax::Result` type alias is
+  changed accordingly.
 
 ## [0.25.0] - 2026-10-06
 
@@ -1304,7 +1304,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - Initial implementation of the `yash-builtin` crate
 
-[0.25.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.25.1
+[0.26.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.26.0
 [0.25.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.25.0
 [0.24.3]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.24.3
 [0.24.2]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.24.2

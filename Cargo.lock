@@ -520,7 +520,7 @@ dependencies = [
 
 [[package]]
 name = "yash-builtin"
-version = "0.25.1"
+version = "0.26.0"
 dependencies = [
  "assert_matches",
  "either",
