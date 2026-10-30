@@ -20,7 +20,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `help` module, which implements the `help` built-in. The built-in prints
   the help registered in a table stored in `Env::any`. The table initially
   contains the help of the built-ins in this crate, and `help::register` adds
-  help for other built-ins.
+  help for other built-ins. Without operands, the built-in lists the built-ins
+  in `Env::builtins` with their summaries.
 - The `common::help` module, which describes the help of built-ins:
     - The `Help` trait abstracts the help of a built-in as a one-line summary
       and a message body.
