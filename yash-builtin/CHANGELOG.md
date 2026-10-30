@@ -39,10 +39,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `common::syntax::ParseError::HelpWithOtherArguments`, returned by
   `parse_arguments_with_help` if `--help` is given with other options or
   operands.
-- `HELP` in the `alias`, `bg`, `break`, `cd`, `command`, `continue`, `eval`,
-  `exec`, `exit`, `fg`, `getopts`, `jobs`, `pwd`, `return`, `shift`, `source`,
-  `times`, `trap`, `type`, `ulimit`, `umask`, `unalias`, `unset`, and `wait`
-  modules, the help of the respective built-ins.
+- `HELP` in the `alias`, `bg`, `break`, `cd`, `colon`, `command`, `continue`,
+  `eval`, `exec`, `exit`, `false`, `fg`, `getopts`, `jobs`, `pwd`, `return`,
+  `shift`, `source`, `times`, `trap`, `true`, `type`, `ulimit`, `umask`,
+  `unalias`, `unset`, and `wait` modules, the help of the respective built-ins.
 - `common::syntax::OptionSpec::description` and
   `common::syntax::OptionSpec::get_description` set and get the description of
   an option shown in the help.
