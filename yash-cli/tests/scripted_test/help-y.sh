@@ -104,3 +104,18 @@ __IN__
 test_OE -e 1 'false built-in ignores --help'
 false --help
 __IN__
+
+test_oE -e 0 'listing built-ins without operand'
+help >help.out
+echo status=$?
+head -n 2 help.out
+grep -e '^Built-in utilities:$' -e '^  pwd  *print the working directory path$' help.out
+tail -n 1 help.out
+__IN__
+status=0
+This is yash-rs, a command-line shell. To run a command, type its name followed
+by any arguments, separated by spaces, and press Enter. See
+Built-in utilities:
+  pwd       print the working directory path
+Run `help NAME` to see the details of a built-in.
+__OUT__

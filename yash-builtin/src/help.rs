@@ -17,7 +17,8 @@
 //! Help built-in
 //!
 //! This module implements the `help` built-in, which prints the help message
-//! of built-ins.
+//! of built-ins. Given no operand, the built-in instead lists the built-ins in
+//! [`Env::builtins`] with their summaries.
 //!
 //! The help information of built-ins is kept in a table stored in
 //! [`Env::any`]. The table initially contains the help of the built-ins
@@ -34,9 +35,10 @@ use crate::common::help::{
     print_help_of_current_builtin,
 };
 use crate::common::output;
-use crate::common::report::{merge_reports, report_error, report_failure, report_simple_error};
+use crate::common::report::{merge_reports, report_error, report_failure};
 use crate::common::syntax::Mode;
 use std::collections::HashMap;
+use std::fmt::Write as _;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::source::pretty::{Footnote, FootnoteType, Report, ReportType, Snippet};
@@ -53,6 +55,16 @@ pub static HELP: BuiltinHelp = BuiltinHelp {
     options: OPTION_SPECS.get(),
     manual_page_name: "help",
 };
+
+/// Text that begins the output of the `help` built-in given no operand
+const INTRODUCTION: &str = "\
+This is yash-rs, a command-line shell. To run a command, type its name followed
+by any arguments, separated by spaces, and press Enter. See
+<https://magicant.github.io/yash-rs/> for the manual.
+";
+
+/// Text shown in place of the summary of a built-in that has no help
+const NO_HELP: &str = "(no help available)";
 
 /// Table of help information keyed by the name of the built-in
 #[derive(Clone)]
@@ -143,6 +155,27 @@ fn no_help_report(operand: &Field) -> Report<'_> {
     report
 }
 
+/// Returns the text printed by the `help` built-in when given no operand.
+///
+/// The list reflects the built-ins available in [`Env::builtins`] rather than
+/// those in the help table.
+fn list_builtins<S>(env: &mut Env<S>) -> String {
+    let mut names = env.builtins.keys().copied().collect::<Vec<_>>();
+    names.sort_unstable();
+    let width = names.iter().map(|name| name.len()).max().unwrap_or(0);
+
+    let table = table(env);
+    let mut list = format!("{INTRODUCTION}\nBuilt-in utilities:\n");
+    for name in names {
+        let summary = table
+            .get(name)
+            .map_or(NO_HELP.into(), |help| help.summary());
+        writeln!(list, "  {name:width$}  {summary}").unwrap();
+    }
+    list.push_str("\nRun `help NAME` to see the details of a built-in.\n");
+    list
+}
+
 /// Entry point of the `help` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
@@ -155,8 +188,8 @@ where
         Err(error) => return report_error(env, &error).await,
     };
     if operands.is_empty() {
-        // TODO: List the built-ins with their summaries
-        return report_simple_error(env, "listing built-ins is not implemented yet").await;
+        let list = list_builtins(env);
+        return output(env, &list).await;
     }
     print(env, &operands).await
 }
@@ -231,16 +264,49 @@ mod tests {
         }
     }
 
+    fn dummy_builtin() -> yash_env::builtin::Builtin<Rc<Concurrent<VirtualSystem>>> {
+        yash_env::builtin::Builtin::new(yash_env::builtin::Type::Mandatory, |_, _| {
+            Box::pin(std::future::ready(crate::Result::default()))
+        })
+    }
+
     #[test]
-    fn reports_unimplemented_listing_without_operand() {
+    fn lists_registered_builtins_without_operand() {
+        let (mut env, system) = env();
+        env.builtins.insert("foo", dummy_builtin());
+        env.builtins.insert("a-long-name", dummy_builtin());
+        env.builtins.insert("Z", dummy_builtin());
+        register(&mut env, "foo", &DummyHelp);
+        register(&mut env, "a-long-name", &DummyHelp);
+
+        let result = main(&mut env, vec![]).now_or_never().unwrap();
+
+        assert_eq!(result, crate::Result::default());
+        assert_stdout(&system.state, |stdout| {
+            assert_eq!(
+                stdout,
+                format!(
+                    "{INTRODUCTION}\n\
+                     Built-in utilities:\n  \
+                     Z            (no help available)\n  \
+                     a-long-name  dummy\n  \
+                     foo          dummy\n\n\
+                     Run `help NAME` to see the details of a built-in.\n"
+                )
+            );
+        });
+        assert_stderr(&system.state, |stderr| assert_eq!(stderr, ""));
+    }
+
+    #[test]
+    fn listing_excludes_help_of_unregistered_builtin() {
         let (mut env, system) = env();
 
         let result = main(&mut env, vec![]).now_or_never().unwrap();
 
-        assert_eq!(result, crate::Result::from(ExitStatus::ERROR));
-        assert_stdout(&system.state, |stdout| assert_eq!(stdout, ""));
-        assert_stderr(&system.state, |stderr| {
-            assert!(stderr.contains("not implemented"), "stderr = {stderr:?}");
+        assert_eq!(result, crate::Result::default());
+        assert_stdout(&system.state, |stdout| {
+            assert!(!stdout.contains("pwd"), "stdout = {stdout:?}");
         });
     }
 

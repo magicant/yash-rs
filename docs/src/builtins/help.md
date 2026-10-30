@@ -16,27 +16,25 @@ Some built-ins print the same help when invoked with the [`--help` option](index
 
 Not all built-ins have help yet.
 
+If no operand is given, the built-in prints a short description of the shell and a list of the available built-ins with their summaries, sorted by name. A built-in that has no help is listed with `(no help available)` in place of its summary.
+
 ## Options
 
 The **`--help`** option prints the [help](index.html#help-option) of the built-in.
 
 ## Operands
 
-Each operand is the name of a built-in whose help should be printed.
-
-Listing all the built-ins when no operand is given is not yet implemented.
+Each operand is the name of a built-in whose help should be printed. If no operand is given, the built-in lists the available built-ins as described above.
 
 ## Errors
 
 It is an error if an operand does not name a built-in that has help. The built-in still prints the help of the other operands.
 
-It is an error if no operand is given, since listing the built-ins is not yet implemented.
-
 The [`portable` option](../environment/options.md#portable) causes additional errors; see [Compatibility](#compatibility).
 
 ## Exit Status
 
-Zero if the help of all the operands was printed successfully; non-zero otherwise.
+Zero if the help of all the operands, or the list of built-ins if no operand is given, was printed successfully; non-zero otherwise.
 
 ## Examples
 
