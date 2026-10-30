@@ -14,9 +14,9 @@ The `alias` built-in defines aliases or prints existing alias definitions, depen
 
 ## Options
 
-None.
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
 
-Non-POSIX options may be added in the future.
+Other non-POSIX options may be added in the future.
 
 ## Operands
 
@@ -39,6 +39,8 @@ See [Aliases](../language/aliases.md).
 ## Compatibility
 
 The `alias` built-in is specified by POSIX.1-2024.
+
+The `--help` option is a non-standard extension.
 
 POSIX only requires alias names consisting of ASCII letters, digits, `!`, `%`, `,`, `-`, `@`, and `_` to be supported. By default, yash-rs allows other characters as well. (Since 3.3.1) When the [`portable` option](../environment/options.md#portable) is set, it is an error to define an alias whose name contains a character other than the above. The alias is not defined in that case.
 

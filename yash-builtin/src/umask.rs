@@ -21,6 +21,7 @@
 //!
 //! [`umask` built-in]: https://magicant.github.io/yash-rs/builtins/umask.html
 
+use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
 use crate::common::output;
 use crate::common::report::report_error;
 use yash_env::Env;
@@ -91,16 +92,25 @@ impl Command {
     }
 }
 
+/// Help information of the `umask` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "print or set the file mode creation mask",
+    usage: &["umask [-S] [mode]"],
+    options: syntax::OPTION_SPECS.get(),
+    manual_page_name: "umask",
+};
+
 /// Entry point of the `umask` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
     S: Umask + Isatty + WriteAll,
 {
     match syntax::parse(env, args) {
-        Ok(command) => {
+        Ok(WithHelp::Main(command)) => {
             let result = command.execute(env);
             output(env, &result).await
         }
+        Ok(WithHelp::Help) => print_help_of_current_builtin(env).await,
         Err(e) => report_error(env, &e).await,
     }
 }

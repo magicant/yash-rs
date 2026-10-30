@@ -162,6 +162,11 @@ fn break_builtin() {
 }
 
 #[test]
+fn break_builtin_ex() {
+    run("break-y.sh")
+}
+
+#[test]
 fn builtins() {
     run("builtins-p.sh")
 }
@@ -212,6 +217,11 @@ fn continue_builtin() {
 }
 
 #[test]
+fn continue_builtin_ex() {
+    run("continue-y.sh")
+}
+
+#[test]
 fn declaration_utilities() {
     run("declutil-p.sh")
 }
@@ -242,8 +252,18 @@ fn eval_builtin() {
 }
 
 #[test]
+fn eval_builtin_ex() {
+    run("eval-y.sh")
+}
+
+#[test]
 fn exec_builtin() {
     run("exec-p.sh")
+}
+
+#[test]
+fn exec_builtin_ex() {
+    run("exec-y.sh")
 }
 
 #[test]
@@ -518,6 +538,11 @@ fn shift_builtin() {
 }
 
 #[test]
+fn shift_builtin_ex() {
+    run("shift-y.sh")
+}
+
+#[test]
 fn simple_command() {
     run("simple-p.sh")
 }
@@ -553,6 +578,11 @@ fn tilde_expansion() {
 }
 
 // This test case also covers the behavior of the trap execution.
+#[test]
+fn times_builtin_ex() {
+    run("times-y.sh")
+}
+
 #[test]
 fn trap_builtin() {
     run("trap-p.sh")

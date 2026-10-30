@@ -21,7 +21,7 @@ outermost one.
 
 ## Options
 
-None.
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
 
 ## Operands
 
@@ -40,6 +40,8 @@ See [Break and continue](../language/commands/loops.md#break-and-continue).
 ## Compatibility
 
 The `break` built-in is specified by POSIX.1-2024.
+
+The `--help` option is a non-standard extension.
 
 The behavior is unspecified in POSIX when the `break` built-in is used without an enclosing loop, in which case the current implementation returns an error.
 

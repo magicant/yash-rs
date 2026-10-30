@@ -28,6 +28,7 @@
 //! in [`Env::any`] to handle trapped signals while waiting for jobs. If there
 //! is no such instance, the built-in will ignore all signals.
 
+use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
 use crate::common::report::{
     group_errors_by_kind, merge_reports, report, report_error, report_simple_failure,
 };
@@ -133,13 +134,22 @@ impl Command {
     }
 }
 
+/// Help information of the `wait` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "wait for jobs to finish",
+    usage: &["wait [job_id_or_process_id...]"],
+    options: syntax::OPTION_SPECS.get(),
+    manual_page_name: "wait",
+};
+
 /// Entry point for executing the `wait` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
     S: Isatty + SignalSystem + Wait + WaitForSignals + WriteAll + 'static,
 {
     match syntax::parse(env, args) {
-        Ok(command) => command.execute(env).await,
+        Ok(WithHelp::Main(command)) => command.execute(env).await,
+        Ok(WithHelp::Help) => print_help_of_current_builtin(env).await,
         Err(error) => report_error(env, &error).await,
     }
 }

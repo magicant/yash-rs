@@ -36,3 +36,23 @@ kill -s KILL %1
 __IN__
 jobs: 2
 __OUT__
+
+test_oE -e 0 'help option prints help'
+jobs --help
+__IN__
+jobs: print the status of jobs
+
+Usage:
+  jobs [-l|-p] [job_id...]
+
+Options:
+  -l, --verbose    print the process ID as well
+  -p, --pgid-only  print the process ID only
+      --help       print this help
+
+See <https://magicant.github.io/yash-rs/builtins/jobs.html> for details.
+__OUT__
+
+test_O -d -e 2 'help option with another option'
+jobs --help -l
+__IN__

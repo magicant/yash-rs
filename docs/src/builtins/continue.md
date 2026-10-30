@@ -25,7 +25,7 @@ If the affected loop is a `while` or `until` loop, the condition is re-evaluated
 
 ## Options
 
-None.
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
 
 ## Operands
 
@@ -44,6 +44,8 @@ See [Break and continue](../language/commands/loops.md#break-and-continue).
 ## Compatibility
 
 The `continue` built-in is specified by POSIX.1-2024.
+
+The `--help` option is a non-standard extension.
 
 The behavior is unspecified in POSIX when the `continue` built-in is used without an enclosing loop, in which case the current implementation returns an error.
 

@@ -16,7 +16,7 @@ its children.
 
 ## Options
 
-None.
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
 
 ## Operands
 
@@ -45,6 +45,8 @@ Zero unless an error occurred.
 ## Compatibility
 
 The `times` built-in is defined in POSIX.
+
+The `--help` option is a non-standard extension.
 
 POSIX requires each field to be printed with six digits after the decimal
 point, but many implementations print less. Note that the number of digits

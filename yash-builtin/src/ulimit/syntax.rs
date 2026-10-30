@@ -17,8 +17,9 @@
 //! Command-line argument parser for the `ulimit` built-in
 
 use super::{Command, ResourceExt as _, SetLimitType, SetLimitValue, ShowLimitType};
+use crate::common::help::{HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help};
 use crate::common::syntax::{
-    ConflictingOptionError, Mode, OptionOccurrence, OptionSpec, ParseError, parse_arguments,
+    ConflictingOptionError, Mode, OptionOccurrence, OptionSpec, ParseError,
 };
 use std::num::ParseIntError;
 use std::str::FromStr;
@@ -195,39 +196,112 @@ impl<'a> From<&'a Error> for Report<'a> {
 }
 
 /// Result of parsing command line arguments
-pub type Result = std::result::Result<Command, Error>;
+pub type Result = std::result::Result<WithHelp<Command>, Error>;
 
 /// Command-line options for the `ulimit` built-in
-const OPTION_SPECS: &[OptionSpec] = &[
-    OptionSpec::new().short('H').long("hard"),
-    OptionSpec::new().short('S').long("soft"),
-    OptionSpec::new().short('a').long("all"),
-    OptionSpec::new().short('v').long("as"),
-    OptionSpec::new().short('c').long("core"),
-    OptionSpec::new().short('t').long("cpu"),
-    OptionSpec::new().short('d').long("data"),
-    OptionSpec::new().short('f').long("fsize"),
-    OptionSpec::new().short('k').long("kqueues").extension(true),
-    OptionSpec::new().short('x').long("locks").extension(true),
-    OptionSpec::new().short('l').long("memlock").extension(true),
+pub(super) const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
+    OptionSpec::new()
+        .short('H')
+        .long("hard")
+        .description("set or show the hard limit"),
+    OptionSpec::new()
+        .short('S')
+        .long("soft")
+        .description("set or show the soft limit"),
+    OptionSpec::new()
+        .short('a')
+        .long("all")
+        .description("show all limits"),
+    OptionSpec::new()
+        .short('v')
+        .long("as")
+        .description("virtual address space size (KiB)"),
+    OptionSpec::new()
+        .short('c')
+        .long("core")
+        .description("core dump size (512-byte blocks)"),
+    OptionSpec::new()
+        .short('t')
+        .long("cpu")
+        .description("CPU time (seconds)"),
+    OptionSpec::new()
+        .short('d')
+        .long("data")
+        .description("data segment size (KiB)"),
+    OptionSpec::new()
+        .short('f')
+        .long("fsize")
+        .description("file size (512-byte blocks)"),
+    OptionSpec::new()
+        .short('k')
+        .long("kqueues")
+        .extension(true)
+        .description("number of kqueues"),
+    OptionSpec::new()
+        .short('x')
+        .long("locks")
+        .extension(true)
+        .description("number of file locks"),
+    OptionSpec::new()
+        .short('l')
+        .long("memlock")
+        .extension(true)
+        .description("locked memory size (KiB)"),
     OptionSpec::new()
         .short('q')
         .long("msgqueue")
-        .extension(true),
-    OptionSpec::new().short('e').long("nice").extension(true),
-    OptionSpec::new().short('n').long("nofile"),
-    OptionSpec::new().short('u').long("nproc").extension(true),
-    OptionSpec::new().short('m').long("rss").extension(true),
-    OptionSpec::new().short('r').long("rtprio").extension(true),
-    OptionSpec::new().short('R').long("rttime").extension(true),
-    OptionSpec::new().short('b').long("sbsize").extension(true),
+        .extension(true)
+        .description("message queue size (bytes)"),
+    OptionSpec::new()
+        .short('e')
+        .long("nice")
+        .extension(true)
+        .description("process priority (20 - nice)"),
+    OptionSpec::new()
+        .short('n')
+        .long("nofile")
+        .description("number of open files"),
+    OptionSpec::new()
+        .short('u')
+        .long("nproc")
+        .extension(true)
+        .description("number of processes"),
+    OptionSpec::new()
+        .short('m')
+        .long("rss")
+        .extension(true)
+        .description("resident set size (KiB)"),
+    OptionSpec::new()
+        .short('r')
+        .long("rtprio")
+        .extension(true)
+        .description("real-time priority"),
+    OptionSpec::new()
+        .short('R')
+        .long("rttime")
+        .extension(true)
+        .description("real-time timeout (microseconds)"),
+    OptionSpec::new()
+        .short('b')
+        .long("sbsize")
+        .extension(true)
+        .description("socket buffer size (bytes)"),
     OptionSpec::new()
         .short('i')
         .long("sigpending")
-        .extension(true),
-    OptionSpec::new().short('s').long("stack"),
-    OptionSpec::new().short('w').long("swap").extension(true),
-];
+        .extension(true)
+        .description("number of pending signals"),
+    OptionSpec::new()
+        .short('s')
+        .long("stack")
+        .description("stack size (KiB)"),
+    OptionSpec::new()
+        .short('w')
+        .long("swap")
+        .extension(true)
+        .description("swap space size (KiB)"),
+    HELP_OPTION,
+]);
 
 /// Rejects the option syntax POSIX does not guarantee for the `ulimit` utility.
 ///
@@ -278,7 +352,11 @@ fn check_option_syntax(options: &[OptionOccurrence]) -> std::result::Result<(), 
 /// rejected with [`Error::NonPortableLimit`] because POSIX specifies only
 /// numerals and `unlimited` as limits.
 pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
-    let (options, operands) = parse_arguments(OPTION_SPECS, Mode::with_env(env), args)?;
+    let WithHelp::Main((options, operands)) =
+        parse_arguments_with_help(OPTION_SPECS, Mode::with_env(env), args)?
+    else {
+        return Ok(WithHelp::Help);
+    };
     let portable = env.options.get(Portable) == State::On;
 
     if portable {
@@ -317,7 +395,9 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
             return if let Some(operand) = operands.into_iter().next() {
                 Err(Error::AllWithOperand(operand))
             } else {
-                Ok(Command::ShowAll(show_limit_type(hard, soft)?))
+                Ok(WithHelp::Main(Command::ShowAll(show_limit_type(
+                    hard, soft,
+                )?)))
             };
         }
 
@@ -337,10 +417,13 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
     if let Some(operand) = { operands }.pop() {
         let limit_type = set_limit_type(hard, soft);
         let value = parse_value(operand, portable)?;
-        return Ok(Command::Set(resource, limit_type, value));
+        return Ok(WithHelp::Main(Command::Set(resource, limit_type, value)));
     }
 
-    Ok(Command::ShowOne(resource, show_limit_type(hard, soft)?))
+    Ok(WithHelp::Main(Command::ShowOne(
+        resource,
+        show_limit_type(hard, soft)?,
+    )))
 }
 
 fn show_limit_type(
@@ -397,12 +480,32 @@ mod tests {
     use assert_matches::assert_matches;
 
     #[test]
+    fn help_option() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["--help"]));
+        assert_eq!(result, Ok(WithHelp::Help));
+    }
+
+    #[test]
+    fn help_option_with_other_arguments() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["-H", "--help"]));
+        assert_matches!(
+            result,
+            Err(Error::CommonError(ParseError::HelpWithOtherArguments(_)))
+        );
+    }
+
+    #[test]
     fn show_default_soft_default_fsize() {
         let env = Env::new_virtual();
         let result = parse(&env, vec![]);
         assert_eq!(
             result,
-            Ok(Command::ShowOne(Resource::FSIZE, ShowLimitType::Soft))
+            Ok(WithHelp::Main(Command::ShowOne(
+                Resource::FSIZE,
+                ShowLimitType::Soft
+            )))
         );
     }
 
@@ -412,7 +515,10 @@ mod tests {
         let result = parse(&env, Field::dummies(["-S"]));
         assert_eq!(
             result,
-            Ok(Command::ShowOne(Resource::FSIZE, ShowLimitType::Soft))
+            Ok(WithHelp::Main(Command::ShowOne(
+                Resource::FSIZE,
+                ShowLimitType::Soft
+            )))
         );
     }
 
@@ -422,7 +528,10 @@ mod tests {
         let result = parse(&env, Field::dummies(["-H"]));
         assert_eq!(
             result,
-            Ok(Command::ShowOne(Resource::FSIZE, ShowLimitType::Hard))
+            Ok(WithHelp::Main(Command::ShowOne(
+                Resource::FSIZE,
+                ShowLimitType::Hard
+            )))
         );
     }
 
@@ -432,7 +541,10 @@ mod tests {
         let result = parse(&env, Field::dummies(["-t"]));
         assert_eq!(
             result,
-            Ok(Command::ShowOne(Resource::CPU, ShowLimitType::Soft))
+            Ok(WithHelp::Main(Command::ShowOne(
+                Resource::CPU,
+                ShowLimitType::Soft
+            )))
         );
     }
 
@@ -442,7 +554,10 @@ mod tests {
         let result = parse(&env, Field::dummies(["-t", "-H"]));
         assert_eq!(
             result,
-            Ok(Command::ShowOne(Resource::CPU, ShowLimitType::Hard))
+            Ok(WithHelp::Main(Command::ShowOne(
+                Resource::CPU,
+                ShowLimitType::Hard
+            )))
         );
     }
 
@@ -450,21 +565,30 @@ mod tests {
     fn show_all_default_soft() {
         let env = Env::new_virtual();
         let result = parse(&env, Field::dummies(["-a"]));
-        assert_eq!(result, Ok(Command::ShowAll(ShowLimitType::Soft)));
+        assert_eq!(
+            result,
+            Ok(WithHelp::Main(Command::ShowAll(ShowLimitType::Soft)))
+        );
     }
 
     #[test]
     fn show_all_explicit_soft() {
         let env = Env::new_virtual();
         let result = parse(&env, Field::dummies(["-Sa"]));
-        assert_eq!(result, Ok(Command::ShowAll(ShowLimitType::Soft)));
+        assert_eq!(
+            result,
+            Ok(WithHelp::Main(Command::ShowAll(ShowLimitType::Soft)))
+        );
     }
 
     #[test]
     fn show_all_explicit_hard() {
         let env = Env::new_virtual();
         let result = parse(&env, Field::dummies(["-aH"]));
-        assert_eq!(result, Ok(Command::ShowAll(ShowLimitType::Hard)));
+        assert_eq!(
+            result,
+            Ok(WithHelp::Main(Command::ShowAll(ShowLimitType::Hard)))
+        );
     }
 
     #[test]
@@ -473,11 +597,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(
+            Ok(WithHelp::Main(Command::Set(
                 Resource::FSIZE,
                 SetLimitType::Both,
                 SetLimitValue::Number(0)
-            ))
+            )))
         );
     }
 
@@ -487,11 +611,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-S", "0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(
+            Ok(WithHelp::Main(Command::Set(
                 Resource::FSIZE,
                 SetLimitType::Soft,
                 SetLimitValue::Number(0)
-            ))
+            )))
         );
     }
 
@@ -501,11 +625,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-H", "0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(
+            Ok(WithHelp::Main(Command::Set(
                 Resource::FSIZE,
                 SetLimitType::Hard,
                 SetLimitValue::Number(0)
-            ))
+            )))
         );
     }
 
@@ -515,11 +639,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-d", "0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(
+            Ok(WithHelp::Main(Command::Set(
                 Resource::DATA,
                 SetLimitType::Both,
                 SetLimitValue::Number(0)
-            ))
+            )))
         );
     }
 
@@ -529,11 +653,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-Sd", "0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(
+            Ok(WithHelp::Main(Command::Set(
                 Resource::DATA,
                 SetLimitType::Soft,
                 SetLimitValue::Number(0)
-            ))
+            )))
         );
     }
 
@@ -543,11 +667,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-Hd", "0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(
+            Ok(WithHelp::Main(Command::Set(
                 Resource::DATA,
                 SetLimitType::Hard,
                 SetLimitValue::Number(0)
-            ))
+            )))
         );
     }
 
@@ -557,11 +681,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["unlimited"]));
         assert_eq!(
             result,
-            Ok(Command::Set(
+            Ok(WithHelp::Main(Command::Set(
                 Resource::FSIZE,
                 SetLimitType::Both,
                 SetLimitValue::Unlimited
-            ))
+            )))
         );
     }
 
@@ -591,11 +715,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-HS", "0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(
+            Ok(WithHelp::Main(Command::Set(
                 Resource::FSIZE,
                 SetLimitType::Both,
                 SetLimitValue::Number(0)
-            ))
+            )))
         );
     }
 
@@ -605,11 +729,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-H", "-H", "0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(
+            Ok(WithHelp::Main(Command::Set(
                 Resource::FSIZE,
                 SetLimitType::Hard,
                 SetLimitValue::Number(0)
-            ))
+            )))
         );
     }
 
@@ -626,11 +750,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-dd", "-d", "0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(
+            Ok(WithHelp::Main(Command::Set(
                 Resource::DATA,
                 SetLimitType::Both,
                 SetLimitValue::Number(0)
-            ))
+            )))
         );
     }
 
@@ -649,11 +773,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-S", "-f", "0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(
+            Ok(WithHelp::Main(Command::Set(
                 Resource::FSIZE,
                 SetLimitType::Soft,
                 SetLimitValue::Number(0)
-            ))
+            )))
         );
     }
 
@@ -680,11 +804,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-H", "-H", "0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(
+            Ok(WithHelp::Main(Command::Set(
                 Resource::FSIZE,
                 SetLimitType::Hard,
                 SetLimitValue::Number(0)
-            ))
+            )))
         );
     }
 
@@ -711,21 +835,21 @@ mod tests {
         let result = parse(&env, Field::dummies(["0"]));
         assert_eq!(
             result,
-            Ok(Command::Set(
+            Ok(WithHelp::Main(Command::Set(
                 Resource::FSIZE,
                 SetLimitType::Both,
                 SetLimitValue::Number(0)
-            ))
+            )))
         );
 
         let result = parse(&env, Field::dummies(["unlimited"]));
         assert_eq!(
             result,
-            Ok(Command::Set(
+            Ok(WithHelp::Main(Command::Set(
                 Resource::FSIZE,
                 SetLimitType::Both,
                 SetLimitValue::Unlimited
-            ))
+            )))
         );
     }
 
@@ -751,11 +875,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["+5"]));
         assert_eq!(
             result,
-            Ok(Command::Set(
+            Ok(WithHelp::Main(Command::Set(
                 Resource::FSIZE,
                 SetLimitType::Both,
                 SetLimitValue::Number(5)
-            ))
+            )))
         );
     }
 

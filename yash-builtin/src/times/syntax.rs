@@ -16,7 +16,8 @@
 
 //! Command line syntax parsing for the times built-in
 
-use crate::common::syntax::{Mode, parse_arguments};
+use crate::common::help::{HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help};
+use crate::common::syntax::Mode;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::semantics::Field;
@@ -63,13 +64,19 @@ impl<'a> From<&'a Error> for Report<'a> {
     }
 }
 
+pub(super) const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION]);
+
 /// Parses command line arguments for the times built-in.
-pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<(), Error> {
-    let (options, operands) = parse_arguments(&[], Mode::with_env(env), args)?;
+pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<WithHelp<()>, Error> {
+    let WithHelp::Main((options, operands)) =
+        parse_arguments_with_help(OPTION_SPECS, Mode::with_env(env), args)?
+    else {
+        return Ok(WithHelp::Help);
+    };
     debug_assert_eq!(options, []);
 
     if operands.is_empty() {
-        Ok(())
+        Ok(WithHelp::Main(()))
     } else {
         Err(Error::UnexpectedOperands(operands))
     }

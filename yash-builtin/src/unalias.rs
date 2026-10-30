@@ -20,6 +20,7 @@
 //!
 //! [`unalias` built-in]: https://magicant.github.io/yash-rs/builtins/unalias.html
 
+use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
 use crate::common::report::merge_reports;
 use crate::common::report::report_error;
 use crate::common::report::report_failure;
@@ -40,19 +41,28 @@ pub enum Command {
 pub mod semantics;
 pub mod syntax;
 
+/// Help information of the `unalias` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "remove aliases",
+    usage: &["unalias name...", "unalias -a"],
+    options: syntax::OPTION_SPECS.get(),
+    manual_page_name: "unalias",
+};
+
 /// Entry point for executing the `unalias` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
     S: Isatty + WriteAll,
 {
     match syntax::parse(env, args) {
-        Ok(command) => {
+        Ok(WithHelp::Main(command)) => {
             let errors = command.execute(env);
             match merge_reports(&errors) {
                 None => crate::Result::default(),
                 Some(report) => report_failure(env, report).await,
             }
         }
+        Ok(WithHelp::Help) => print_help_of_current_builtin(env).await,
         Err(e) => report_error(env, &e).await,
     }
 }

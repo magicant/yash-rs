@@ -17,6 +17,7 @@
 //! Command line argument parser for the trap built-in
 
 use super::Command;
+use crate::common::help::{HELP_OPTION, OptionSpecsWithHelp};
 use crate::common::syntax::{OptionOccurrence, OptionSpec};
 use itertools::Itertools as _;
 use std::borrow::Cow;
@@ -30,7 +31,13 @@ use yash_env::trap::{Action, Condition};
 use yash_quote::quoted;
 
 /// Command line options for the trap built-in
-pub const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('p').long("print")];
+pub const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
+    OptionSpec::new()
+        .short('p')
+        .long("print")
+        .description("print the traps for the operands, or all traps if none"),
+    HELP_OPTION,
+]);
 
 /// Error that may occur while [interpreting](interpret) command line arguments.
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
@@ -183,7 +190,8 @@ fn parse_condition<S: Signals>(
 
 /// Converts parsed command line arguments into a `Command`.
 ///
-/// The result of [`parse_arguments`](crate::common::syntax::parse_arguments)
+/// The options and operands parsed by
+/// [`parse_arguments_with_help`](crate::common::help::parse_arguments_with_help)
 /// should be passed to this function.
 ///
 /// On failure, returns a non-empty list of errors.

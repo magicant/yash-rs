@@ -22,6 +22,7 @@
 //! [`unset` built-in]: https://magicant.github.io/yash-rs/builtins/unset.html
 
 use crate::Result;
+use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
 use crate::common::report::{merge_reports, report_error, report_failure};
 use yash_env::Env;
 use yash_env::semantics::Field;
@@ -54,13 +55,22 @@ pub struct Command {
 pub mod semantics;
 pub mod syntax;
 
+/// Help information of the `unset` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "unset variables or functions",
+    usage: &["unset [-f|-v] name..."],
+    options: syntax::OPTION_SPECS.get(),
+    manual_page_name: "unset",
+};
+
 /// Entry point of the `unset` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
     S: Isatty + WriteAll,
 {
     let command = match syntax::parse(env, args) {
-        Ok(command) => command,
+        Ok(WithHelp::Main(command)) => command,
+        Ok(WithHelp::Help) => return print_help_of_current_builtin(env).await,
         Err(e) => return report_error(env, &e).await,
     };
 

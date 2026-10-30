@@ -27,11 +27,13 @@
 //! are cleared when the built-in modifies any trap in the subshell. See
 //! [`TrapSet::enter_subshell`] and [`TrapSet::set_action`] for details.
 
+use crate::common::help::{
+    BuiltinHelp, WithHelp, parse_arguments_with_help, print_help_of_current_builtin,
+};
 use crate::common::report::merge_reports;
 use crate::common::report::report_error;
 use crate::common::report::report_failure;
 use crate::common::syntax::Mode;
-use crate::common::syntax::parse_arguments;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::option::Option::{Interactive, Portable};
@@ -272,14 +274,23 @@ impl Command {
     }
 }
 
+/// Help information of the `trap` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "set or print traps",
+    usage: &["trap [action] condition...", "trap [-p [condition...]]"],
+    options: syntax::OPTION_SPECS.get(),
+    manual_page_name: "trap",
+};
+
 /// Entry point for executing the `trap` built-in
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> crate::Result
 where
     S: Isatty + SignalSystem + WriteAll,
 {
-    let (options, operands) = match parse_arguments(syntax::OPTION_SPECS, Mode::with_env(env), args)
-    {
-        Ok(result) => result,
+    let mode = Mode::with_env(env);
+    let (options, operands) = match parse_arguments_with_help(syntax::OPTION_SPECS, mode, args) {
+        Ok(WithHelp::Main(result)) => result,
+        Ok(WithHelp::Help) => return print_help_of_current_builtin(env).await,
         Err(error) => return report_error(env, &error).await,
     };
 

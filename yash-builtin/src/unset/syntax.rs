@@ -16,9 +16,9 @@
 
 //! Parses the unset built-in command arguments.
 
+use crate::common::help::{HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help};
 use crate::common::syntax::ConflictingOptionError;
 use crate::common::syntax::OptionSpec;
-use crate::common::syntax::parse_arguments;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::option::Option::Portable;
@@ -81,12 +81,19 @@ impl<'a> From<&'a Error> for Report<'a> {
 }
 
 /// Result of parsing command line arguments
-pub type Result = std::result::Result<Command, Error>;
+pub type Result = std::result::Result<WithHelp<Command>, Error>;
 
-const OPTION_SPECS: &[OptionSpec] = &[
-    OptionSpec::new().short('f').long("functions"),
-    OptionSpec::new().short('v').long("variables"),
-];
+pub(super) const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
+    OptionSpec::new()
+        .short('f')
+        .long("functions")
+        .description("unset functions"),
+    OptionSpec::new()
+        .short('v')
+        .long("variables")
+        .description("unset variables (default)"),
+    HELP_OPTION,
+]);
 
 /// Parses command line arguments for the unset built-in.
 ///
@@ -95,7 +102,11 @@ const OPTION_SPECS: &[OptionSpec] = &[
 /// invocation without operands is rejected with [`Error::MissingOperand`].
 pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
     let parser_mode = crate::common::syntax::Mode::with_env(env);
-    let (options, operands) = parse_arguments(OPTION_SPECS, parser_mode, args)?;
+    let WithHelp::Main((options, operands)) =
+        parse_arguments_with_help(OPTION_SPECS, parser_mode, args)?
+    else {
+        return Ok(WithHelp::Help);
+    };
 
     // Decide which to unset: variables or functions.
     let f_option = options.iter().position(|o| o.spec.get_short() == Some('f'));
@@ -114,13 +125,31 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
         return Err(Error::MissingOperand);
     }
 
-    Ok(Command { mode, names })
+    Ok(WithHelp::Main(Command { mode, names }))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::syntax::ParseError;
     use assert_matches::assert_matches;
+
+    #[test]
+    fn help_option() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["--help"]));
+        assert_eq!(result, Ok(WithHelp::Help));
+    }
+
+    #[test]
+    fn help_option_with_other_arguments() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["--help", "foo"]));
+        assert_matches!(
+            result,
+            Err(Error::CommonError(ParseError::HelpWithOtherArguments(_)))
+        );
+    }
 
     #[test]
     fn no_arguments_without_portable() {
@@ -128,10 +157,10 @@ mod tests {
         let result = parse(&env, vec![]);
         assert_eq!(
             result,
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 mode: Mode::Variables,
                 names: vec![],
-            })
+            }))
         );
     }
 
@@ -164,10 +193,10 @@ mod tests {
         let result = parse(&env, args.clone());
         assert_eq!(
             result,
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 mode: Mode::Variables,
                 names: args,
-            })
+            }))
         );
     }
 
@@ -198,20 +227,20 @@ mod tests {
         let result = parse(&env, Field::dummies(["-v"]));
         assert_eq!(
             result,
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 mode: Mode::Variables,
                 names: vec![],
-            })
+            }))
         );
 
         // The same option can be specified multiple times.
         let result = parse(&env, Field::dummies(["-vv", "--variables"]));
         assert_eq!(
             result,
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 mode: Mode::Variables,
                 names: vec![],
-            })
+            }))
         );
     }
 
@@ -221,20 +250,20 @@ mod tests {
         let result = parse(&env, Field::dummies(["-f"]));
         assert_eq!(
             result,
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 mode: Mode::Functions,
                 names: vec![],
-            })
+            }))
         );
 
         // The same option can be specified multiple times.
         let result = parse(&env, Field::dummies(["-ff", "--functions"]));
         assert_eq!(
             result,
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 mode: Mode::Functions,
                 names: vec![],
-            })
+            }))
         );
     }
 
@@ -261,10 +290,10 @@ mod tests {
         let result = parse(&env, args.clone());
         assert_eq!(
             result,
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 mode: Mode::Variables,
                 names: args,
-            })
+            }))
         );
     }
 }

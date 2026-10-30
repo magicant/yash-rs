@@ -21,6 +21,7 @@
 //! [`cd` built-in]: https://magicant.github.io/yash-rs/builtins/cd.html
 
 use crate::Result;
+use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
 use crate::common::report::report;
 use yash_env::Env;
 use yash_env::path::Path;
@@ -125,6 +126,14 @@ where
     self::report(env, report, exit_status).await
 }
 
+/// Help information of the `cd` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "change the working directory",
+    usage: &["cd [-L|-P [-e]] [directory]"],
+    options: syntax::OPTION_SPECS.get(),
+    manual_page_name: "cd",
+};
+
 /// Entry point for executing the `cd` built-in
 ///
 /// This function uses functions in the submodules to execute the built-in.
@@ -133,7 +142,8 @@ where
     S: Chdir + Fstat + GetCwd + Isatty + WriteAll,
 {
     let command = match syntax::parse(env, args) {
-        Ok(command) => command,
+        Ok(WithHelp::Main(command)) => command,
+        Ok(WithHelp::Help) => return print_help_of_current_builtin(env).await,
         Err(e) => return report(env, &e, EXIT_STATUS_SYNTAX_ERROR).await,
     };
 

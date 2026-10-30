@@ -20,6 +20,8 @@ The unalias built-in removes alias definitions as specified by the operands.
 
 The **`-a`** (**`--all`**) option removes all alias definitions.
 
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
+
 ## Operands
 
 Each operand must be the name of an alias to remove.
@@ -53,6 +55,6 @@ error: cannot execute external utility "greet"
 
 The `unalias` built-in is specified in POSIX.
 
-The long option name `--all` is a non-standard extension. When the [`portable` option](../environment/options.md#portable) is set, using the long option name is rejected with an error. Use `-a` instead.
+The long option name `--all` and the `--help` option are a non-standard extension. When the [`portable` option](../environment/options.md#portable) is set, using the long option name is rejected with an error. Use `-a` instead.
 
 Some shells implement some built-in utilities as predefined aliases. Using `unalias -a` may make such built-ins unavailable.

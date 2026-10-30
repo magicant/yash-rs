@@ -20,12 +20,12 @@ use super::Command;
 use super::Identify;
 use super::Invoke;
 use super::Search;
+use crate::common::help::{HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help};
 use crate::common::syntax::ConflictingOptionError;
 use crate::common::syntax::Mode;
 use crate::common::syntax::OptionOccurrence;
 use crate::common::syntax::OptionSpec;
 use crate::common::syntax::ParseError;
-use crate::common::syntax::parse_arguments;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::option::Option::Portable;
@@ -133,15 +133,26 @@ impl<'a> From<&'a Error> for Report<'a> {
     }
 }
 
-const OPTION_SPECS: &[OptionSpec] = &[
-    OptionSpec::new().short('p').long("path"),
-    OptionSpec::new().short('v').long("identify"),
-    OptionSpec::new().short('V').long("verbose-identify"),
-];
+pub(super) const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
+    OptionSpec::new()
+        .short('p')
+        .long("path")
+        .description("search the standard path instead of $PATH"),
+    OptionSpec::new()
+        .short('v')
+        .long("identify")
+        .description("identify the command concisely"),
+    OptionSpec::new()
+        .short('V')
+        .long("verbose-identify")
+        .description("identify the command verbosely"),
+    HELP_OPTION,
+]);
 
 /// Interprets the parsed command line arguments
 ///
-/// This function converts the result of [`parse_arguments`] into a `Command`.
+/// This function converts the options and operands parsed by
+/// [`parse_arguments_with_help`] into a `Command`.
 ///
 /// `portable` should be the state of the `Portable` shell option. While it is
 /// `On`, the command line must have at least one operand, as POSIX requires
@@ -196,8 +207,12 @@ pub fn interpret(
 /// [`Error::ConflictingOption`] and a surplus operand with
 /// [`Error::TooManyCommandNames`]. These checks are not shared with the type
 /// built-in, which has neither option and whose operands POSIX spells `name…`.
-pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
-    let (mut options, mut operands) = parse_arguments(OPTION_SPECS, Mode::with_env(env), args)?;
+pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<WithHelp<Command>, Error> {
+    let WithHelp::Main((mut options, mut operands)) =
+        parse_arguments_with_help(OPTION_SPECS, Mode::with_env(env), args)?
+    else {
+        return Ok(WithHelp::Help);
+    };
     let portable = env.options.get(Portable);
 
     if portable == State::On {
@@ -224,7 +239,7 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
         }
     }
 
-    interpret(options, operands, portable)
+    interpret(options, operands, portable).map(WithHelp::Main)
 }
 
 #[cfg(test)]
@@ -239,7 +254,7 @@ mod tests {
         let env = Env::new_virtual();
         let result = parse(&env, Field::dummies(["foo", "bar", "baz"]));
 
-        assert_matches!(result, Ok(Command::Invoke(invoke)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::Invoke(invoke))) => {
             assert_eq!(invoke.fields, Field::dummies(["foo", "bar", "baz"]));
             assert_eq!(
                 invoke.search,
@@ -256,7 +271,7 @@ mod tests {
         let env = Env::new_virtual();
         let result = parse(&env, Field::dummies(["-p", "foo"]));
 
-        assert_matches!(result, Ok(Command::Invoke(invoke)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::Invoke(invoke))) => {
             assert_eq!(invoke.fields, Field::dummies(["foo"]));
             assert_eq!(
                 invoke.search,
@@ -273,7 +288,7 @@ mod tests {
         let env = Env::new_virtual();
         let result = parse(&env, Field::dummies(["-v", "foo"]));
 
-        assert_matches!(result, Ok(Command::Identify(identify)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::Identify(identify))) => {
             assert_eq!(identify.names, Field::dummies(["foo"]));
             assert_eq!(
                 identify.search,
@@ -291,7 +306,7 @@ mod tests {
         let env = Env::new_virtual();
         let result = parse(&env, Field::dummies(["-v", "-p", "foo"]));
 
-        assert_matches!(result, Ok(Command::Identify(identify)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::Identify(identify))) => {
             assert_eq!(identify.names, Field::dummies(["foo"]));
             assert_eq!(
                 identify.search,
@@ -309,7 +324,7 @@ mod tests {
         let env = Env::new_virtual();
         let result = parse(&env, Field::dummies(["-V", "bar"]));
 
-        assert_matches!(result, Ok(Command::Identify(identify)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::Identify(identify))) => {
             assert_eq!(identify.names, Field::dummies(["bar"]));
             assert_eq!(
                 identify.search,
@@ -323,11 +338,28 @@ mod tests {
     }
 
     #[test]
+    fn help_option() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["--help"]));
+        assert_eq!(result, Ok(WithHelp::Help));
+    }
+
+    #[test]
+    fn help_option_with_other_arguments() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["--help", "foo"]));
+        assert_matches!(
+            result,
+            Err(Error::CommonError(ParseError::HelpWithOtherArguments(_)))
+        );
+    }
+
+    #[test]
     fn no_operands_without_portable() {
         let env = Env::new_virtual();
         let result = parse(&env, vec![]);
 
-        assert_matches!(result, Ok(Command::Invoke(invoke)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::Invoke(invoke))) => {
             assert_eq!(invoke.fields, []);
         });
     }
@@ -362,7 +394,7 @@ mod tests {
         env.options.set(Portable, State::On);
         let result = parse(&env, Field::dummies(["foo"]));
 
-        assert_matches!(result, Ok(Command::Invoke(invoke)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::Invoke(invoke))) => {
             assert_eq!(invoke.fields, Field::dummies(["foo"]));
         });
     }
@@ -417,7 +449,7 @@ mod tests {
         env.options.set(Portable, State::On);
         let result = parse(&env, Field::dummies(["-v", "foo"]));
 
-        assert_matches!(result, Ok(Command::Identify(identify)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::Identify(identify))) => {
             assert_eq!(identify.names, Field::dummies(["foo"]));
         });
     }
@@ -431,7 +463,7 @@ mod tests {
         let args = Field::dummies(["foo", "bar", "baz"]);
         let result = parse(&env, args.clone());
 
-        assert_matches!(result, Ok(Command::Invoke(invoke)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::Invoke(invoke))) => {
             assert_eq!(invoke.fields, args);
         });
     }
@@ -441,7 +473,7 @@ mod tests {
         let env = Env::new_virtual();
         let result = parse(&env, Field::dummies(["-v", "foo", "bar"]));
 
-        assert_matches!(result, Ok(Command::Identify(identify)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::Identify(identify))) => {
             assert_eq!(identify.names, Field::dummies(["foo", "bar"]));
         });
     }
@@ -521,12 +553,12 @@ mod tests {
         env.options.set(Portable, State::On);
 
         let result = parse(&env, Field::dummies(["-v", "-v", "foo"]));
-        assert_matches!(result, Ok(Command::Identify(identify)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::Identify(identify))) => {
             assert!(!identify.verbose);
         });
 
         let result = parse(&env, Field::dummies(["-V", "-V", "foo"]));
-        assert_matches!(result, Ok(Command::Identify(identify)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::Identify(identify))) => {
             assert!(identify.verbose);
         });
     }
@@ -567,12 +599,12 @@ mod tests {
         let env = Env::new_virtual();
 
         let result = parse(&env, Field::dummies(["-V", "-v", "baz"]));
-        assert_matches!(result, Ok(Command::Identify(identify)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::Identify(identify))) => {
             assert!(!identify.verbose);
         });
 
         let result = parse(&env, Field::dummies(["-v", "-V", "baz"]));
-        assert_matches!(result, Ok(Command::Identify(identify)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::Identify(identify))) => {
             assert!(identify.verbose);
         });
     }

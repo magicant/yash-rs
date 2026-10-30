@@ -20,6 +20,10 @@
 //!
 //! [`jobs` built-in]: https://magicant.github.io/yash-rs/builtins/jobs.html
 
+use crate::common::help::{
+    BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+    print_help_of_current_builtin,
+};
 use crate::common::output;
 use crate::common::report::job;
 use crate::common::report::merge_reports;
@@ -28,7 +32,6 @@ use crate::common::report::report_failure;
 use crate::common::syntax::ConflictingOptionError;
 use crate::common::syntax::Mode;
 use crate::common::syntax::OptionSpec;
-use crate::common::syntax::parse_arguments;
 use itertools::Itertools as _;
 use std::fmt::Display;
 use yash_env::Env;
@@ -48,10 +51,25 @@ use yash_env::system::{Isatty, Signals};
 
 // TODO Split into syntax and semantics submodules
 
-const OPTIONS: &[OptionSpec] = &[
-    OptionSpec::new().short('l').long("verbose"),
-    OptionSpec::new().short('p').long("pgid-only"),
-];
+const OPTIONS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
+    OptionSpec::new()
+        .short('l')
+        .long("verbose")
+        .description("print the process ID as well"),
+    OptionSpec::new()
+        .short('p')
+        .long("pgid-only")
+        .description("print the process ID only"),
+    HELP_OPTION,
+]);
+
+/// Help information of the `jobs` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "print the status of jobs",
+    usage: &["jobs [-l|-p] [job_id...]"],
+    options: OPTIONS.get(),
+    manual_page_name: "jobs",
+};
 
 /// Error report for an operand that does not name a single job
 fn operand_error_report<'a>(error: &dyn Display, operand: &'a Field) -> Report<'a> {
@@ -92,8 +110,10 @@ pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
     S: Isatty + Signals + WriteAll,
 {
-    let (options, operands) = match parse_arguments(OPTIONS, Mode::with_env(env), args) {
-        Ok(result) => result,
+    let mode = Mode::with_env(env);
+    let (options, operands) = match parse_arguments_with_help(OPTIONS, mode, args) {
+        Ok(WithHelp::Main(result)) => result,
+        Ok(WithHelp::Help) => return print_help_of_current_builtin(env).await,
         Err(error) => return report_error(env, &error).await,
     };
 

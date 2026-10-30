@@ -128,3 +128,21 @@ __IN__
 test_O -d -e 2 'missing operand (1)'
 getopts a
 __IN__
+
+test_oE -e 0 'help option prints help'
+getopts --help
+__IN__
+getopts: parse options in shell scripts
+
+Usage:
+  getopts option_spec variable_name [argument...]
+
+Options:
+      --help  print this help
+
+See <https://magicant.github.io/yash-rs/builtins/getopts.html> for details.
+__OUT__
+
+test_O -d -e 2 'help option with another operand'
+getopts --help a opt
+__IN__

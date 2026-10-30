@@ -18,7 +18,7 @@ In the future, the shell may provide a way to cancel a wait in progress or treat
 
 ## Options
 
-None.
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
 
 ## Operands
 
@@ -75,6 +75,8 @@ In the above example, `wait` treats the job `%` as an unknown job and returns ex
 ## Compatibility
 
 The `wait` built-in is specified in POSIX.1-2024.
+
+The `--help` option is a non-standard extension.
 
 (Since 3.4.1) When the [`portable` option](../environment/options.md#portable) is set, the lone `%` is rejected as a [job ID].
 

@@ -33,3 +33,41 @@ __IN__
 test_OE -e 0 'unalias short option name still accepted under the portable option' -o portable
 unalias -a
 __IN__
+
+test_oE -e 0 'help option prints help'
+alias --help
+__IN__
+alias: define or print aliases
+
+Usage:
+  alias [name[=value]...]
+
+Options:
+      --help  print this help
+
+See <https://magicant.github.io/yash-rs/builtins/alias.html> for details.
+__OUT__
+
+test_O -d -e 2 'help option with another operand'
+alias --help foo
+__IN__
+
+test_oE -e 0 'unalias help option prints help'
+unalias --help
+__IN__
+unalias: remove aliases
+
+Usage:
+  unalias name...
+  unalias -a
+
+Options:
+  -a, --all   remove all aliases
+      --help  print this help
+
+See <https://magicant.github.io/yash-rs/builtins/unalias.html> for details.
+__OUT__
+
+test_O -d -e 2 'unalias help option with another option'
+unalias --help -a
+__IN__

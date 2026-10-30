@@ -16,8 +16,8 @@
 
 //! Command line argument parser for the break/continue built-in
 
+use crate::common::help::{HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help};
 use crate::common::syntax::Mode;
-use crate::common::syntax::parse_arguments;
 use std::num::NonZeroUsize;
 use std::num::ParseIntError;
 use thiserror::Error;
@@ -77,22 +77,29 @@ impl<'a> From<&'a Error> for Report<'a> {
 /// Result of parsing command line arguments
 ///
 /// If successful, the result is the number of levels to break.
-pub type Result = std::result::Result<NonZeroUsize, Error>;
+pub type Result = std::result::Result<WithHelp<NonZeroUsize>, Error>;
+
+pub(crate) const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION]);
 
 /// Parses command line arguments for the break/continue built-in.
 pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
-    let (_options, mut operands) = parse_arguments(&[], Mode::with_env(env), args)?;
+    let WithHelp::Main((_options, mut operands)) =
+        parse_arguments_with_help(OPTION_SPECS, Mode::with_env(env), args)?
+    else {
+        return Ok(WithHelp::Help);
+    };
 
     if operands.len() > 1 {
         return Err(Error::TooManyOperands(operands));
     }
 
     match operands.pop() {
-        None => Ok(NonZeroUsize::new(1).unwrap()),
+        None => Ok(WithHelp::Main(NonZeroUsize::new(1).unwrap())),
 
         Some(field) => field
             .value
             .parse()
+            .map(WithHelp::Main)
             .map_err(|e| Error::InvalidNumber(field, e)),
     }
 }
@@ -100,6 +107,7 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::syntax::ParseError;
     use assert_matches::assert_matches;
     use std::num::IntErrorKind;
 
@@ -107,7 +115,7 @@ mod tests {
     fn default_count() {
         let env = Env::new_virtual();
         let result = parse(&env, vec![]);
-        assert_eq!(result, Ok(NonZeroUsize::new(1).unwrap()));
+        assert_eq!(result, Ok(WithHelp::Main(NonZeroUsize::new(1).unwrap())));
     }
 
     #[test]
@@ -115,11 +123,28 @@ mod tests {
         let env = Env::new_virtual();
         let args = Field::dummies(["1"]);
         let result = parse(&env, args);
-        assert_eq!(result, Ok(NonZeroUsize::new(1).unwrap()));
+        assert_eq!(result, Ok(WithHelp::Main(NonZeroUsize::new(1).unwrap())));
 
         let args = Field::dummies(["2"]);
         let result = parse(&env, args);
-        assert_eq!(result, Ok(NonZeroUsize::new(2).unwrap()));
+        assert_eq!(result, Ok(WithHelp::Main(NonZeroUsize::new(2).unwrap())));
+    }
+
+    #[test]
+    fn help_option() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["--help"]));
+        assert_eq!(result, Ok(WithHelp::Help));
+    }
+
+    #[test]
+    fn help_option_with_other_arguments() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["--help", "1"]));
+        assert_matches!(
+            result,
+            Err(Error::CommonError(ParseError::HelpWithOtherArguments(_)))
+        );
     }
 
     #[test]

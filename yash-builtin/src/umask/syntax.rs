@@ -18,7 +18,8 @@
 
 use super::Command;
 use super::symbol::{ParseClausesError, parse_clauses};
-use crate::common::syntax::{Mode, OptionSpec, ParseError, parse_arguments};
+use crate::common::help::{HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help};
+use crate::common::syntax::{Mode, OptionSpec, ParseError};
 use std::num::ParseIntError;
 use thiserror::Error;
 use yash_env::Env;
@@ -82,19 +83,29 @@ impl<'a> From<&'a Error> for Report<'a> {
 }
 
 /// Result of parsing command line arguments
-pub type Result = std::result::Result<Command, Error>;
+pub type Result = std::result::Result<WithHelp<Command>, Error>;
 
 /// List of all options supported by the `umask` built-in
-const OPTION_SPECS: &[OptionSpec] = &[OptionSpec::new().short('S').long("symbolic")];
+pub(super) const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
+    OptionSpec::new()
+        .short('S')
+        .long("symbolic")
+        .description("print the mask in symbolic notation"),
+    HELP_OPTION,
+]);
 
 /// Parses command line arguments.
 pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
-    let (options, operands) = parse_arguments(OPTION_SPECS, Mode::with_env(env), args)?;
+    let WithHelp::Main((options, operands)) =
+        parse_arguments_with_help(OPTION_SPECS, Mode::with_env(env), args)?
+    else {
+        return Ok(WithHelp::Help);
+    };
 
     match operands.len() {
         0 => {
             let symbolic = options.iter().any(|o| o.spec.get_short() == Some('S'));
-            Ok(Command::Show { symbolic })
+            Ok(WithHelp::Main(Command::Show { symbolic }))
         }
 
         1 => {
@@ -103,13 +114,13 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result {
             // TODO Use char::is_ascii_octdigit
             if field.value.starts_with(|c: char| c.is_ascii_digit()) {
                 return match u16::from_str_radix(&field.value, 8) {
-                    Ok(mask) => Ok(Command::set_from_raw_mask(mask)),
+                    Ok(mask) => Ok(WithHelp::Main(Command::set_from_raw_mask(mask))),
                     Err(e) => Err(Error::InvalidNumericMode(field, e)),
                 };
             }
 
             match parse_clauses(&field.value) {
-                Ok(clauses) => Ok(Command::Set(clauses)),
+                Ok(clauses) => Ok(WithHelp::Main(Command::Set(clauses))),
                 Err(e) => Err(Error::InvalidSymbolicMode(field, e)),
             }
         }
@@ -125,24 +136,44 @@ mod tests {
     use assert_matches::assert_matches;
 
     #[test]
+    fn help_option() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["--help"]));
+        assert_eq!(result, Ok(WithHelp::Help));
+    }
+
+    #[test]
+    fn help_option_with_other_arguments() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["-S", "--help"]));
+        assert_matches!(
+            result,
+            Err(Error::CommonError(ParseError::HelpWithOtherArguments(_)))
+        );
+    }
+
+    #[test]
     fn no_arguments() {
         let env = Env::new_virtual();
         let result = parse(&env, vec![]);
-        assert_eq!(result, Ok(Command::Show { symbolic: false }));
+        assert_eq!(
+            result,
+            Ok(WithHelp::Main(Command::Show { symbolic: false }))
+        );
     }
 
     #[test]
     fn symbolic_option() {
         let env = Env::new_virtual();
         let result = parse(&env, Field::dummies(["-S"]));
-        assert_eq!(result, Ok(Command::Show { symbolic: true }));
+        assert_eq!(result, Ok(WithHelp::Main(Command::Show { symbolic: true })));
     }
 
     #[test]
     fn long_symbolic_option() {
         let env = Env::new_virtual();
         let result = parse(&env, Field::dummies(["--symbolic"]));
-        assert_eq!(result, Ok(Command::Show { symbolic: true }));
+        assert_eq!(result, Ok(WithHelp::Main(Command::Show { symbolic: true })));
     }
 
     #[test]
@@ -152,7 +183,7 @@ mod tests {
         let result = parse(&env, args);
         assert_eq!(
             result,
-            Ok(Command::Set(vec![Clause {
+            Ok(WithHelp::Main(Command::Set(vec![Clause {
                 who: Who { mask: 0o777 },
                 actions: vec![Action {
                     operator: Operator::Set,
@@ -161,7 +192,7 @@ mod tests {
                         conditional_executable: false
                     },
                 }],
-            }]))
+            }])))
         );
     }
 
@@ -172,7 +203,7 @@ mod tests {
         let result = parse(&env, args);
         assert_eq!(
             result,
-            Ok(Command::Set(vec![
+            Ok(WithHelp::Main(Command::Set(vec![
                 Clause {
                     who: Who { mask: 0o700 },
                     actions: vec![Action {
@@ -202,7 +233,7 @@ mod tests {
                         }
                     ]
                 }
-            ]))
+            ])))
         );
     }
 
@@ -222,13 +253,13 @@ mod tests {
         let result = parse(&env, args);
         assert_eq!(
             result,
-            Ok(Command::Set(vec![Clause {
+            Ok(WithHelp::Main(Command::Set(vec![Clause {
                 who: Who { mask: 0o077 },
                 actions: vec![Action {
                     operator: Operator::Set,
                     permission: Permission::CopyUser,
                 }],
-            }]))
+            }])))
         );
     }
 

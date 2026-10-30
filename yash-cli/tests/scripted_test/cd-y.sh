@@ -211,4 +211,25 @@ test_O -e 0 'printing to closed stream'
 OLDPWD=/ cd - >&-
 __IN__
 
+test_oE -e 0 'help option prints help'
+cd --help
+__IN__
+cd: change the working directory
+
+Usage:
+  cd [-L|-P [-e]] [directory]
+
+Options:
+  -L, --logical     keep symbolic links in $PWD (default)
+  -P, --physical    resolve symbolic links in the path
+  -e, --ensure-pwd  with -P, fail if $PWD cannot be updated
+      --help        print this help
+
+See <https://magicant.github.io/yash-rs/builtins/cd.html> for details.
+__OUT__
+
+test_O -d -e 5 'help option with another option'
+cd --help -P
+__IN__
+
 # vim: set ft=sh ts=8 sts=4 sw=4 et:

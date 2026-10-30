@@ -23,12 +23,15 @@
 use crate::command::Command;
 use crate::command::Identify;
 use crate::command::syntax::interpret;
+use crate::common::help::{
+    BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+    print_help_of_current_builtin,
+};
 use crate::common::report::report_error;
 use crate::common::syntax::Mode;
 use crate::common::syntax::OptionOccurrence;
 use crate::common::syntax::OptionSpec;
 use crate::common::syntax::OptionSpelling;
-use crate::common::syntax::parse_arguments;
 use yash_env::Env;
 use yash_env::option::Option::Portable;
 use yash_env::semantics::Field;
@@ -36,12 +39,28 @@ use yash_env::source::Location;
 use yash_env::system::concurrency::WriteAll;
 use yash_env::system::{Fstat, GetCwd, IsExecutableFile, Isatty, Sysconf};
 
-const OPTION_SPECS: &[OptionSpec] = &[
+const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
     // TODO: Non-standard options
-];
+    HELP_OPTION,
+]);
 
-fn parse<S>(env: &mut Env<S>, args: Vec<Field>) -> Result<Identify, crate::command::syntax::Error> {
-    let (mut options, operands) = parse_arguments(OPTION_SPECS, Mode::with_env(env), args)?;
+/// Help information of the `type` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "identify the type of commands",
+    usage: &["type [name...]"],
+    options: OPTION_SPECS.get(),
+    manual_page_name: "type",
+};
+
+fn parse<S>(
+    env: &mut Env<S>,
+    args: Vec<Field>,
+) -> Result<WithHelp<Identify>, crate::command::syntax::Error> {
+    let WithHelp::Main((mut options, operands)) =
+        parse_arguments_with_help(OPTION_SPECS, Mode::with_env(env), args)?
+    else {
+        return Ok(WithHelp::Help);
+    };
 
     // `type` is equivalent to `command -V`, so add the `-V` option and delegate
     // to the `command` built-in.
@@ -58,7 +77,7 @@ fn parse<S>(env: &mut Env<S>, args: Vec<Field>) -> Result<Identify, crate::comma
     });
 
     interpret(options, operands, env.options.get(Portable)).map(|command| match command {
-        Command::Identify(identify) => identify,
+        Command::Identify(identify) => WithHelp::Main(identify),
         // With the added `-V` option, other variants are unreachable.
         Command::Invoke(_) => unreachable!(),
     })
@@ -70,7 +89,8 @@ where
     S: Fstat + GetCwd + IsExecutableFile + Isatty + Sysconf + WriteAll + 'static,
 {
     match parse(env, args) {
-        Ok(identify) => identify.execute(env).await,
+        Ok(WithHelp::Main(identify)) => identify.execute(env).await,
+        Ok(WithHelp::Help) => print_help_of_current_builtin(env).await,
         Err(error) => report_error(env, &error).await,
     }
 }

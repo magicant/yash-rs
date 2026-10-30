@@ -452,6 +452,28 @@ __IN__
 bg
 __OUT__
 
+test_oE -e 0 'help option prints help'
+command --help
+__IN__
+command: execute or identify a command bypassing functions
+
+Usage:
+  command [-p] name [argument...]
+  command -v|-V [-p] name
+
+Options:
+  -p, --path              search the standard path instead of $PATH
+  -v, --identify          identify the command concisely
+  -V, --verbose-identify  identify the command verbosely
+      --help              print this help
+
+See <https://magicant.github.io/yash-rs/builtins/command.html> for details.
+__OUT__
+
+test_O -d -e 2 'help option with another operand'
+command --help ls
+__IN__
+
 (
 posix="true"
 

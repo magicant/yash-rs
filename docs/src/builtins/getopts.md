@@ -51,7 +51,7 @@ to `1` before invoking the built-in.
 
 ## Options
 
-None.
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
 
 ## Operands
 
@@ -139,6 +139,8 @@ done
 The `getopts` built-in is specified by POSIX. Only ASCII alphanumeric
 characters are allowed for option names, though this implementation allows
 any characters but `:`.
+
+The `--help` option is a non-standard extension.
 
 The current implementation considers variable names containing a `=` as
 invalid names. However, more names many be considered invalid in the future.

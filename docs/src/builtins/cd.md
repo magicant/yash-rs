@@ -69,6 +69,8 @@ With the **`-P`** (**`--physical`**) option, the operand is resolved physically;
 These two options are mutually exclusive. The last specified one applies if given both. The default is `-L`.
 
 When `-P` is effective, the built-in may fail to determine the new working directory pathname to assign to `PWD`. By default, the exit status does not indicate the failure. If the **`-e`** (**`--ensure-pwd`**) option is given together with `-P`, the built-in returns exit status 1 in this case. This allows callers to detect that `PWD` could not be determined and handle the condition.
+
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
 <!-- TODO: The **`--default-directory=directory`** option is not implemented. -->
 <!-- TODO: The **`--print={always,auto,never}`** option is not implemented. -->
 
@@ -175,7 +177,7 @@ By default, the built-in resolves pathnames logically (`-L`), while many other u
 
 POSIX-1.2024 defines the `cd` utility with the `-L`, `-P`, and `-e` options. <!-- TODO: The other options are non-standard. -->
 
-The long option names (`--logical`, `--physical`, `--ensure-pwd`) are a non-standard extension.
+The long option names (`--logical`, `--physical`, `--ensure-pwd`) and the `--help` option are a non-standard extension.
 
 (Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, using a long option name is rejected with an error. Use the corresponding short option instead.
 

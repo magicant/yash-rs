@@ -21,8 +21,12 @@
 //!
 //! [`shift` built-in]: https://magicant.github.io/yash-rs/builtins/shift.html
 
+use crate::common::help::{
+    BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+    print_help_of_current_builtin,
+};
 use crate::common::report::{report_error, report_failure, syntax_error};
-use crate::common::syntax::{Mode, parse_arguments};
+use crate::common::syntax::Mode;
 use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::semantics::Field;
@@ -33,13 +37,25 @@ use yash_env::source::pretty::{
 use yash_env::system::Isatty;
 use yash_env::system::concurrency::WriteAll;
 
+// TODO Support non-POSIX options
+const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION]);
+
+/// Help information of the `shift` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "remove positional parameters",
+    usage: &["shift [n]"],
+    options: OPTION_SPECS.get(),
+    manual_page_name: "shift",
+};
+
 pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
     S: Isatty + WriteAll,
 {
-    // TODO Support non-POSIX options
-    let args = match parse_arguments(&[], Mode::with_env(env), args) {
-        Ok((_options, operands)) => operands,
+    let mode = Mode::with_env(env);
+    let args = match parse_arguments_with_help(OPTION_SPECS, mode, args) {
+        Ok(WithHelp::Main((_options, operands))) => operands,
+        Ok(WithHelp::Help) => return print_help_of_current_builtin(env).await,
         Err(error) => return report_error(env, &error).await,
     };
 

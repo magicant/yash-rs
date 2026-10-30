@@ -43,6 +43,7 @@
 //! [`RunFunction`]: yash_env::semantics::command::RunFunction
 //! [`type`]: crate::type
 
+use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
 use crate::common::report::report_error;
 use enumset::EnumSet;
 use enumset::EnumSetType;
@@ -215,6 +216,14 @@ mod invoke;
 pub mod search;
 pub mod syntax;
 
+/// Help information of the `command` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "execute or identify a command bypassing functions",
+    usage: &["command [-p] name [argument...]", "command -v|-V [-p] name"],
+    options: syntax::OPTION_SPECS.get(),
+    manual_page_name: "command",
+};
+
 /// Entry point of the `command` built-in
 ///
 /// This function parses the arguments into [`Command`] and executes it.
@@ -247,7 +256,8 @@ where
         + 'static,
 {
     match syntax::parse(env, args) {
-        Ok(command) => command.execute(env).await,
+        Ok(WithHelp::Main(command)) => command.execute(env).await,
+        Ok(WithHelp::Help) => print_help_of_current_builtin(env).await,
         Err(error) => report_error(env, &error).await,
     }
 }

@@ -32,6 +32,8 @@ When a [subshell](../environment/index.html#subshells) is entered, traps with a 
 
 The **`-p`** (**`--print`**) option prints the traps configured in the [shell environment].
 
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
+
 ## Operands
 
 An ***action*** specifies what to do when the trap condition is met. It may be one of the following:
@@ -101,7 +103,7 @@ trap -- '' INT
 
 The `trap` built-in is specified by POSIX.1-2024.
 
-The `--print` long option name is a non-standard extension.
+The `--print` long option name and the `--help` option are a non-standard extension.
 
 (Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, using it is rejected with an error. Use `-p` instead.
 

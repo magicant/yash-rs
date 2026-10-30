@@ -262,3 +262,25 @@ test_O -d -e 1 'printing to closed stream: printing specific traps (with -p)'
 trap '' USR1
 trap -p USR1 >&-
 __IN__
+
+test_oE -e 0 'help option prints help without exiting the shell'
+trap --help
+echo $?
+__IN__
+trap: set or print traps
+
+Usage:
+  trap [action] condition...
+  trap [-p [condition...]]
+
+Options:
+  -p, --print  print the traps for the operands, or all traps if none
+      --help   print this help
+
+See <https://magicant.github.io/yash-rs/builtins/trap.html> for details.
+0
+__OUT__
+
+test_O -d -e 2 'help option with another option'
+trap --help -p
+__IN__

@@ -27,8 +27,12 @@
 //! environment's [`any`](yash_env::Env::any) storage.
 
 use crate::Result;
+use crate::common::help::{
+    BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+    print_help_of_current_builtin,
+};
 use crate::common::report::report_error;
-use crate::common::syntax::{Mode, parse_arguments};
+use crate::common::syntax::Mode;
 use std::cell::RefCell;
 use std::rc::Rc;
 use yash_env::Env;
@@ -40,6 +44,17 @@ use yash_env::semantics::{Field, RunReadEvalLoop};
 use yash_env::source::Source;
 use yash_env::system::Isatty;
 use yash_env::system::concurrency::WriteAll;
+
+// TODO Support non-POSIX options
+const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION]);
+
+/// Help information of the `eval` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "evaluate arguments as shell commands",
+    usage: &["eval [command...]"],
+    options: OPTION_SPECS.get(),
+    manual_page_name: "eval",
+};
 
 /// Entry point of the `eval` built-in execution
 ///
@@ -56,9 +71,10 @@ pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
     S: Isatty + WriteAll + 'static,
 {
-    // TODO Support non-POSIX options
-    let args = match parse_arguments(&[], Mode::with_env(env), args) {
-        Ok((_options, operands)) => operands,
+    let mode = Mode::with_env(env);
+    let args = match parse_arguments_with_help(OPTION_SPECS, mode, args) {
+        Ok(WithHelp::Main((_options, operands))) => operands,
+        Ok(WithHelp::Help) => return print_help_of_current_builtin(env).await,
         Err(error) => return report_error(env, &error).await,
     };
 

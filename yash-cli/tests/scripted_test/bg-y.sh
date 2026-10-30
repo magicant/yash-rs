@@ -35,3 +35,21 @@ bg: 2
 job is stopped
 __OUT__
 )
+
+test_oE -e 0 'help option prints help'
+bg --help
+__IN__
+bg: resume jobs in the background
+
+Usage:
+  bg [job_id...]
+
+Options:
+      --help  print this help
+
+See <https://magicant.github.io/yash-rs/builtins/bg.html> for details.
+__OUT__
+
+test_O -d -e 2 'help option with another operand'
+bg --help %1
+__IN__

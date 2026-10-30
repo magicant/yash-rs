@@ -27,6 +27,8 @@ immediately.
   built-in prints a warning and returns a non-zero exit status if there are
   any suspended jobs in an interactive shell.
 
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
+
 ## Operands
 
 The optional ***exit_status*** operand, if given, should be a non-negative
@@ -83,6 +85,8 @@ $ exit -f
 ## Compatibility
 
 The `exit` built-in is specified by POSIX.1-2024.
+
+The `--help` option is a non-standard extension.
 
 In some shells, the `exit` built-in lacks support for the [`--` separator](index.html#separators).
 

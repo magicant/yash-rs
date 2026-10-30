@@ -33,6 +33,8 @@ pathname of the utility, if found.
 The **`-V`** (**`--verbose-identify`**) option identifies the type of the command name and prints a
 more detailed description of the utility.
 
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
+
 ## Operands
 
 The ***name*** operand specifies the name of the utility to execute or
@@ -76,7 +78,7 @@ See [Replacing existing utilities](../language/functions.md#replacing-existing-u
 
 ## Compatibility
 
-The long option names (`--path`, `--identify`, `--verbose-identify`) are a non-standard extension.
+The long option names (`--path`, `--identify`, `--verbose-identify`) and the `--help` option are a non-standard extension.
 
 (Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, using a long option name is rejected with an error. Use the corresponding short option instead.
 
