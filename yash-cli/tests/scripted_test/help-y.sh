@@ -67,3 +67,40 @@ Options:
 
 See <https://magicant.github.io/yash-rs/builtins/help.html> for details.
 __OUT__
+
+test_oE -e 0 'printing help of built-ins that do not accept --help'
+help : true false
+__IN__
+:: do nothing
+
+Usage:
+  : [argument...]
+
+See <https://magicant.github.io/yash-rs/builtins/colon.html> for details.
+
+true: do nothing, successfully
+
+Usage:
+  true
+
+See <https://magicant.github.io/yash-rs/builtins/true.html> for details.
+
+false: do nothing, unsuccessfully
+
+Usage:
+  false
+
+See <https://magicant.github.io/yash-rs/builtins/false.html> for details.
+__OUT__
+
+test_OE -e 0 'colon built-in ignores --help'
+: --help
+__IN__
+
+test_OE -e 0 'true built-in ignores --help'
+true --help
+__IN__
+
+test_OE -e 1 'false built-in ignores --help'
+false --help
+__IN__

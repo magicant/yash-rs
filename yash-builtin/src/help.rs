@@ -62,6 +62,7 @@ impl Default for HelpTable {
     fn default() -> Self {
         Self(HashMap::from([
             (".", &crate::source::HELP as &dyn Help),
+            (":", &crate::colon::HELP),
             ("alias", &crate::alias::HELP),
             ("bg", &crate::bg::HELP),
             ("break", &crate::r#break::HELP),
@@ -71,6 +72,7 @@ impl Default for HelpTable {
             ("eval", &crate::eval::HELP),
             ("exec", &crate::exec::HELP),
             ("exit", &crate::exit::HELP),
+            ("false", &crate::r#false::HELP),
             ("fg", &crate::fg::HELP),
             ("getopts", &crate::getopts::HELP),
             ("help", &HELP),
@@ -81,6 +83,7 @@ impl Default for HelpTable {
             ("source", &crate::source::HELP),
             ("times", &crate::times::HELP),
             ("trap", &crate::trap::HELP),
+            ("true", &crate::r#true::HELP),
             ("type", &crate::r#type::HELP),
             ("ulimit", &crate::ulimit::HELP),
             ("umask", &crate::umask::HELP),
