@@ -51,7 +51,7 @@ const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION
 /// Help information of the `eval` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "evaluate arguments as shell commands",
-    usage: &["eval [command...]"],
+    usage: &["eval [COMMAND...]"],
     options: OPTION_SPECS.get(),
     manual_page_name: "eval",
 };

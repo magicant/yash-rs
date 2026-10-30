@@ -191,7 +191,7 @@ const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION
 /// Help information of the `fg` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "resume a job in the foreground",
-    usage: &["fg [job_id]"],
+    usage: &["fg [JOB_ID]"],
     options: OPTION_SPECS.get(),
     manual_page_name: "fg",
 };

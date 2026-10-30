@@ -5,7 +5,7 @@ The **`fg`** resumes a suspended job in the foreground.
 ## Synopsis
 
 ```sh
-fg [job_id]
+fg [JOB_ID]
 ```
 
 ## Description

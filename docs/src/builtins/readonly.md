@@ -16,7 +16,7 @@ If the `-p` (`--print`)<!-- TODO: or `-f` (`--functions`) --> option is not spec
 ### Synopsis
 
 ```sh
-readonly name[=value]…
+readonly NAME[=VALUE]…
 ```
 
 ### Options
@@ -40,7 +40,7 @@ If the `-p` (`--print`) option is specified<!-- TODO: and the `-f` (`--functions
 ### Synopsis
 
 ```sh
-readonly -p [name…]
+readonly -p [NAME…]
 ```
 
 ```sh
@@ -71,7 +71,7 @@ If the `-f` (`--functions`) option is specified, the built-in makes the specifie
 ### Synopsis
 
 ```sh
-readonly -f name…
+readonly -f NAME…
 ```
 
 ### Options
@@ -94,7 +94,7 @@ If the `-f` (`--functions`) and `-p` (`--print`) options are specified, the buil
 ### Synopsis
 
 ```sh
-readonly -fp [name…]
+readonly -fp [NAME…]
 ```
 
 ```sh
@@ -159,7 +159,7 @@ When the [`portable` option](../environment/options.md#portable) is set, these a
 
 - (Since 3.3.3) Making the `PWD`, `OLDPWD`, `OPTIND`, `OPTARG`, or `LINENO` [variable][variables] read-only, since POSIX requires the shell to be able to update these variables.
 - (Since 3.3.3) Making a variable read-only if its name contains a character other than ASCII letters, digits, and underscores, or starts with a digit.
-- (Since 3.3.5) Invoking the built-in without operands and without the `-p` option, or with the `-p` option and one or more operands. POSIX specifies only the `readonly name…` and `readonly -p` forms.
+- (Since 3.3.5) Invoking the built-in without operands and without the `-p` option, or with the `-p` option and one or more operands. POSIX specifies only the `readonly NAME…` and `readonly -p` forms.
 - (Since 3.3.5) Using the `--print` option, spelled out in full or abbreviated. Use `-p` instead.
 
 [variables]: ../language/parameters/variables.md

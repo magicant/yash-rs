@@ -5,7 +5,7 @@ The colon (**`:`**) built-in does nothing.
 ## Synopsis
 
 ```sh
-: […]
+: [ARGUMENT…]
 ```
 
 ## Description

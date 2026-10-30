@@ -7,7 +7,7 @@ __IN__
 continue: resume the next iteration of loops
 
 Usage:
-  continue [n]
+  continue [N]
 
 Options:
       --help  print this help

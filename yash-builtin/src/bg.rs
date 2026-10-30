@@ -231,7 +231,7 @@ const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION
 /// Help information of the `bg` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "resume jobs in the background",
-    usage: &["bg [job_id...]"],
+    usage: &["bg [JOB_ID...]"],
     options: OPTION_SPECS.get(),
     manual_page_name: "bg",
 };

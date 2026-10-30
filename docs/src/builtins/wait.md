@@ -5,7 +5,7 @@ The **`wait`** built-in waits for jobs to finish.
 ## Synopsis
 
 ```sh
-wait [job_id_or_process_id…]
+wait [JOB_ID_OR_PROCESS_ID…]
 ```
 
 ## Description

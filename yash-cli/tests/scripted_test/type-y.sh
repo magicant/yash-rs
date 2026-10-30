@@ -261,7 +261,7 @@ __IN__
 type: identify the type of commands
 
 Usage:
-  type [name...]
+  type [NAME...]
 
 Options:
       --help  print this help

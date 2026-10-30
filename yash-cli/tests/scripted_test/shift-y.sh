@@ -7,7 +7,7 @@ __IN__
 shift: remove positional parameters
 
 Usage:
-  shift [n]
+  shift [N]
 
 Options:
       --help  print this help

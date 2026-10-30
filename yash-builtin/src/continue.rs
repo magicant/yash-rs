@@ -46,7 +46,7 @@ pub use super::r#break::syntax;
 /// Help information of the `continue` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "resume the next iteration of loops",
-    usage: &["continue [n]"],
+    usage: &["continue [N]"],
     options: syntax::OPTION_SPECS.get(),
     manual_page_name: "continue",
 };

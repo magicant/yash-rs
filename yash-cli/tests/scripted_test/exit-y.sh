@@ -19,7 +19,7 @@ __IN__
 exit: exit the shell
 
 Usage:
-  exit [-f] [exit_status]
+  exit [-f] [EXIT_STATUS]
 
 Options:
   -f, --force  exit even if there are suspended jobs

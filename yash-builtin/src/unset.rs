@@ -58,7 +58,7 @@ pub mod syntax;
 /// Help information of the `unset` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "unset variables or functions",
-    usage: &["unset [-f|-v] name..."],
+    usage: &["unset [-f|-v] NAME..."],
     options: syntax::OPTION_SPECS.get(),
     manual_page_name: "unset",
 };

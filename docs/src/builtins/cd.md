@@ -5,7 +5,7 @@ The **`cd`** built-in changes the [working directory](../environment/working_dir
 ## Synopsis
 
 ```sh
-cd [-L|-P [-e]] [directory]
+cd [-L|-P [-e]] [DIRECTORY]
 ```
 
 ### Specifying directory

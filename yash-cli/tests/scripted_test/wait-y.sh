@@ -16,7 +16,7 @@ __IN__
 wait: wait for jobs to finish
 
 Usage:
-  wait [job_id_or_process_id...]
+  wait [JOB_ID_OR_PROCESS_ID...]
 
 Options:
       --help  print this help

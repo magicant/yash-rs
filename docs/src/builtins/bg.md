@@ -5,7 +5,7 @@ The **`bg`** built-in resumes suspended jobs in the background.
 ## Synopsis
 
 ```sh
-bg [job_id…]
+bg [JOB_ID…]
 ```
 
 ## Description

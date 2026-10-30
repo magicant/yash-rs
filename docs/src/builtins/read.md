@@ -5,7 +5,7 @@ The **`read`** built-in reads a line into [variables](../language/parameters/var
 ## Synopsis
 
 ```sh
-read [-d delimiter] [-r] variable…
+read [-d DELIMITER] [-r] VARIABLE…
 ```
 
 ## Description

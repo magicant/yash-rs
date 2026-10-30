@@ -16,7 +16,7 @@ You can specify additional options to set the scope and attributes of the variab
 ### Synopsis
 
 ```sh
-typeset [-grx] [+rx] name[=value]…
+typeset [-grx] [+rx] NAME[=VALUE]…
 ```
 
 ### Options
@@ -75,7 +75,7 @@ If the `-p` (`--print`) option is specified and the `-f` (`--functions`) option 
 ### Synopsis
 
 ```sh
-typeset -p [-grx] [+rx] [name…]
+typeset -p [-grx] [+rx] [NAME…]
 ```
 
 ```sh
@@ -131,7 +131,7 @@ If the `-f` (`--functions`) option is specified, the `-p` (`--print`) option is 
 ### Synopsis
 
 ```sh
-typeset -f [-r] [+r] name…
+typeset -f [-r] [+r] NAME…
 ```
 
 ### Options
@@ -163,7 +163,7 @@ If both the `-f` (`--functions`) and `-p` (`--print`) options are specified, the
 ### Synopsis
 
 ```sh
-typeset -fp [-r] [+r] [name…]
+typeset -fp [-r] [+r] [NAME…]
 ```
 
 ```sh

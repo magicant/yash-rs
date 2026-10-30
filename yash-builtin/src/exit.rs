@@ -90,7 +90,7 @@ const OPTIONS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
 /// Help information of the `exit` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "exit the shell",
-    usage: &["exit [-f] [exit_status]"],
+    usage: &["exit [-f] [EXIT_STATUS]"],
     options: OPTIONS.get(),
     manual_page_name: "exit",
 };

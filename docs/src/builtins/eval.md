@@ -5,7 +5,7 @@ The **`eval`** built-in evaluates the arguments as shell commands.
 ## Synopsis
 
 ```sh
-eval [command…]
+eval [COMMAND…]
 ```
 
 ## Description

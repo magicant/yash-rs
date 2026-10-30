@@ -150,7 +150,7 @@ __IN__
 ulimit: show or set resource limits
 
 Usage:
-  ulimit [-HS] [resource_option] [limit]
+  ulimit [-HS] [RESOURCE_OPTION] [LIMIT]
   ulimit [-H|-S] -a
 
 Options:

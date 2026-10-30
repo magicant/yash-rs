@@ -252,8 +252,8 @@ The syntax and options specified in POSIX.1-2024 are much more limited than thos
 
 POSIX.1-2024 syntax:
 
-- Enable a long option: `set -o optionname` (no `--` prefix).
-- Disable a long option: `set +o optionname` (no `++` prefix).
+- Enable a long option: `set -o NAME` (no `--` prefix).
+- Disable a long option: `set +o NAME` (no `++` prefix).
 - Long options are case-sensitive, must be spelled out in full, cannot contain extra symbols, and must be given as a separate argument: `set -o errexit`, not `set -oerrexit`.
 - No support for `no`-prefix inversion of long options.
 - Enable a short option: `-` followed by the option character.

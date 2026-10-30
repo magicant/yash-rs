@@ -5,7 +5,7 @@ The **`shift`** built-in removes some [positional parameters](../language/parame
 ## Synopsis
 
 ```sh
-shift [n]
+shift [N]
 ```
 
 ## Description

@@ -30,6 +30,10 @@ To link to other sections of the documentation, use relative links in Markdown f
 - In the `src/SUMMARY.md` file, all files are referred to by their true pathnames. Pathnames ending with `/README.md` are converted to `index.html` in their respective directories.
 - In other Markdown files, to link to a file named `README.md`, use the relative path ending with `/index.html` because the pathnames are not converted to `index.html` in the rendered HTML due to <https://github.com/rust-lang/mdBook/issues/984>.
 
+## Writing synopses
+
+In the synopsis of a utility, and wherever the text quotes a form of its command line in inline code, write parameters in upper case, as in `source FILE [ARGUMENT…]`. A code block cannot use italics to tell parameters from literal text. In prose, including where an operand is defined in bold italics (***file***), keep parameters in lower case.
+
 ## Describing the `portable` option
 
 Many pages in `src/builtins` describe utilities whose behavior depends on the [`portable` shell option](src/environment/options.md#portable). Keep the description of the option confined to the Compatibility section so that readers who do not use the option are not distracted by it:

@@ -42,7 +42,7 @@ __IN__
 bg: resume jobs in the background
 
 Usage:
-  bg [job_id...]
+  bg [JOB_ID...]
 
 Options:
       --help  print this help

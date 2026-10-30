@@ -5,12 +5,12 @@ The **`exit`** built-in causes the currently executing shell to exit.
 ## Synopsis
 
 ```sh
-exit [-f] [exit_status]
+exit [-f] [EXIT_STATUS]
 ```
 
 ## Description
 
-`exit exit_status` makes the shell exit from the currently executing
+`exit EXIT_STATUS` makes the shell exit from the currently executing
 environment with the specified exit status.
 
 The shell executes the [EXIT trap](../termination.md#exit-trap), if any, before exiting, except when the built-in is invoked in the trap itself.

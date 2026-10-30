@@ -277,7 +277,7 @@ impl Command {
 /// Help information of the `trap` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "set or print traps",
-    usage: &["trap [action] condition...", "trap [-p [condition...]]"],
+    usage: &["trap [ACTION] CONDITION...", "trap [-p [CONDITION...]]"],
     options: syntax::OPTION_SPECS.get(),
     manual_page_name: "trap",
 };

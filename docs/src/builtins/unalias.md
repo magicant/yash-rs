@@ -5,7 +5,7 @@ The **`unalias`** built-in removes [alias](../language/aliases.md) definitions.
 ## Synopsis
 
 ```sh
-unalias name…
+unalias NAME…
 ```
 
 ```sh

@@ -7,7 +7,7 @@ __IN__
 break: exit from loops
 
 Usage:
-  break [n]
+  break [N]
 
 Options:
       --help  print this help

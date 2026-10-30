@@ -5,7 +5,7 @@ The **`type`** built-in identifies the type of commands.
 ## Synopsis
 
 ```sh
-type [name…]
+type [NAME…]
 ```
 
 ## Description

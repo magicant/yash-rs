@@ -137,7 +137,7 @@ impl Command {
 /// Help information of the `wait` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "wait for jobs to finish",
-    usage: &["wait [job_id_or_process_id...]"],
+    usage: &["wait [JOB_ID_OR_PROCESS_ID...]"],
     options: syntax::OPTION_SPECS.get(),
     manual_page_name: "wait",
 };

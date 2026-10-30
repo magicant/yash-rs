@@ -51,7 +51,7 @@ const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION
 /// Help information of the `help` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "print the help of built-ins",
-    usage: &["help [name...]"],
+    usage: &["help [NAME...]"],
     options: OPTION_SPECS.get(),
     manual_page_name: "help",
 };
@@ -389,7 +389,7 @@ mod tests {
         assert_stdout(&system.state, |stdout| {
             assert!(
                 stdout
-                    .starts_with("help: print the help of built-ins\n\nUsage:\n  help [name...]\n"),
+                    .starts_with("help: print the help of built-ins\n\nUsage:\n  help [NAME...]\n"),
                 "stdout = {stdout:?}"
             )
         });

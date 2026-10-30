@@ -5,12 +5,12 @@ The **`return`** built-in quits the currently executing innermost [function](../
 ## Synopsis
 
 ```sh
-return [-n] [exit_status]
+return [-n] [EXIT_STATUS]
 ```
 
 ## Description
 
-`return exit_status` makes the shell return from the currently executing
+`return EXIT_STATUS` makes the shell return from the currently executing
 function or script with the specified exit status.
 
 If the shell is not executing a function or script, the built-in will work like [`exit`](exit.md), but this behavior may change in the future.

@@ -5,7 +5,7 @@ The **`unset`** built-in unsets [variables](../language/parameters/variables.md)
 ## Synopsis
 
 ```sh
-unset [-f|-v] name…
+unset [-f|-v] NAME…
 ```
 
 ## Description

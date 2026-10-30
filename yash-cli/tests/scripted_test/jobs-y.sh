@@ -43,7 +43,7 @@ __IN__
 jobs: print the status of jobs
 
 Usage:
-  jobs [-l|-p] [job_id...]
+  jobs [-l|-p] [JOB_ID...]
 
 Options:
   -l, --verbose    print the process ID as well

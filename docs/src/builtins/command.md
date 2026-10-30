@@ -6,11 +6,11 @@ This is useful when you want to execute a utility that has the same name as a fu
 ## Synopsis
 
 ```sh
-command [-p] name [arguments…]
+command [-p] NAME [ARGUMENT…]
 ```
 
 ```sh
-command -v|-V [-p] name
+command -v|-V [-p] NAME
 ```
 
 ## Description
@@ -94,7 +94,7 @@ POSIX allows only one *name* operand with the `-v` or `-V` option, but this
 implementation identifies every operand given. (Since 3.3.5) The
 [`portable` option](../environment/options.md#portable) rejects a surplus
 operand with an error. Note that the
-[`type` built-in](type.md), for which POSIX specifies `type name…`, accepts
+[`type` built-in](type.md), for which POSIX specifies `type NAME…`, accepts
 more than one operand regardless of the option.
 
 (Since 3.3.4) When the [`portable` option](../environment/options.md#portable)

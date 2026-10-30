@@ -219,7 +219,7 @@ pub mod syntax;
 /// Help information of the `command` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "execute or identify a command bypassing functions",
-    usage: &["command [-p] name [argument...]", "command -v|-V [-p] name"],
+    usage: &["command [-p] NAME [ARGUMENT...]", "command -v|-V [-p] NAME"],
     options: syntax::OPTION_SPECS.get(),
     manual_page_name: "command",
 };
