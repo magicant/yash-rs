@@ -38,6 +38,8 @@ Multibyte characters are not supported.
 The **`-r`** (**`--raw-mode`**) option disables the interpretation of
 backslashes.
 
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
+
 ## Operands
 
 One or more operands are required.
@@ -142,7 +144,7 @@ $ printf '[%s]\n' "$line"
 
 POSIX.1-2024 defines the `read` built-in with the `-d` and `-r` options. Previous versions of yash supported additional options, which are not yet implemented in yash-rs.
 
-The long option names (`--delimiter`, `--raw-mode`) are a non-standard extension.
+The long option names (`--delimiter`, `--raw-mode`) and the `--help` option are non-standard extensions.
 
 (Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, using a long option name is rejected with an error. Use the corresponding short option instead.
 

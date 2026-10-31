@@ -2,6 +2,46 @@
 
 setup -d
 
+test_oE -e 0 'help option prints help'
+read --help
+__IN__
+read: read a line into variables
+
+Usage:
+  read [-d DELIMITER] [-r] VARIABLE...
+
+Options:
+  -d, --delimiter=DELIMITER  stop reading at DELIMITER instead of a newline
+  -r, --raw-mode             do not interpret backslashes
+      --help                 print this help
+
+See <https://magicant.github.io/yash-rs/builtins/read.html> for details.
+__OUT__
+
+test_oE -e 0 'help built-in prints help of read'
+help read
+__IN__
+read: read a line into variables
+
+Usage:
+  read [-d DELIMITER] [-r] VARIABLE...
+
+Options:
+  -d, --delimiter=DELIMITER  stop reading at DELIMITER instead of a newline
+  -r, --raw-mode             do not interpret backslashes
+      --help                 print this help
+
+See <https://magicant.github.io/yash-rs/builtins/read.html> for details.
+__OUT__
+
+test_O -d -e 4 'help option with another option'
+read --help -r
+__IN__
+
+test_O -d -e 4 'help option with an operand'
+read --help var
+__IN__
+
 test_oE 'input ending with backslash - not raw mode'
 printf '%s' 'A\' | {
 read a

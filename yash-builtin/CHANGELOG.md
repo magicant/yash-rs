@@ -41,9 +41,10 @@ A _private dependency_ is used internally and not visible to downstream users.
   `parse_arguments_with_help` if `--help` is given with other options or
   operands.
 - `HELP` in the `alias`, `bg`, `break`, `cd`, `colon`, `command`, `continue`,
-  `eval`, `exec`, `exit`, `false`, `fg`, `getopts`, `jobs`, `pwd`, `return`,
-  `shift`, `source`, `times`, `trap`, `true`, `type`, `ulimit`, `umask`,
-  `unalias`, `unset`, and `wait` modules, the help of the respective built-ins.
+  `eval`, `exec`, `exit`, `false`, `fg`, `getopts`, `jobs`, `pwd`, `read`,
+  `return`, `shift`, `source`, `times`, `trap`, `true`, `type`, `ulimit`,
+  `umask`, `unalias`, `unset`, and `wait` modules, the help of the respective
+  built-ins.
 - `common::syntax::OptionSpec::description` and
   `common::syntax::OptionSpec::get_description` set and get the description of
   an option shown in the help.
@@ -52,15 +53,16 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - `iter` now includes the `help` built-in as an elective built-in.
 - `main` in the `alias`, `bg`, `break`, `cd`, `command`, `continue`, `eval`,
-  `exec`, `exit`, `fg`, `getopts`, `jobs`, `pwd`, `return`, `shift`, `source`,
-  `times`, `trap`, `type`, `ulimit`, `umask`, `unalias`, `unset`, and `wait`
-  modules now prints the help of the respective built-in if `--help` is the only
-  argument.
+  `exec`, `exit`, `fg`, `getopts`, `jobs`, `pwd`, `read`, `return`, `shift`,
+  `source`, `times`, `trap`, `type`, `ulimit`, `umask`, `unalias`, `unset`, and
+  `wait` modules now prints the help of the respective built-in if `--help` is
+  the only argument.
 - `parse` in the `break::syntax`, `cd::syntax`, `command::syntax`,
-  `pwd::syntax`, `source::syntax`, `ulimit::syntax`, `umask::syntax`,
-  `unalias::syntax`, `unset::syntax`, and `wait::syntax` modules now recognizes
-  `--help` and returns its previous result wrapped in `WithHelp`. The `Result`
-  type alias in each of these modules, if any, is changed accordingly.
+  `pwd::syntax`, `read::syntax`, `source::syntax`, `ulimit::syntax`,
+  `umask::syntax`, `unalias::syntax`, `unset::syntax`, and `wait::syntax` modules
+  now recognizes `--help` and returns its previous result wrapped in `WithHelp`.
+  The `Result` type alias in each of these modules, if any, is changed
+  accordingly.
 - `trap::syntax::OPTION_SPECS` and `unalias::syntax::OPTION_SPECS` are now
   `OptionSpecsWithHelp` including `common::help::HELP_OPTION` and have a
   description for each option.
