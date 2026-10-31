@@ -30,6 +30,7 @@
 //! be available in the environment's [`any`](yash_env::Env::any) storage. If no
 //! such instance is found, the built-in will **panic**.
 
+use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
 use crate::common::report::{merge_reports, report, report_simple};
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
@@ -55,6 +56,14 @@ pub const EXIT_STATUS_READ_ERROR: ExitStatus = ExitStatus(3);
 
 /// Exit status on a command line syntax error
 pub const EXIT_STATUS_SYNTAX_ERROR: ExitStatus = ExitStatus(4);
+
+/// Help information of the `read` built-in
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "read a line into variables",
+    usage: &["read [-d DELIMITER] [-r] VARIABLE..."],
+    options: syntax::OPTION_SPECS.get(),
+    manual_page_name: "read",
+};
 
 /// Abstract command line arguments of the `read` built-in
 ///
@@ -89,7 +98,8 @@ where
     S: Isatty + Read + WriteAll + 'static,
 {
     let command = match syntax::parse(env, args) {
-        Ok(command) => command,
+        Ok(WithHelp::Main(command)) => command,
+        Ok(WithHelp::Help) => return print_help_of_current_builtin(env).await,
         Err(error) => return report(env, &error, EXIT_STATUS_SYNTAX_ERROR).await,
     };
 

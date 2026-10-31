@@ -93,9 +93,7 @@
 //! }
 //! ```
 
-use super::syntax::{
-    Mode, OptionArgumentSpec, OptionOccurrence, OptionSpec, ParseError, parse_arguments,
-};
+use super::syntax::{Mode, OptionOccurrence, OptionSpec, ParseError, parse_arguments};
 use std::borrow::Cow;
 use std::fmt::Write as _;
 use std::ops::Deref;
@@ -161,7 +159,7 @@ const fn is_help_option(spec: &OptionSpec) -> bool {
     };
     spec.get_short().is_none()
         && str_eq(long, "help")
-        && matches!(spec.get_argument(), OptionArgumentSpec::None)
+        && spec.get_argument().is_none()
         && spec.is_extension() == HELP_OPTION.is_extension()
         && str_eq(spec.get_description(), HELP_OPTION.get_description())
 }
@@ -285,13 +283,17 @@ pub struct BuiltinHelp {
 }
 
 fn option_name(spec: &OptionSpec) -> String {
-    // TODO: Show the name of the option argument
-    match (spec.get_short(), spec.get_long()) {
+    let mut name = match (spec.get_short(), spec.get_long()) {
         (Some(short), Some(long)) => format!("-{short}, --{long}"),
         (Some(short), None) => format!("-{short}"),
         (None, Some(long)) => format!("    --{long}"),
         (None, None) => String::new(),
+    };
+    if let Some(argument) = spec.get_argument() {
+        let separator = if spec.get_long().is_some() { '=' } else { ' ' };
+        write!(name, "{separator}{argument}").unwrap();
     }
+    name
 }
 
 impl Help for BuiltinHelp {
@@ -550,6 +552,45 @@ Options:
   -a           do A
   -b, --bravo  do B
       --help   print this help
+
+See <https://magicant.github.io/yash-rs/builtins/foo.html> for details.
+"
+        );
+    }
+
+    #[test]
+    fn message_with_option_arguments() {
+        static HELP: BuiltinHelp = BuiltinHelp {
+            summary: "do something",
+            usage: &["foo"],
+            options: &[
+                OptionSpec::new()
+                    .short('a')
+                    .long("all")
+                    .argument("ALL")
+                    .description("both names"),
+                OptionSpec::new()
+                    .short('b')
+                    .argument("BAR")
+                    .description("short name only"),
+                OptionSpec::new()
+                    .long("baz")
+                    .argument("BAZ")
+                    .description("long name only"),
+            ],
+            manual_page_name: "foo",
+        };
+
+        assert_eq!(
+            HELP.message(),
+            "\
+Usage:
+  foo
+
+Options:
+  -a, --all=ALL  both names
+  -b BAR         short name only
+      --baz=BAZ  long name only
 
 See <https://magicant.github.io/yash-rs/builtins/foo.html> for details.
 "

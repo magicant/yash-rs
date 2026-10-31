@@ -90,6 +90,7 @@ impl Default for HelpTable {
             ("help", &HELP),
             ("jobs", &crate::jobs::HELP),
             ("pwd", &crate::pwd::HELP),
+            ("read", &crate::read::HELP),
             ("return", &crate::r#return::HELP),
             ("shift", &crate::shift::HELP),
             ("source", &crate::source::HELP),

@@ -17,10 +17,9 @@
 //! Command line argument parser for the read built-in
 
 use super::Command;
+use crate::common::help::{HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help};
 use crate::common::syntax::Mode;
-use crate::common::syntax::OptionArgumentSpec;
 use crate::common::syntax::OptionSpec;
-use crate::common::syntax::parse_arguments;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::option::Option::Portable;
@@ -108,18 +107,26 @@ impl<'a> From<&'a Error> for Report<'a> {
     }
 }
 
-const OPTION_SPECS: &[OptionSpec] = &[
+pub(super) const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
     OptionSpec::new()
         .short('d')
         .long("delimiter")
-        .argument(OptionArgumentSpec::Required),
-    OptionSpec::new().short('r').long("raw-mode"),
-];
+        .argument("DELIMITER")
+        .description("stop reading at DELIMITER instead of a newline"),
+    OptionSpec::new()
+        .short('r')
+        .long("raw-mode")
+        .description("do not interpret backslashes"),
+    HELP_OPTION,
+]);
 
 /// Parses command line arguments.
-pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
+pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<WithHelp<Command>, Error> {
     let mode = Mode::with_env(env);
-    let (options, operands) = parse_arguments(OPTION_SPECS, mode, args)?;
+    let WithHelp::Main((options, operands)) = parse_arguments_with_help(OPTION_SPECS, mode, args)?
+    else {
+        return Ok(WithHelp::Help);
+    };
 
     // Parse options
     let mut delimiter = b'\n';
@@ -144,12 +151,12 @@ pub fn parse<S>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
     let mut variables = validate_names(operands, portable)?;
     let last_variable = variables.pop().ok_or(Error::MissingOperand)?;
 
-    Ok(Command {
+    Ok(WithHelp::Main(Command {
         delimiter,
         is_raw,
         variables,
         last_variable,
-    })
+    }))
 }
 
 /// Tests if all the variable names are valid.
@@ -185,12 +192,12 @@ mod tests {
         let env = Env::new_virtual();
         assert_eq!(
             parse(&env, Field::dummies(["var"])),
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 delimiter: b'\n',
                 is_raw: false,
                 variables: vec![],
                 last_variable: Field::dummy("var"),
-            })
+            }))
         );
     }
 
@@ -199,12 +206,12 @@ mod tests {
         let env = Env::new_virtual();
         assert_eq!(
             parse(&env, Field::dummies(["-r", "var"])),
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 delimiter: b'\n',
                 is_raw: true,
                 variables: vec![],
                 last_variable: Field::dummy("var"),
-            })
+            }))
         );
     }
 
@@ -213,12 +220,12 @@ mod tests {
         let env = Env::new_virtual();
         assert_eq!(
             parse(&env, Field::dummies(["-d", "", "var"])),
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 delimiter: b'\0',
                 is_raw: false,
                 variables: vec![],
                 last_variable: Field::dummy("var"),
-            })
+            }))
         );
     }
 
@@ -227,12 +234,12 @@ mod tests {
         let env = Env::new_virtual();
         assert_eq!(
             parse(&env, Field::dummies(["-d", ":", "var"])),
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 delimiter: b':',
                 is_raw: false,
                 variables: vec![],
                 last_variable: Field::dummy("var"),
-            })
+            }))
         );
     }
 
@@ -259,23 +266,29 @@ mod tests {
         let env = Env::new_virtual();
         assert_eq!(
             parse(&env, Field::dummies(["foo", "bar"])),
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 delimiter: b'\n',
                 is_raw: false,
                 variables: Field::dummies(["foo"]),
                 last_variable: Field::dummy("bar"),
-            })
+            }))
         );
 
         assert_eq!(
             parse(&env, Field::dummies(["first", "second", "third"])),
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 delimiter: b'\n',
                 is_raw: false,
                 variables: Field::dummies(["first", "second"]),
                 last_variable: Field::dummy("third"),
-            })
+            }))
         );
+    }
+
+    #[test]
+    fn help_option() {
+        let env = Env::new_virtual();
+        assert_eq!(parse(&env, Field::dummies(["--help"])), Ok(WithHelp::Help));
     }
 
     #[test]
@@ -343,12 +356,12 @@ mod tests {
         env.options.set(Portable, State::On);
         assert_eq!(
             parse(&env, Field::dummies(["foo", "_bar123"])),
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 delimiter: b'\n',
                 is_raw: false,
                 variables: Field::dummies(["foo"]),
                 last_variable: Field::dummy("_bar123"),
-            })
+            }))
         );
     }
 
@@ -357,12 +370,12 @@ mod tests {
         let env = Env::new_virtual();
         assert_eq!(
             parse(&env, Field::dummies(["foo-bar"])),
-            Ok(Command {
+            Ok(WithHelp::Main(Command {
                 delimiter: b'\n',
                 is_raw: false,
                 variables: vec![],
                 last_variable: Field::dummy("foo-bar"),
-            })
+            }))
         );
     }
 }
