@@ -45,7 +45,7 @@
 //! let specs = &[
 //!     OptionSpec::new().short('a'),
 //!     OptionSpec::new().short('b').long("bar"),
-//!     OptionSpec::new().long("baz").argument(OptionArgumentSpec::Required),
+//!     OptionSpec::new().long("baz").argument("BAZ"),
 //! ];
 //!
 //! let arguments = Field::dummies(["-ba", "--baz", "--", "--bar", "--", "-a", "foo"]);
@@ -74,26 +74,13 @@ use yash_env::source::{
 pub use yash_env::semantics::Field;
 use yash_quote::quoted;
 
-/// Specification for an options's argument
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-#[non_exhaustive]
-pub enum OptionArgumentSpec {
-    /// The option does not take an argument. (default)
-    #[default]
-    None,
-    /// The option requires an argument.
-    Required,
-    // /// The option may have an argument.
-    // Optional,
-}
-
 /// Specification of an option
 ///
 /// This structure may contain the following properties:
 ///
 /// - Short option name (a single character)
 /// - Long option name (a string)
-/// - Whether this option takes an argument
+/// - Name of the argument this option takes, if any
 /// - Whether this option is a non-portable extension
 /// - Description of this option shown in the help message
 ///
@@ -103,7 +90,7 @@ pub enum OptionArgumentSpec {
 pub struct OptionSpec<'a> {
     short: Option<char>,
     long: Option<&'a str>,
-    argument: OptionArgumentSpec,
+    argument: Option<&'a str>,
     extension: bool,
     description: &'a str,
 }
@@ -114,7 +101,7 @@ impl OptionSpec<'static> {
         OptionSpec {
             short: None,
             long: None,
-            argument: OptionArgumentSpec::None,
+            argument: None,
             extension: false,
             description: "",
         }
@@ -166,20 +153,25 @@ impl<'a> OptionSpec<'a> {
     }
 }
 
-impl OptionSpec<'_> {
-    /// Returns whether this option takes an argument.
-    pub const fn get_argument(&self) -> OptionArgumentSpec {
+impl<'a> OptionSpec<'a> {
+    /// Returns the name of the argument this option takes.
+    ///
+    /// The result is `None` if this option does not take an argument.
+    pub const fn get_argument(&self) -> Option<&'a str> {
         self.argument
     }
 
-    /// Specifies whether this option takes an argument.
-    pub fn set_argument(&mut self, argument: OptionArgumentSpec) {
-        self.argument = argument;
+    /// Makes this option require an argument.
+    ///
+    /// The name is shown in the help message of the built-in. It should be in
+    /// upper case.
+    pub fn set_argument(&mut self, name: &'a str) {
+        self.argument = Some(name);
     }
 
     /// Chained version of [`set_argument`](Self::set_argument)
-    pub const fn argument(mut self, argument: OptionArgumentSpec) -> Self {
-        self.argument = argument;
+    pub const fn argument(mut self, name: &'a str) -> Self {
+        self.argument = Some(name);
         self
     }
 }
@@ -585,43 +577,40 @@ fn parse_short_options<'a, I: Iterator<Item = Field>>(
         if spec.is_extension() && !mode.extension_options {
             return Err(ParseError::NonPortableShortOption(c, field, spec));
         }
-        match spec.get_argument() {
-            OptionArgumentSpec::None => {
-                option_occurrences.push(OptionOccurrence {
-                    spec,
-                    location: field.origin.clone(),
-                    spelling: OptionSpelling::Short(index),
-                    argument: None,
-                });
-            }
-            OptionArgumentSpec::Required => {
-                let remainder_len = chars.as_str().len();
-                let location = field.origin.clone();
-                let argument = if remainder_len == 0 {
-                    // The option argument is the next command-line argument.
-                    arguments
-                        .next()
-                        .ok_or(ParseError::MissingOptionArgument(field, spec))?
-                } else {
-                    // The option argument is the rest of the current command-line argument.
-                    if !mode.option_arguments_in_same_field {
-                        return Err(ParseError::UnseparatedOptionArgument(field, spec));
-                    }
-                    // Remove the option name and the hyphen from the field value
-                    let prefix = field.value.len() - remainder_len;
-                    let mut field = field;
-                    field.value.drain(..prefix);
-                    field
-                };
-                option_occurrences.push(OptionOccurrence {
-                    spec,
-                    location,
-                    spelling: OptionSpelling::Short(index),
-                    argument: Some(argument),
-                });
-                break;
-            }
-        };
+        if spec.get_argument().is_none() {
+            option_occurrences.push(OptionOccurrence {
+                spec,
+                location: field.origin.clone(),
+                spelling: OptionSpelling::Short(index),
+                argument: None,
+            });
+        } else {
+            let remainder_len = chars.as_str().len();
+            let location = field.origin.clone();
+            let argument = if remainder_len == 0 {
+                // The option argument is the next command-line argument.
+                arguments
+                    .next()
+                    .ok_or(ParseError::MissingOptionArgument(field, spec))?
+            } else {
+                // The option argument is the rest of the current command-line argument.
+                if !mode.option_arguments_in_same_field {
+                    return Err(ParseError::UnseparatedOptionArgument(field, spec));
+                }
+                // Remove the option name and the hyphen from the field value
+                let prefix = field.value.len() - remainder_len;
+                let mut field = field;
+                field.value.drain(..prefix);
+                field
+            };
+            option_occurrences.push(OptionOccurrence {
+                spec,
+                location,
+                spelling: OptionSpelling::Short(index),
+                argument: Some(argument),
+            });
+            break;
+        }
     }
     Ok(true)
 }
@@ -697,18 +686,18 @@ fn parse_long_option<'a, I: Iterator<Item = Field>>(
     let location = field.origin.clone();
 
     let argument = match (spec.get_argument(), equal) {
-        (OptionArgumentSpec::None, None) => None,
-        (OptionArgumentSpec::None, Some(_)) => {
+        (None, None) => None,
+        (None, Some(_)) => {
             return Err(ParseError::UnexpectedOptionArgument(field, spec));
         }
-        (OptionArgumentSpec::Required, None) => {
+        (Some(_), None) => {
             let argument = arguments.next();
             if argument.is_none() {
                 return Err(ParseError::MissingOptionArgument(field, spec));
             }
             argument
         }
-        (OptionArgumentSpec::Required, Some(index)) => {
+        (Some(_), Some(index)) => {
             let mut field = field;
             field.value.drain(..index + 1); // Remove "--", name, and "="
             Some(field)
@@ -1093,9 +1082,7 @@ mod tests {
 
     #[test]
     fn adjacent_argument_to_short_option() {
-        let specs = &[OptionSpec::new()
-            .short('a')
-            .argument(OptionArgumentSpec::Required)];
+        let specs = &[OptionSpec::new().short('a').argument("ARG")];
 
         let arguments = Field::dummies(["-afoo"]);
         let (options, operands) =
@@ -1128,9 +1115,7 @@ mod tests {
 
     #[test]
     fn separate_argument_to_short_option() {
-        let specs = &[OptionSpec::new()
-            .short('a')
-            .argument(OptionArgumentSpec::Required)];
+        let specs = &[OptionSpec::new().short('a').argument("ARG")];
 
         let arguments = Field::dummies(["-a", "foo"]);
         let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
@@ -1161,15 +1146,9 @@ mod tests {
     #[test]
     fn argument_taking_short_option_after_other_short_options_in_cluster() {
         let specs = &[
-            OptionSpec::new()
-                .short('a')
-                .argument(OptionArgumentSpec::None),
-            OptionSpec::new()
-                .short('b')
-                .argument(OptionArgumentSpec::None),
-            OptionSpec::new()
-                .short('c')
-                .argument(OptionArgumentSpec::Required),
+            OptionSpec::new().short('a'),
+            OptionSpec::new().short('b'),
+            OptionSpec::new().short('c').argument("ARG"),
         ];
 
         let arguments = Field::dummies(["-abcdef"]);
@@ -1190,9 +1169,7 @@ mod tests {
 
     #[test]
     fn empty_argument_to_short_option() {
-        let specs = &[OptionSpec::new()
-            .short('a')
-            .argument(OptionArgumentSpec::Required)];
+        let specs = &[OptionSpec::new().short('a').argument("ARG")];
 
         let arguments = Field::dummies(["-a", ""]);
         let (options, operands) = parse_arguments(specs, Mode::default(), arguments).unwrap();
@@ -1330,9 +1307,7 @@ mod tests {
 
     #[test]
     fn adjacent_argument_to_long_option() {
-        let specs = &[OptionSpec::new()
-            .long("option")
-            .argument(OptionArgumentSpec::Required)];
+        let specs = &[OptionSpec::new().long("option").argument("ARG")];
 
         let arguments = Field::dummies(["--option="]);
         let (options, operands) =
@@ -1367,9 +1342,7 @@ mod tests {
 
     #[test]
     fn separate_argument_to_long_option() {
-        let specs = &[OptionSpec::new()
-            .long("option")
-            .argument(OptionArgumentSpec::Required)];
+        let specs = &[OptionSpec::new().long("option").argument("ARG")];
 
         let arguments = Field::dummies(["--option", ""]);
         let (options, operands) =
@@ -1404,9 +1377,7 @@ mod tests {
 
     #[test]
     fn option_argument_that_looks_like_separator() {
-        let specs = &[OptionSpec::new()
-            .short('a')
-            .argument(OptionArgumentSpec::Required)];
+        let specs = &[OptionSpec::new().short('a').argument("ARG")];
 
         let arguments = Field::dummies(["-a", "argument", "-a", "--", "--", "operand"]);
         let (options, operands) =
@@ -1604,9 +1575,8 @@ mod tests {
 
     #[test]
     fn missing_argument_to_short_option() {
-        use OptionArgumentSpec::Required;
         let specs = &[
-            OptionSpec::new().short('a').argument(Required),
+            OptionSpec::new().short('a').argument("ARG"),
             OptionSpec::new().short('b'),
         ];
 
@@ -1629,10 +1599,9 @@ mod tests {
 
     #[test]
     fn unseparated_argument_to_short_option() {
-        use OptionArgumentSpec::Required;
         let specs = &[
             OptionSpec::new().short('a'),
-            OptionSpec::new().short('b').argument(Required),
+            OptionSpec::new().short('b').argument("ARG"),
         ];
 
         let arguments = Field::dummies(["-barg"]);
@@ -1667,9 +1636,8 @@ mod tests {
 
     #[test]
     fn missing_argument_to_long_option() {
-        use OptionArgumentSpec::Required;
         let specs = &[
-            OptionSpec::new().long("foo").argument(Required),
+            OptionSpec::new().long("foo").argument("ARG"),
             OptionSpec::new().long("bar"),
         ];
 
@@ -1684,9 +1652,8 @@ mod tests {
 
     #[test]
     fn unexpected_argument_to_long_option() {
-        use OptionArgumentSpec::Required;
         let specs = &[
-            OptionSpec::new().long("foo").argument(Required),
+            OptionSpec::new().long("foo").argument("ARG"),
             OptionSpec::new().long("bar"),
         ];
 

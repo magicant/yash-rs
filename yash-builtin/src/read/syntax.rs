@@ -18,7 +18,6 @@
 
 use super::Command;
 use crate::common::syntax::Mode;
-use crate::common::syntax::OptionArgumentSpec;
 use crate::common::syntax::OptionSpec;
 use crate::common::syntax::parse_arguments;
 use thiserror::Error;
@@ -112,7 +111,7 @@ const OPTION_SPECS: &[OptionSpec] = &[
     OptionSpec::new()
         .short('d')
         .long("delimiter")
-        .argument(OptionArgumentSpec::Required),
+        .argument("DELIMITER"),
     OptionSpec::new().short('r').long("raw-mode"),
 ];
 

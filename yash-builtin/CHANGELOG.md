@@ -64,6 +64,14 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `trap::syntax::OPTION_SPECS` and `unalias::syntax::OPTION_SPECS` are now
   `OptionSpecsWithHelp` including `common::help::HELP_OPTION` and have a
   description for each option.
+- `common::syntax::OptionSpec::argument` and `set_argument` now take the name of
+  the option argument, which is shown in the help, and `get_argument` returns
+  the name in an `Option`.
+
+### Removed
+
+- `common::syntax::OptionArgumentSpec`. An option spec now requires an argument
+  if it has the name of the argument.
 
 ## [0.25.0] - 2026-10-06
 
