@@ -136,7 +136,7 @@ impl Command {
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "show or set resource limits",
     usage: &[
-        "ulimit [-HS] [resource_option] [limit]",
+        "ulimit [-HS] [RESOURCE_OPTION] [LIMIT]",
         "ulimit [-H|-S] -a",
     ],
     options: syntax::OPTION_SPECS.get(),

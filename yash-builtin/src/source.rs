@@ -63,7 +63,7 @@ pub struct Command {
 /// Help information of the `.` (`source`) built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "execute commands in a file",
-    usage: &[". file [argument...]", "source file [argument...]"],
+    usage: &[". FILE [ARGUMENT...]", "source FILE [ARGUMENT...]"],
     options: syntax::OPTION_SPECS.get(),
     manual_page_name: "source",
 };

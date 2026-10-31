@@ -68,7 +68,7 @@ const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
 /// Help information of the `return` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "return from a function or script",
-    usage: &["return [-n] [exit_status]"],
+    usage: &["return [-n] [EXIT_STATUS]"],
     options: OPTION_SPECS.get(),
     manual_page_name: "return",
 };

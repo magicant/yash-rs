@@ -47,7 +47,7 @@ const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
 /// Help information of the `type` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "identify the type of commands",
-    usage: &["type [name...]"],
+    usage: &["type [NAME...]"],
     options: OPTION_SPECS.get(),
     manual_page_name: "type",
 };

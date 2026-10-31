@@ -5,12 +5,12 @@ The **`continue`** built-in skips the execution of a [loop] to the next iteratio
 ## Synopsis
 
 ```sh
-continue [n]
+continue [N]
 ```
 
 ## Description
 
-`continue n` interrupts the execution of the *n*th innermost `for`, `while`, or `until` [loop] and resumes its next iteration.  The specified loop must lexically enclose the continue command, that is:
+`continue N` interrupts the execution of the *n*th innermost `for`, `while`, or `until` [loop] and resumes its next iteration.  The specified loop must lexically enclose the continue command, that is:
 
 - The loop is running in the same [execution environment] as the continue command; and
 - The continue command appears inside the condition or body of the loop but not in the body of a [function definition command](../language/functions.md#defining-functions) appearing inside the loop.

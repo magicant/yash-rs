@@ -64,7 +64,7 @@
 //! // The help lists the same options as the built-in accepts.
 //! static HELP: BuiltinHelp = BuiltinHelp {
 //!     summary: "do something with files",
-//!     usage: &["foo [-n] file..."],
+//!     usage: &["foo [-n] FILE..."],
 //!     options: OPTION_SPECS.get(),
 //!     manual_page_name: "foo",
 //! };
@@ -245,7 +245,7 @@ impl<'a> Deref for OptionSpecsWithHelp<'a> {
 ///
 /// static HELP: BuiltinHelp = BuiltinHelp {
 ///     summary: "do something with files",
-///     usage: &["foo [-n] file..."],
+///     usage: &["foo [-n] FILE..."],
 ///     options: OPTION_SPECS.get(),
 ///     manual_page_name: "foo",
 /// };
@@ -255,7 +255,7 @@ impl<'a> Deref for OptionSpecsWithHelp<'a> {
 ///     HELP.message(),
 ///     "\
 /// Usage:
-///   foo [-n] file...
+///   foo [-n] FILE...
 ///
 /// Options:
 ///   -n, --dry-run  print what would be done
@@ -270,6 +270,9 @@ pub struct BuiltinHelp {
     /// One-line summary of the built-in
     pub summary: &'static str,
     /// Usage lines, each showing a form of the command line
+    ///
+    /// Parameters are written in upper case to distinguish them from the name
+    /// of the built-in and literal arguments.
     pub usage: &'static [&'static str],
     /// Option specs of the built-in
     ///
@@ -557,7 +560,7 @@ See <https://magicant.github.io/yash-rs/builtins/foo.html> for details.
     fn message_without_options() {
         let help = BuiltinHelp {
             summary: "do something",
-            usage: &["foo [arg...]"],
+            usage: &["foo [ARG...]"],
             options: &[],
             manual_page_name: "foo",
         };
@@ -565,7 +568,7 @@ See <https://magicant.github.io/yash-rs/builtins/foo.html> for details.
         assert_eq!(
             help.message(),
             "Usage:
-  foo [arg...]
+  foo [ARG...]
 
 See <https://magicant.github.io/yash-rs/builtins/foo.html> for details.
 "

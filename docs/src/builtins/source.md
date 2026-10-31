@@ -5,11 +5,11 @@ The **`source`** (**`.`**) built-in reads and executes commands from a file.
 ## Synopsis
 
 ```sh
-. file [arguments…]
+. FILE [ARGUMENT…]
 ```
 
 ```sh
-source file [arguments…]
+source FILE [ARGUMENT…]
 ```
 
 ## Description

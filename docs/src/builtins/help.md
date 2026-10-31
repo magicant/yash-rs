@@ -5,7 +5,7 @@
 ## Synopsis
 
 ```sh
-help [name…]
+help [NAME…]
 ```
 
 ## Description

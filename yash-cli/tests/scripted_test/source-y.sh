@@ -57,8 +57,8 @@ __IN__
 .: execute commands in a file
 
 Usage:
-  . file [argument...]
-  source file [argument...]
+  . FILE [ARGUMENT...]
+  source FILE [ARGUMENT...]
 
 Options:
       --help  print this help
@@ -77,8 +77,8 @@ __IN__
 source: execute commands in a file
 
 Usage:
-  . file [argument...]
-  source file [argument...]
+  . FILE [ARGUMENT...]
+  source FILE [ARGUMENT...]
 
 Options:
       --help  print this help

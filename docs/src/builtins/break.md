@@ -5,12 +5,12 @@ The **`break`** built-in terminates the execution of a [loop].
 ## Synopsis
 
 ```sh
-break [n]
+break [N]
 ```
 
 ## Description
 
-`break n` quits the execution of the *n*th innermost `for`, `while`, or `until` [loop]. The specified loop must lexically enclose the break command, that is:
+`break N` quits the execution of the *n*th innermost `for`, `while`, or `until` [loop]. The specified loop must lexically enclose the break command, that is:
 
 - The loop is running in the same [execution environment] as the break command; and
 - The break command appears inside the condition or body of the loop but not in the body of a [function definition command](../language/functions.md#defining-functions) appearing inside the loop.

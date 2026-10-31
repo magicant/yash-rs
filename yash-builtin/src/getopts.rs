@@ -70,7 +70,7 @@ const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION
 /// Help information of the `getopts` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "parse options in shell scripts",
-    usage: &["getopts option_spec variable_name [argument...]"],
+    usage: &["getopts OPTION_SPEC VARIABLE_NAME [ARGUMENT...]"],
     options: OPTION_SPECS.get(),
     manual_page_name: "getopts",
 };

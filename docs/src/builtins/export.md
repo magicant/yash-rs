@@ -5,7 +5,7 @@ The **`export`** built-in exports [variables](../language/parameters/variables.m
 ## Synopsis
 
 ```sh
-export [-p] [name[=value]…]
+export [-p] [NAME[=VALUE]…]
 ```
 
 ## Description
@@ -56,7 +56,7 @@ only when the `-p` option is used without operands, and the long option name
 When the [`portable` option](../environment/options.md#portable) is set, these are errors:
 
 - (Since 3.3.3) Exporting a variable whose name contains a character other than ASCII letters, digits, and underscores, or starts with a digit.
-- (Since 3.3.5) Invoking the built-in without operands and without the `-p` option, or with the `-p` option and one or more operands. POSIX specifies only the `export name…` and `export -p` forms.
+- (Since 3.3.5) Invoking the built-in without operands and without the `-p` option, or with the `-p` option and one or more operands. POSIX specifies only the `export NAME…` and `export -p` forms.
 - (Since 3.3.5) Using the `--print` option, spelled out in full or abbreviated. Use `-p` instead.
 
 Previous versions of yash supported the non-standard `-r` and `-X` options, but these are not yet supported in yash-rs.

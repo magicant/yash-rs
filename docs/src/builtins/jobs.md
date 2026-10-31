@@ -5,7 +5,7 @@ The **`jobs`** built-in reports job status.
 ## Synopsis
 
 ```sh
-jobs [-l|-p] [job_id…]
+jobs [-l|-p] [JOB_ID…]
 ```
 
 ## Description

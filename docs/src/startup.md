@@ -7,9 +7,9 @@ This section describes how yash-rs is started and configured.
 Start the shell by running the `yash3` executable. The general syntax is:
 
 ```sh
-yash3 [options] [file [arguments…]]
-yash3 [options] -c command [command_name [arguments…]]
-yash3 [options] -s [arguments…]
+yash3 [OPTION…] [FILE [ARGUMENT…]]
+yash3 [OPTION…] -c COMMAND [COMMAND_NAME [ARGUMENT…]]
+yash3 [OPTION…] -s [ARGUMENT…]
 ```
 
 The shell's behavior is determined by the options and operands you provide. See [Command line argument syntax conventions](builtins/index.html#command-line-argument-syntax-conventions) for how arguments are parsed into options and operands.
@@ -19,7 +19,7 @@ The shell's behavior is determined by the options and operands you provide. See 
 The shell accepts [shell options] to control its behavior. The following options are only available at startup:
 
 `-c` (`--cmdline`)
-: Read and execute commands from the `command` operand.
+: Read and execute commands from the ***command*** operand.
 
 `-s` (`--stdin`)
 : Read and execute commands from [standard input].
@@ -30,13 +30,13 @@ The shell accepts [shell options] to control its behavior. The following options
 `-l` (`--login`)
 : Make the shell a login shell. This can also be triggered by a leading hyphen in the command name (e.g., `-yash3`).
 
-`--profile <file>`
+`--profile FILE`
 : Specify a [profile file] to execute.
 
 `--noprofile`
 : Do not execute any [profile file].
 
-`--rcfile <file>`
+`--rcfile FILE`
 : Specify an [rcfile] to execute.
 
 `--norcfile`
@@ -56,7 +56,7 @@ File mode
 : If neither `-c` nor `-s` is specified, the first operand is treated as the path to a script file to execute. Any following operands become [positional parameters] for the script.
 
 Command string mode
-: With `-c`, the shell executes the command string given as the first operand. If `command_name` is specified, it sets the [special parameter] `0`. Remaining operands become [positional parameters].
+: With `-c`, the shell executes the command string given as the first operand. If ***command_name*** is specified, it sets the [special parameter] `0`. Remaining operands become [positional parameters].
 
 Standard input mode
 : With `-s`, the shell reads commands from [standard input]. Any operands are set as positional parameters.

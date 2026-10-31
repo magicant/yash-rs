@@ -5,7 +5,7 @@ The **`ulimit`** built-in displays or sets system resource limits for the curren
 ## Synopsis
 
 ```sh
-ulimit [-SH] [-a|-b|-c|-d|-e|-f|-i|-k|-l|-m|-n|-q|-R|-r|-s|-t|-u|-v|-w|-x] [limit]
+ulimit [-SH] [-a|-b|-c|-d|-e|-f|-i|-k|-l|-m|-n|-q|-R|-r|-s|-t|-u|-v|-w|-x] [LIMIT]
 ```
 
 ## Description

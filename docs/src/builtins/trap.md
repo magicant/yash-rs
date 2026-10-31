@@ -5,11 +5,11 @@ The **`trap`** built-in sets or prints [traps](../environment/traps.md).
 ## Synopsis
 
 ```sh
-trap [action] condition…
+trap [ACTION] CONDITION…
 ```
 
 ```sh
-trap [-p [condition…]]
+trap [-p [CONDITION…]]
 ```
 
 ## Description
@@ -22,7 +22,7 @@ When setting traps, the built-in sets the *action* for each *condition* in the c
 
 ### Printing traps
 
-When the built-in is invoked with no operands, it prints the currently configured traps in the format `trap -- action condition` where *action* and *condition* are properly [quoted](../language/words/quoting.md) so that the output can be [read](eval.md) by the shell to restore the traps. By default, the built-in prints traps that have non-default actions. To print all traps, use the `-p` option with no operands.
+When the built-in is invoked with no operands, it prints the currently configured traps in the format `trap -- ACTION CONDITION` where *action* and *condition* are properly [quoted](../language/words/quoting.md) so that the output can be [read](eval.md) by the shell to restore the traps. By default, the built-in prints traps that have non-default actions. To print all traps, use the `-p` option with no operands.
 
 When the `-p` option is used with one or more *condition*s, the built-in prints the traps for the specified *condition*s.
 

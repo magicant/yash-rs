@@ -5,11 +5,11 @@ The **`kill`** built-in sends a [signal](../environment/traps.md#what-are-signal
 ## Synopsis
 
 ```sh
-kill [-s SIGNAL|-n SIGNAL|-SIGNAL] target…
+kill [-s SIGNAL|-n SIGNAL|-SIGNAL] TARGET…
 ```
 
 ```sh
-kill -l|-v [SIGNAL|exit_status]…
+kill -l|-v [SIGNAL|EXIT_STATUS]…
 ```
 
 ## Description
@@ -162,11 +162,11 @@ argument as the option name as well. Writing `kill -sTERM` rather than `kill -s
 TERM` is therefore portable to other implementations, but is not the syntax
 POSIX prescribes for applications.
 
-The `kill -SIGNAL target…` form may not be parsed as expected by other
+The `kill -SIGNAL TARGET…` form may not be parsed as expected by other
 implementations when the signal name starts with a letter that names an option
 there. POSIX defines the `-s` and `-l` options, so a name such as `STOP` or
 `LOST` is especially at risk: `kill -stop 123` may try to send the `SIGTOP`
-signal instead of the `SIGSTOP` signal. Write `kill -s SIGNAL target…` where
+signal instead of the `SIGSTOP` signal. Write `kill -s SIGNAL TARGET…` where
 this matters.
 
 POSIX defines the following signal numbers:

@@ -95,7 +95,7 @@ impl Command {
 /// Help information of the `umask` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "print or set the file mode creation mask",
-    usage: &["umask [-S] [mode]"],
+    usage: &["umask [-S] [MODE]"],
     options: syntax::OPTION_SPECS.get(),
     manual_page_name: "umask",
 };

@@ -5,7 +5,7 @@ The **`alias`** built-in defines [aliases](../language/aliases.md) or prints ali
 ## Synopsis
 
 ```sh
-alias [name[=value]…]
+alias [NAME[=VALUE]…]
 ```
 
 ## Description

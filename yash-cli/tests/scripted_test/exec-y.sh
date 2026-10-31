@@ -7,7 +7,7 @@ __IN__
 exec: replace the shell process with a utility
 
 Usage:
-  exec [name [argument...]]
+  exec [NAME [ARGUMENT...]]
 
 Options:
       --help  print this help

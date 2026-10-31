@@ -5,7 +5,7 @@ The **`exec`** built-in replaces the current shell process with an external util
 ## Synopsis
 
 ```sh
-exec [name [arguments...]]
+exec [NAME [ARGUMENT…]]
 ```
 
 ## Description

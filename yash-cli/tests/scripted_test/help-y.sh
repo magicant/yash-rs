@@ -6,7 +6,7 @@ __IN__
 help: print the help of built-ins
 
 Usage:
-  help [name...]
+  help [NAME...]
 
 Options:
       --help  print this help
@@ -20,7 +20,7 @@ __IN__
 help: print the help of built-ins
 
 Usage:
-  help [name...]
+  help [NAME...]
 
 Options:
       --help  print this help
@@ -46,7 +46,7 @@ __IN__
 help: print the help of built-ins
 
 Usage:
-  help [name...]
+  help [NAME...]
 
 Options:
       --help  print this help
@@ -60,7 +60,7 @@ __IN__
 help: print the help of built-ins
 
 Usage:
-  help [name...]
+  help [NAME...]
 
 Options:
       --help  print this help
@@ -74,7 +74,7 @@ __IN__
 :: do nothing
 
 Usage:
-  : [argument...]
+  : [ARGUMENT...]
 
 See <https://magicant.github.io/yash-rs/builtins/colon.html> for details.
 

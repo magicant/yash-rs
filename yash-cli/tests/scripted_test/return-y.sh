@@ -22,7 +22,7 @@ __IN__
 return: return from a function or script
 
 Usage:
-  return [-n] [exit_status]
+  return [-n] [EXIT_STATUS]
 
 Options:
   -n, --no-return  set the exit status without returning

@@ -66,7 +66,7 @@ const OPTIONS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
 /// Help information of the `jobs` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "print the status of jobs",
-    usage: &["jobs [-l|-p] [job_id...]"],
+    usage: &["jobs [-l|-p] [JOB_ID...]"],
     options: OPTIONS.get(),
     manual_page_name: "jobs",
 };

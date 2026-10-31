@@ -24,7 +24,7 @@ __IN__
 umask: print or set the file mode creation mask
 
 Usage:
-  umask [-S] [mode]
+  umask [-S] [MODE]
 
 Options:
   -S, --symbolic  print the mask in symbolic notation

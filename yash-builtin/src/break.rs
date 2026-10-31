@@ -44,7 +44,7 @@ pub mod syntax;
 /// Help information of the `break` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "exit from loops",
-    usage: &["break [n]"],
+    usage: &["break [N]"],
     options: syntax::OPTION_SPECS.get(),
     manual_page_name: "break",
 };

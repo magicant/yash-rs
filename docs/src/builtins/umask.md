@@ -5,7 +5,7 @@ The **`umask`** built-in shows or sets the file mode creation mask.
 ## Synopsis
 
 ```sh
-umask [-S] [mode]
+umask [-S] [MODE]
 ```
 
 ## Description

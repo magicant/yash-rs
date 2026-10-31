@@ -44,7 +44,7 @@ pub mod syntax;
 /// Help information of the `unalias` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "remove aliases",
-    usage: &["unalias name...", "unalias -a"],
+    usage: &["unalias NAME...", "unalias -a"],
     options: syntax::OPTION_SPECS.get(),
     manual_page_name: "unalias",
 };

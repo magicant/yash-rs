@@ -40,7 +40,7 @@ __IN__
 alias: define or print aliases
 
 Usage:
-  alias [name[=value]...]
+  alias [NAME[=VALUE]...]
 
 Options:
       --help  print this help
@@ -58,7 +58,7 @@ __IN__
 unalias: remove aliases
 
 Usage:
-  unalias name...
+  unalias NAME...
   unalias -a
 
 Options:

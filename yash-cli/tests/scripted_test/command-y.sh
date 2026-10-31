@@ -458,8 +458,8 @@ __IN__
 command: execute or identify a command bypassing functions
 
 Usage:
-  command [-p] name [argument...]
-  command -v|-V [-p] name
+  command [-p] NAME [ARGUMENT...]
+  command -v|-V [-p] NAME
 
 Options:
   -p, --path              search the standard path instead of $PATH

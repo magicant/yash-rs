@@ -43,7 +43,7 @@ const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION
 /// Help information of the `shift` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "remove positional parameters",
-    usage: &["shift [n]"],
+    usage: &["shift [N]"],
     options: OPTION_SPECS.get(),
     manual_page_name: "shift",
 };

@@ -7,7 +7,7 @@ __IN__
 eval: evaluate arguments as shell commands
 
 Usage:
-  eval [command...]
+  eval [COMMAND...]
 
 Options:
       --help  print this help

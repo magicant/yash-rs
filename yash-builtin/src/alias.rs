@@ -51,7 +51,7 @@ const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION
 /// Help information of the `alias` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "define or print aliases",
-    usage: &["alias [name[=value]...]"],
+    usage: &["alias [NAME[=VALUE]...]"],
     options: OPTION_SPECS.get(),
     manual_page_name: "alias",
 };

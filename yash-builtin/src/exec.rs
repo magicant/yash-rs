@@ -59,7 +59,7 @@ const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION
 /// Help information of the `exec` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "replace the shell process with a utility",
-    usage: &["exec [name [argument...]]"],
+    usage: &["exec [NAME [ARGUMENT...]]"],
     options: OPTION_SPECS.get(),
     manual_page_name: "exec",
 };

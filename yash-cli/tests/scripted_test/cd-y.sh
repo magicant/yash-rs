@@ -217,7 +217,7 @@ __IN__
 cd: change the working directory
 
 Usage:
-  cd [-L|-P [-e]] [directory]
+  cd [-L|-P [-e]] [DIRECTORY]
 
 Options:
   -L, --logical     keep symbolic links in $PWD (default)

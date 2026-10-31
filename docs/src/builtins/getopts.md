@@ -5,7 +5,7 @@ The **`getopts`** built-in is used to parse options in shell scripts.
 ## Synopsis
 
 ```sh
-getopts option_spec variable_name [argument…]
+getopts OPTION_SPEC VARIABLE_NAME [ARGUMENT…]
 ```
 
 ## Description

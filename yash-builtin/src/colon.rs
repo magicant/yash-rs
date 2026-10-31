@@ -31,7 +31,7 @@ use yash_env::semantics::Field;
 /// only from the `help` built-in.
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "do nothing",
-    usage: &[": [argument...]"],
+    usage: &[": [ARGUMENT...]"],
     options: &[],
     manual_page_name: "colon",
 };

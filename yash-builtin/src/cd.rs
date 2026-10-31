@@ -129,7 +129,7 @@ where
 /// Help information of the `cd` built-in
 pub static HELP: BuiltinHelp = BuiltinHelp {
     summary: "change the working directory",
-    usage: &["cd [-L|-P [-e]] [directory]"],
+    usage: &["cd [-L|-P [-e]] [DIRECTORY]"],
     options: syntax::OPTION_SPECS.get(),
     manual_page_name: "cd",
 };

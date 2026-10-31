@@ -52,7 +52,7 @@ __IN__
 unset: unset variables or functions
 
 Usage:
-  unset [-f|-v] name...
+  unset [-f|-v] NAME...
 
 Options:
   -f, --functions  unset functions

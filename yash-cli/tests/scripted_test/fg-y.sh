@@ -16,7 +16,7 @@ __IN__
 fg: resume a job in the foreground
 
 Usage:
-  fg [job_id]
+  fg [JOB_ID]
 
 Options:
       --help  print this help

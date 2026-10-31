@@ -270,8 +270,8 @@ __IN__
 trap: set or print traps
 
 Usage:
-  trap [action] condition...
-  trap [-p [condition...]]
+  trap [ACTION] CONDITION...
+  trap [-p [CONDITION...]]
 
 Options:
   -p, --print  print the traps for the operands, or all traps if none

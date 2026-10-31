@@ -135,7 +135,7 @@ __IN__
 getopts: parse options in shell scripts
 
 Usage:
-  getopts option_spec variable_name [argument...]
+  getopts OPTION_SPEC VARIABLE_NAME [ARGUMENT...]
 
 Options:
       --help  print this help
