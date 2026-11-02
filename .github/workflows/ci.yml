@@ -12,7 +12,8 @@ env:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # TODO Return to ubuntu-latest when #896 is fixed
+    runs-on: ubuntu-24.04
     env:
       CARGO_BUILD_WARNINGS: deny
     permissions:
