@@ -580,12 +580,15 @@ Usage:
   yash3 [OPTION...] -s [ARGUMENT...]
 
 Startup options:
-      --help
-  -V, --version
+  -c, --cmdline
+  -s, --stdin
+  -i, --interactive
       --profile=FILE
       --noprofile
       --rcfile=FILE
       --norcfile
+      --help
+  -V, --version
 
 Shell options:
   Turn on an option with -o NAME or --NAME, and turn it off with +o NAME or
@@ -595,13 +598,11 @@ Shell options:
 
   -a  -o allexport
   +C  -o clobber
-  -c  -o cmdline
   -e  -o errexit
   +n  -o exec
   +f  -o glob
   -h  -o hashondefinition
       -o ignoreeof
-  -i  -o interactive
       -o log
   -l  -o login
   -m  -o monitor
@@ -609,7 +610,6 @@ Shell options:
       -o pipefail
       -o portable
       -o posixlycorrect
-  -s  -o stdin
   +u  -o unset
   -v  -o verbose
       -o vi

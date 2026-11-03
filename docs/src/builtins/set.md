@@ -92,6 +92,10 @@ $ echo $#
 0
 ```
 
+### Printing help
+
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
+
 ## Exit status
 
 - 0: successful
@@ -103,6 +107,8 @@ $ echo $#
 The `set` built-in is specified by POSIX.1-2024. See [Compatibility](../environment/options.md#compatibility) for the compatibility of the option syntax and available options.
 
 (Since 3.3.5) When the [`portable` option](../environment/options.md#portable) is set, the built-in accepts only the option spellings POSIX specifies and rejects the rest with an error.
+
+The `--help` option is a non-standard extension.
 
 The output format of `set -o` and `set +o` depends on the shell.
 

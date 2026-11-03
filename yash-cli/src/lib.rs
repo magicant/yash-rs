@@ -29,12 +29,12 @@ use self::startup::args::Parse;
 use self::startup::init_file::run_rcfile;
 use self::startup::input::prepare_input;
 use std::cell::RefCell;
-use std::fmt::Write as _;
 use std::ops::ControlFlow::{Break, Continue};
 use std::rc::Rc;
+use yash_builtin::set::SHELL_OPTIONS_HELP;
 use yash_env::Env;
 use yash_env::RealSystem;
-use yash_env::option::{Interactive, Off, On, Portable};
+use yash_env::option::{Interactive, On, Portable};
 use yash_env::semantics::{Divert, ExitStatus, exit_or_raise};
 use yash_env::system::concurrency::WriteAll;
 use yash_env::system::resource::GetRlimit;
@@ -56,29 +56,19 @@ Usage:
   yash3 [OPTION...] -s [ARGUMENT...]
 
 Startup options:
-      --help
-  -V, --version
+  -c, --cmdline
+  -s, --stdin
+  -i, --interactive
       --profile=FILE
       --noprofile
       --rcfile=FILE
       --norcfile
-
-Shell options:
-  Turn on an option with -o NAME or --NAME, and turn it off with +o NAME or
-  ++NAME. Prefixing NAME with \"no\" reverses the effect, as in -o noglob.
-  Each single-letter option below does the same as the -o form beside it,
-  and swapping its - or + reverses the effect.
+      --help
+  -V, --version
 
 "
     .to_owned();
-    for option in yash_env::option::Option::iter() {
-        match option.short_name() {
-            Some((name, On)) => writeln!(help, "  -{name}  -o {option}"),
-            Some((name, Off)) => writeln!(help, "  +{name}  -o {option}"),
-            None => writeln!(help, "      -o {option}"),
-        }
-        .unwrap();
-    }
+    help.push_str(SHELL_OPTIONS_HELP);
     help.push_str(concat!(
         "\nSee <",
         env!("CARGO_PKG_HOMEPAGE"),
