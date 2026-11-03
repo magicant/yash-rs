@@ -296,13 +296,11 @@ fn option_name(spec: &OptionSpec) -> String {
     name
 }
 
-impl Help for BuiltinHelp {
-    fn summary(&self) -> Cow<'_, str> {
-        Cow::Borrowed(self.summary)
-    }
-
-    fn message(&self) -> Cow<'_, str> {
-        let mut message = String::new();
+impl BuiltinHelp {
+    /// Appends the usage and option sections to `message`.
+    ///
+    /// Each section is followed by an empty line.
+    pub(crate) fn append_usage_and_options(&self, message: &mut String) {
         if !self.usage.is_empty() {
             message.push_str("Usage:\n");
             for usage in self.usage {
@@ -320,13 +318,28 @@ impl Help for BuiltinHelp {
             }
             message.push('\n');
         }
+    }
 
+    /// Appends the line linking to the manual page to `message`.
+    pub(crate) fn append_manual_link(&self, message: &mut String) {
         writeln!(
             message,
             "See <{MANUAL_BASE_URL}{}.html> for details.",
             self.manual_page_name
         )
         .unwrap();
+    }
+}
+
+impl Help for BuiltinHelp {
+    fn summary(&self) -> Cow<'_, str> {
+        Cow::Borrowed(self.summary)
+    }
+
+    fn message(&self) -> Cow<'_, str> {
+        let mut message = String::new();
+        self.append_usage_and_options(&mut message);
+        self.append_manual_link(&mut message);
         Cow::Owned(message)
     }
 }

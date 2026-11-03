@@ -17,6 +17,7 @@
 //! Command line argument parser for the set built-in
 
 use super::Command;
+use crate::common::help::WithHelp;
 use std::iter::Peekable;
 use thiserror::Error;
 use yash_env::option::FromStrError::*;
@@ -97,6 +98,14 @@ pub enum Error {
     /// field.
     #[error("option argument not separated from the option name in {:?}", .0.value)]
     UnseparatedOptionArgument(Field, String),
+
+    /// `++help`
+    #[error("option {:?} cannot be canceled with '++'", .0.value)]
+    UncancelableLongOption(Field),
+
+    /// `--help` used with other options or operands
+    #[error("option {:?} cannot be used with other options or operands", .0.value)]
+    HelpWithOtherArguments(Field),
 }
 
 /// Returns whether the given `-o` option name is one POSIX specifies.
@@ -150,6 +159,8 @@ impl Error {
             Error::NonPortableLongOption(field, _option) => field,
             Error::NonPortableSeparator(field) => field,
             Error::UnseparatedOptionArgument(field, _spelling) => field,
+            Error::UncancelableLongOption(field) => field,
+            Error::HelpWithOtherArguments(field) => field,
         }
     }
 
@@ -297,6 +308,14 @@ fn try_parse_short<I: Iterator<Item = Field>>(
     Ok(true)
 }
 
+/// Long option recognized by [`try_parse_long`]
+enum LongOption {
+    /// Shell option and the state the user requested
+    Shell(yash_env::option::Option, State),
+    /// `--help`, with the field containing it
+    Help(Field),
+}
+
 /// Tries to parse and consume the next field in `args`.
 ///
 /// `portable` is the state of the [`Portable`] option in effect for this field.
@@ -307,7 +326,7 @@ fn try_parse_short<I: Iterator<Item = Field>>(
 fn try_parse_long<I: Iterator<Item = Field>>(
     args: &mut Peekable<I>,
     portable: &mut State,
-) -> Result<std::option::Option<(yash_env::option::Option, State)>, Error> {
+) -> Result<std::option::Option<LongOption>, Error> {
     let field = match args.peek() {
         Some(field) => field,
         None => return Ok(None),
@@ -326,8 +345,18 @@ fn try_parse_long<I: Iterator<Item = Field>>(
 
     let name = canonicalize(name);
     let result = parse_long(&name);
+    let is_help = "help".starts_with(&*name);
     let field = args.next().unwrap();
     match result {
+        Err(Ambiguous) => Err(Error::AmbiguousLongOption(field)),
+        Ok(_) if is_help => Err(Error::AmbiguousLongOption(field)),
+        // The uncancelable check comes first: an option that cannot be canceled
+        // cannot be canceled regardless of the `Portable` option.
+        Err(NoSuchOption) if is_help && negate => Err(Error::UncancelableLongOption(field)),
+        Err(NoSuchOption) if is_help && *portable == State::On => {
+            Err(Error::NonPortableLongOption(field, None))
+        }
+        Err(NoSuchOption) if is_help => Ok(Some(LongOption::Help(field))),
         Ok((option, name_state)) if option.is_modifiable() => {
             let new_state = if negate { !name_state } else { name_state };
             if *portable == State::On {
@@ -339,11 +368,10 @@ fn try_parse_long<I: Iterator<Item = Field>>(
             if option == Portable {
                 *portable = new_state;
             }
-            Ok(Some((option, new_state)))
+            Ok(Some(LongOption::Shell(option, new_state)))
         }
         Ok(_) => Err(Error::UnmodifiableLongOption(field)),
         Err(NoSuchOption) => Err(Error::UnknownLongOption(field)),
-        Err(Ambiguous) => Err(Error::AmbiguousLongOption(field)),
     }
 }
 
@@ -353,12 +381,16 @@ fn try_parse_long<I: Iterator<Item = Field>>(
 /// is invoked. While it is on, the parser accepts only the option syntax POSIX
 /// specifies. The arguments are examined in order, so an option that turns
 /// `portable` on or off affects only the options that follow it.
-pub fn parse(args: Vec<Field>, portable: State) -> Result<Command, Error> {
+///
+/// This function returns [`WithHelp::Help`] if the arguments consist of
+/// `--help` only, which a separator may follow. An abbreviation of `--help`
+/// that also matches a shell option name is ambiguous wherever it appears.
+pub fn parse(args: Vec<Field>, portable: State) -> Result<WithHelp<Command>, Error> {
     match args.len() {
-        0 => return Ok(Command::PrintVariables),
+        0 => return Ok(WithHelp::Main(Command::PrintVariables)),
         1 => match args[0].value.as_str() {
-            "-o" => return Ok(Command::PrintOptionsHumanReadable),
-            "+o" => return Ok(Command::PrintOptionsMachineReadable),
+            "-o" => return Ok(WithHelp::Main(Command::PrintOptionsHumanReadable)),
+            "+o" => return Ok(WithHelp::Main(Command::PrintOptionsMachineReadable)),
             _ => (),
         },
         _ => (),
@@ -367,14 +399,20 @@ pub fn parse(args: Vec<Field>, portable: State) -> Result<Command, Error> {
     let mut args = args.into_iter().peekable();
     let mut options = Vec::new();
     let mut portable = portable;
+    let mut help = None;
     loop {
         if try_parse_short(&mut args, &mut options, &mut portable)? {
             continue;
         }
-        if let Some(result) = try_parse_long(&mut args, &mut portable)? {
-            options.push(result);
-        } else {
-            break;
+        match try_parse_long(&mut args, &mut portable)? {
+            Some(LongOption::Shell(option, state)) => options.push((option, state)),
+            Some(LongOption::Help(field)) => {
+                if help.is_some() {
+                    return Err(Error::HelpWithOtherArguments(field));
+                }
+                help = Some(field);
+            }
+            None => break,
         }
     }
 
@@ -387,12 +425,19 @@ pub fn parse(args: Vec<Field>, portable: State) -> Result<Command, Error> {
         })
         .transpose()?;
 
+    if let Some(help) = help {
+        if !options.is_empty() || args.peek().is_some() {
+            return Err(Error::HelpWithOtherArguments(help));
+        }
+        return Ok(WithHelp::Help);
+    }
+
     let positional_params = (separator.is_some() || args.peek().is_some()).then(|| args.collect());
 
-    Ok(Command::Modify {
+    Ok(WithHelp::Main(Command::Modify {
         options,
         positional_params,
-    })
+    }))
 }
 
 #[cfg(test)]
@@ -404,14 +449,17 @@ mod tests {
 
     #[test]
     fn simple_cases() {
-        assert_eq!(parse(vec![], Off), Ok(Command::PrintVariables));
+        assert_eq!(
+            parse(vec![], Off),
+            Ok(WithHelp::Main(Command::PrintVariables))
+        );
         assert_eq!(
             parse(Field::dummies(["-o"]), Off),
-            Ok(Command::PrintOptionsHumanReadable)
+            Ok(WithHelp::Main(Command::PrintOptionsHumanReadable))
         );
         assert_eq!(
             parse(Field::dummies(["+o"]), Off),
-            Ok(Command::PrintOptionsMachineReadable)
+            Ok(WithHelp::Main(Command::PrintOptionsMachineReadable))
         );
     }
 
@@ -419,10 +467,10 @@ mod tests {
     fn positional_params_only() {
         assert_matches!(
             parse(Field::dummies(["foo"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, []);
                 assert_matches!(positional_params.unwrap().as_slice(), [first] => {
                     assert_eq!(first.value, "foo");
@@ -432,10 +480,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies([""]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, []);
                 assert_matches!(positional_params.unwrap().as_slice(), [first] => {
                     assert_eq!(first.value, "");
@@ -445,10 +493,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["a", "b", "c"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, []);
                 assert_matches!(positional_params.unwrap().as_slice(), [first, second, third] => {
                     assert_eq!(first.value, "a");
@@ -463,10 +511,10 @@ mod tests {
     fn double_hyphen_separator_and_positional_params() {
         assert_matches!(
             parse(Field::dummies(["--"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, []);
                 assert_eq!(positional_params.unwrap().as_slice(), []);
             }
@@ -474,10 +522,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["--", "foo", "bar"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, []);
                 assert_matches!(positional_params.unwrap().as_slice(), [first, second] => {
                     assert_eq!(first.value, "foo");
@@ -488,10 +536,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["--", "--"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, []);
                 assert_matches!(positional_params.unwrap().as_slice(), [first] => {
                     assert_eq!(first.value, "--");
@@ -501,10 +549,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["--", "-"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, []);
                 assert_matches!(positional_params.unwrap().as_slice(), [first] => {
                     assert_eq!(first.value, "-");
@@ -514,10 +562,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["--", "-a"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, []);
                 assert_matches!(positional_params.unwrap().as_slice(), [first] => {
                     assert_eq!(first.value, "-a");
@@ -530,10 +578,10 @@ mod tests {
     fn single_hyphen_separator_and_positional_params() {
         assert_matches!(
             parse(Field::dummies(["-"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, []);
                 assert_eq!(positional_params.unwrap().as_slice(), []);
             }
@@ -541,10 +589,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-", "foo", "bar"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, []);
                 assert_matches!(positional_params.unwrap().as_slice(), [first, second] => {
                     assert_eq!(first.value, "foo");
@@ -555,10 +603,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-", "-"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, []);
                 assert_matches!(positional_params.unwrap().as_slice(), [first] => {
                     assert_eq!(first.value, "-");
@@ -568,10 +616,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-", "--"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, []);
                 assert_matches!(positional_params.unwrap().as_slice(), [first] => {
                     assert_eq!(first.value, "--");
@@ -581,10 +629,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-", "-a"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, []);
                 assert_matches!(positional_params.unwrap().as_slice(), [first] => {
                     assert_eq!(first.value, "-a");
@@ -597,10 +645,10 @@ mod tests {
     fn short_options() {
         assert_matches!(
             parse(Field::dummies(["-a"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(AllExport, On)]);
                 assert_eq!(positional_params, None);
             }
@@ -608,10 +656,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-uv"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(Unset, Off), (Verbose, On)]);
                 assert_eq!(positional_params, None);
             }
@@ -619,10 +667,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-u", "-v"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(Unset, Off), (Verbose, On)]);
                 assert_eq!(positional_params, None);
             }
@@ -633,10 +681,10 @@ mod tests {
     fn negated_short_options() {
         assert_matches!(
             parse(Field::dummies(["+a"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(AllExport, Off)]);
                 assert_eq!(positional_params, None);
             }
@@ -644,10 +692,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["+uv"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(Unset, On), (Verbose, Off)]);
                 assert_eq!(positional_params, None);
             }
@@ -655,10 +703,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["+u", "-v"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(Unset, On), (Verbose, On)]);
                 assert_eq!(positional_params, None);
             }
@@ -669,10 +717,10 @@ mod tests {
     fn o_options() {
         assert_matches!(
             parse(Field::dummies(["-oallexpo"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(AllExport, On)]);
                 assert_eq!(positional_params, None);
             }
@@ -680,10 +728,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-o all-Expo"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(AllExport, On)]);
                 assert_eq!(positional_params, None);
             }
@@ -691,10 +739,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-onounset"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(Unset, Off)]);
                 assert_eq!(positional_params, None);
             }
@@ -702,10 +750,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-o","NO_unset"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(Unset, Off)]);
                 assert_eq!(positional_params, None);
             }
@@ -716,10 +764,10 @@ mod tests {
     fn negated_o_options() {
         assert_matches!(
             parse(Field::dummies(["+oallexpo"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(AllExport, Off)]);
                 assert_eq!(positional_params, None);
             }
@@ -727,10 +775,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["+o all-Expo"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(AllExport, Off)]);
                 assert_eq!(positional_params, None);
             }
@@ -738,10 +786,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["+onounset"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(Unset, On)]);
                 assert_eq!(positional_params, None);
             }
@@ -749,10 +797,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["+o","NO+unset"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(Unset, On)]);
                 assert_eq!(positional_params, None);
             }
@@ -763,10 +811,10 @@ mod tests {
     fn long_options() {
         assert_matches!(
             parse(Field::dummies(["--allexpo"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(AllExport, On)]);
                 assert_eq!(positional_params, None);
             }
@@ -774,10 +822,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-- all-Expo"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(AllExport, On)]);
                 assert_eq!(positional_params, None);
             }
@@ -785,10 +833,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["--nounset"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(Unset, Off)]);
                 assert_eq!(positional_params, None);
             }
@@ -799,10 +847,10 @@ mod tests {
     fn negated_long_options() {
         assert_matches!(
             parse(Field::dummies(["++allexpo"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(AllExport, Off)]);
                 assert_eq!(positional_params, None);
             }
@@ -810,10 +858,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["++ all-Expo"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(AllExport, Off)]);
                 assert_eq!(positional_params, None);
             }
@@ -821,10 +869,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["++nounset"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(Unset, On)]);
                 assert_eq!(positional_params, None);
             }
@@ -835,10 +883,10 @@ mod tests {
     fn options_and_separator() {
         assert_matches!(
             parse(Field::dummies(["-a", "--"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(AllExport, On)]);
                 assert_eq!(positional_params, Some(vec![]));
             }
@@ -846,10 +894,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-uv", "--", "-a"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(Unset, Off), (Verbose, On)]);
                 assert_matches!(positional_params.unwrap().as_slice(), [first] => {
                     assert_eq!(first.value, "-a");
@@ -859,10 +907,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-n", "-", "--"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(Exec, Off)]);
                 assert_matches!(positional_params.unwrap().as_slice(), [first] => {
                     assert_eq!(first.value, "--");
@@ -875,10 +923,10 @@ mod tests {
     fn combinations() {
         assert_matches!(
             parse(Field::dummies(["+nononotify", "a", "-a"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(Exec, On), (Notify, On)]);
                 assert_matches!(positional_params.unwrap().as_slice(), [first, second] => {
                     assert_eq!(first.value, "a");
@@ -889,10 +937,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["-uno", "-notify", "++log", "--", "foo", "-v"]), Off),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, [(Unset, Off), (Exec, Off), (Notify, On), (Log, Off)]);
                 assert_matches!(positional_params.unwrap().as_slice(), [first, second] => {
                     assert_eq!(first.value, "foo");
@@ -990,10 +1038,10 @@ mod tests {
     fn assert_portable_options(args: &[&str], expected: &[(yash_env::option::Option, State)]) {
         assert_matches!(
             parse(Field::dummies(args.iter().copied()), On),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params: None,
-            }) => assert_eq!(options, expected, "{args:?}"),
+            })) => assert_eq!(options, expected, "{args:?}"),
             "{args:?}"
         );
     }
@@ -1297,10 +1345,10 @@ mod tests {
     fn portable_accepts_double_hyphen_separator() {
         assert_matches!(
             parse(Field::dummies(["--"]), On),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, []);
                 assert_eq!(positional_params.unwrap().as_slice(), []);
             }
@@ -1308,10 +1356,10 @@ mod tests {
 
         assert_matches!(
             parse(Field::dummies(["--", "-", "foo"]), On),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, []);
                 assert_matches!(positional_params.unwrap().as_slice(), [first, second] => {
                     assert_eq!(first.value, "-");
@@ -1325,10 +1373,10 @@ mod tests {
     fn portable_accepts_single_hyphen_that_is_not_a_separator() {
         assert_matches!(
             parse(Field::dummies(["foo", "-"]), On),
-            Ok(Command::Modify {
+            Ok(WithHelp::Main(Command::Modify {
                 options,
                 positional_params
-            }) => {
+            })) => {
                 assert_eq!(options, []);
                 assert_matches!(positional_params.unwrap().as_slice(), [first, second] => {
                     assert_eq!(first.value, "foo");
@@ -1342,7 +1390,7 @@ mod tests {
     fn portable_state_at_the_separator_decides_the_rejection() {
         assert_matches!(
             parse(Field::dummies(["+o", "portable", "-", "foo"]), On),
-            Ok(Command::Modify { .. })
+            Ok(WithHelp::Main(Command::Modify { .. }))
         );
 
         assert_matches!(
@@ -1364,5 +1412,83 @@ mod tests {
             "this error is reported because the `portable` shell option is enabled"
         );
         assert_eq!(report.footnotes[1].label, "use `--` instead");
+    }
+
+    #[test]
+    fn help_option_alone() {
+        assert_eq!(parse(Field::dummies(["--help"]), Off), Ok(WithHelp::Help));
+    }
+
+    #[test]
+    fn help_option_abbreviated() {
+        assert_eq!(parse(Field::dummies(["--he"]), Off), Ok(WithHelp::Help));
+    }
+
+    #[test]
+    fn help_option_followed_by_separator() {
+        assert_eq!(
+            parse(Field::dummies(["--help", "--"]), Off),
+            Ok(WithHelp::Help)
+        );
+    }
+
+    #[test]
+    fn help_option_with_shell_option() {
+        assert_matches!(
+            parse(Field::dummies(["-e", "--help"]), Off),
+            Err(Error::HelpWithOtherArguments(field)) => assert_eq!(field.value, "--help")
+        );
+    }
+
+    #[test]
+    fn help_option_with_operand() {
+        assert_matches!(
+            parse(Field::dummies(["--help", "--", "foo"]), Off),
+            Err(Error::HelpWithOtherArguments(field)) => assert_eq!(field.value, "--help")
+        );
+    }
+
+    #[test]
+    fn help_option_twice() {
+        assert_matches!(
+            parse(Field::dummies(["--help", "--help"]), Off),
+            Err(Error::HelpWithOtherArguments(_))
+        );
+    }
+
+    #[test]
+    fn help_option_negated() {
+        assert_matches!(
+            parse(Field::dummies(["++help"]), Off),
+            Err(Error::UncancelableLongOption(field)) => assert_eq!(field.value, "++help")
+        );
+    }
+
+    #[test]
+    fn help_abbreviation_matching_shell_option_is_ambiguous() {
+        assert_matches!(
+            parse(Field::dummies(["--h"]), Off),
+            Err(Error::AmbiguousLongOption(field)) => assert_eq!(field.value, "--h")
+        );
+        assert_matches!(
+            parse(Field::dummies(["-e", "--h"]), Off),
+            Err(Error::AmbiguousLongOption(field)) => assert_eq!(field.value, "--h")
+        );
+    }
+
+    #[test]
+    fn help_option_while_portable() {
+        assert_matches!(
+            parse(Field::dummies(["--help"]), On),
+            Err(Error::NonPortableLongOption(field, None)) => assert_eq!(field.value, "--help")
+        );
+    }
+
+    #[test]
+    fn help_is_not_a_shell_option_name() {
+        assert_matches!(
+            parse(Field::dummies(["-o", "help"]), Off),
+            Err(Error::UnknownLongOption(field)) => assert_eq!(field.value, "help")
+        );
     }
 }

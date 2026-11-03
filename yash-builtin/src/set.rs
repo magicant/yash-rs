@@ -27,8 +27,12 @@
 //! to learn how long options are parsed.
 //! Long options are [canonicalize]d before being passed to `parse_long`.
 
+use crate::common::help::{
+    BuiltinHelp, HELP_OPTION, Help, WithHelp, print_help_of_current_builtin,
+};
 use crate::common::output;
 use crate::common::report::report_error;
+use std::borrow::Cow;
 use yash_env::Env;
 use yash_env::builtin::Result;
 use yash_env::job::RunBlocking;
@@ -74,6 +78,77 @@ pub enum Command {
 
 pub mod syntax;
 // TODO pub mod semantics;
+
+/// "Shell options" section of a help message
+///
+/// The section lists the options that can be modified after startup. It ends
+/// with a newline and has no empty line after it.
+///
+/// The message of [`HELP`] includes this section. Other help messages that
+/// describe the same options can include it as well.
+pub const SHELL_OPTIONS_HELP: &str = "\
+Shell options:
+  Turn on an option with -o NAME or --NAME, and turn it off with +o NAME or
+  ++NAME. Prefixing NAME with \"no\" reverses the effect, as in -o noglob.
+  Each single-letter option below does the same as the -o form beside it,
+  and swapping its - or + reverses the effect.
+
+  -a  -o allexport
+  +C  -o clobber
+  -e  -o errexit
+  +n  -o exec
+  +f  -o glob
+  -h  -o hashondefinition
+      -o ignoreeof
+      -o log
+  -l  -o login
+  -m  -o monitor
+  -b  -o notify
+      -o pipefail
+      -o portable
+      -o posixlycorrect
+  +u  -o unset
+  -v  -o verbose
+      -o vi
+  -x  -o xtrace
+";
+
+/// Parts of the help of the `set` built-in that have the standard format
+static STANDARD_HELP: BuiltinHelp = BuiltinHelp {
+    summary: "set shell options and positional parameters",
+    usage: &[
+        "set [-|+OPTION...] [-|+o NAME]... [--] [ARG...]",
+        "set -o",
+        "set +o",
+    ],
+    options: &[HELP_OPTION],
+    manual_page_name: "set",
+};
+
+/// Type of [`HELP`]
+struct SetHelp;
+
+impl Help for SetHelp {
+    fn summary(&self) -> Cow<'_, str> {
+        STANDARD_HELP.summary()
+    }
+
+    fn message(&self) -> Cow<'_, str> {
+        let mut message = String::new();
+        STANDARD_HELP.append_usage_and_options(&mut message);
+        message.push_str(SHELL_OPTIONS_HELP);
+        message.push('\n');
+        STANDARD_HELP.append_manual_link(&mut message);
+        Cow::Owned(message)
+    }
+}
+
+/// Help information of the `set` built-in
+///
+/// In addition to the usage and options of the built-in, the message includes
+/// [`SHELL_OPTIONS_HELP`], which lists the shell options that the built-in can
+/// modify.
+pub const HELP: &dyn Help = &SetHelp;
 
 /// Enables or disables the internal dispositions for the "stopper" signals
 /// depending on the `Interactive` and `Monitor` option states.
@@ -157,7 +232,7 @@ where
     use std::fmt::Write as _;
 
     match syntax::parse(args, env.options.get(Portable)) {
-        Ok(Command::PrintVariables) => {
+        Ok(WithHelp::Main(Command::PrintVariables)) => {
             let IsName(is_name) = env.any.get().expect("`IsName` should be in `env.any`");
             let mut vars: Vec<_> = env
                 .variables
@@ -176,7 +251,7 @@ where
             output(env, &print).await
         }
 
-        Ok(Command::PrintOptionsHumanReadable) => {
+        Ok(WithHelp::Main(Command::PrintOptionsHumanReadable)) => {
             let mut print = String::new();
             for option in yash_env::option::Option::iter() {
                 let state = env.options.get(option);
@@ -185,7 +260,7 @@ where
             output(env, &print).await
         }
 
-        Ok(Command::PrintOptionsMachineReadable) => {
+        Ok(WithHelp::Main(Command::PrintOptionsMachineReadable)) => {
             let mut print = String::new();
             // The commands below name options the way yash does rather than
             // the way POSIX does, so the `portable` option would reject them.
@@ -206,13 +281,15 @@ where
             output(env, &print).await
         }
 
-        Ok(Command::Modify {
+        Ok(WithHelp::Main(Command::Modify {
             options,
             positional_params,
-        }) => {
+        })) => {
             modify(env, options, positional_params).await;
             Result::new(ExitStatus::SUCCESS)
         }
+
+        Ok(WithHelp::Help) => print_help_of_current_builtin(env).await,
 
         Err(error) => report_error(env, &error).await,
     }
@@ -490,4 +567,24 @@ xtrace           off
     // TODO Test the case when the -m option is enabled while the shell is not
     // in the foreground. This requires the correct implementation of the
     // `VirtualSystem::tcsetpgrp` method.
+
+    #[test]
+    fn shell_options_help_lists_modifiable_options() {
+        use std::fmt::Write as _;
+        let mut list = String::new();
+        for option in yash_env::option::Option::iter().filter(|option| option.is_modifiable()) {
+            match option.short_name() {
+                Some((name, On)) => writeln!(list, "  -{name}  -o {option}"),
+                Some((name, Off)) => writeln!(list, "  +{name}  -o {option}"),
+                None => writeln!(list, "      -o {option}"),
+            }
+            .unwrap();
+        }
+
+        let (_, actual_list) = SHELL_OPTIONS_HELP.split_once("\n\n").unwrap();
+        assert_eq!(
+            actual_list, list,
+            "the list should match the modifiable options defined in yash-env"
+        );
+    }
 }

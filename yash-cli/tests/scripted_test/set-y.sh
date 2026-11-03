@@ -1,5 +1,97 @@
 # set-y.sh: yash-specific test of the set built-in
 
+test_oE -e 0 'help option prints help without exiting the shell'
+set --help
+echo $?
+__IN__
+set: set shell options and positional parameters
+
+Usage:
+  set [-|+OPTION...] [-|+o NAME]... [--] [ARG...]
+  set -o
+  set +o
+
+Options:
+      --help  print this help
+
+Shell options:
+  Turn on an option with -o NAME or --NAME, and turn it off with +o NAME or
+  ++NAME. Prefixing NAME with "no" reverses the effect, as in -o noglob.
+  Each single-letter option below does the same as the -o form beside it,
+  and swapping its - or + reverses the effect.
+
+  -a  -o allexport
+  +C  -o clobber
+  -e  -o errexit
+  +n  -o exec
+  +f  -o glob
+  -h  -o hashondefinition
+      -o ignoreeof
+      -o log
+  -l  -o login
+  -m  -o monitor
+  -b  -o notify
+      -o pipefail
+      -o portable
+      -o posixlycorrect
+  +u  -o unset
+  -v  -o verbose
+      -o vi
+  -x  -o xtrace
+
+See <https://magicant.github.io/yash-rs/builtins/set.html> for details.
+0
+__OUT__
+
+test_oE -e 0 'help built-in prints the same help as the help option'
+set --help >help_option
+help set >help_builtin
+diff help_option help_builtin && echo same
+__IN__
+same
+__OUT__
+
+test_OE -e 0 'help option can be abbreviated and followed by a separator'
+set --he >/dev/null &&
+set --help -- >/dev/null
+__IN__
+
+test_O -d -e 2 'help option with a shell option'
+set -e --help
+__IN__
+
+test_O -d -e 2 'help option with an operand'
+set --help foo
+__IN__
+
+test_O -d -e 2 'help option with an operand after a separator'
+set --help -- foo
+__IN__
+
+test_O -d -e 2 'help option given twice'
+set --help --help
+__IN__
+
+test_O -d -e 2 'help option cannot be negated'
+set ++help
+__IN__
+
+test_O -d -e 2 'abbreviation of help that matches a shell option is ambiguous'
+set --h
+__IN__
+
+test_O -d -e 2 'ambiguous help abbreviation is rejected among other arguments'
+set -e --h
+__IN__
+
+test_O -d -e 2 'help is not a shell option name'
+set -o help
+__IN__
+
+test_O -d -e 2 'help option is rejected under the portable option' -o portable
+set --help
+__IN__
+
 test_O -d -e 2 'set built-in rejects long option under the portable option' -o portable
 set --errexit
 __IN__

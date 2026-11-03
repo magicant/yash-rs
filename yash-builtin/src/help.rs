@@ -92,6 +92,7 @@ impl Default for HelpTable {
             ("pwd", &crate::pwd::HELP),
             ("read", &crate::read::HELP),
             ("return", &crate::r#return::HELP),
+            ("set", crate::set::HELP),
             ("shift", &crate::shift::HELP),
             ("source", &crate::source::HELP),
             ("times", &crate::times::HELP),
