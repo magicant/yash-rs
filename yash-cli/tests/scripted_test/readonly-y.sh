@@ -167,3 +167,51 @@ grep -Fq portable result || echo not shown
 __IN__
 not shown
 __OUT__
+
+test_oE -e 0 'help option prints help without exiting the shell'
+readonly --help
+echo $?
+__IN__
+readonly: make variables read-only
+
+Usage:
+  readonly NAME[=VALUE]...
+  readonly -p [NAME...]
+  readonly
+
+Options:
+  -p, --print  print the current definitions
+      --help   print this help
+
+See <https://magicant.github.io/yash-rs/builtins/readonly.html> for details.
+0
+__OUT__
+
+test_oE -e 0 'help built-in prints the same help as the help option'
+readonly --help >help_option
+help readonly >help_builtin
+diff help_option help_builtin && echo same
+__IN__
+same
+__OUT__
+
+test_OE -e 0 'help option can be abbreviated and followed by a separator'
+readonly --he >/dev/null &&
+readonly --help -- >/dev/null
+__IN__
+
+test_O -d -e 2 'help option with another option'
+readonly --help -p
+__IN__
+
+test_O -d -e 2 'help option with an operand'
+readonly --help foo
+__IN__
+
+test_O -d -e 2 'help option with an operand after a separator'
+readonly --help -- foo
+__IN__
+
+test_O -d -e 2 'help option cannot be negated'
+readonly ++help
+__IN__

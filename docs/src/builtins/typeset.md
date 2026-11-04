@@ -193,6 +193,10 @@ Note: Evaluating the printed commands in the current shell environment may fail 
 
 See [Showing function definitions](../language/functions.md#showing-function-definitions).
 
+## Printing help
+
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
+
 ## Errors
 
 The read-only attribute cannot be removed from a variable or function. If a variable is already read-only, you cannot assign a value to it.

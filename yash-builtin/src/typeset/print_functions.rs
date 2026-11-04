@@ -81,8 +81,9 @@ fn print_one<S>(
         if let Some(attr) = option.attr
             && let Ok(attr) = FunctionAttr::try_from(attr)
             && attr.test(function).into()
+            && let Some(short) = option.short
         {
-            options_to_print.push(option.short);
+            options_to_print.push(short);
         }
     }
     if !options_to_print.is_empty() || context.builtin_is_significant {

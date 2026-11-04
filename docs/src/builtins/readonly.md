@@ -116,6 +116,10 @@ A command string of a function definition command is printed for each function, 
 Note that executing the printed commands in the current context will fail because the function is already defined and read-only.
 -->
 
+## Printing help
+
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
+
 ## Errors
 
 When making a variable read-only with a value, it is an error if the variable is already read-only.
@@ -153,7 +157,7 @@ error: error assigning to variable
 
 ## Compatibility
 
-This built-in is part of the POSIX standard. Printing variables is portable only when the `-p` option is used without operands, and the long option name `--print` is a non-standard extension. <!-- TODO: Operations on functions with the `-f` option are non-portable extensions. -->
+This built-in is part of the POSIX standard. Printing variables is portable only when the `-p` option is used without operands, and the long option name `--print` and the `--help` option are non-standard extensions. <!-- TODO: Operations on functions with the `-f` option are non-portable extensions. -->
 
 When the [`portable` option](../environment/options.md#portable) is set, these are errors:
 

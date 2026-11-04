@@ -30,6 +30,7 @@
 //! - Printed commands name the readonly built-in instead of the typeset built-in.
 //! - Printed commands do not include options that modify variable attributes.
 
+use crate::common::help::{Help, WithHelp, print_help_of_current_builtin};
 use crate::common::output;
 use crate::common::report::{merge_reports, report_error, report_failure};
 use crate::common::syntax::Mode;
@@ -37,7 +38,9 @@ use crate::typeset::Command;
 use crate::typeset::FunctionAttr;
 use crate::typeset::PrintContext;
 use crate::typeset::Scope::Global;
+use crate::typeset::TypesetHelp;
 use crate::typeset::VariableAttr;
+use crate::typeset::syntax::HELP_OPTION;
 use crate::typeset::syntax::OptionSpec;
 use crate::typeset::syntax::PRINT_OPTION;
 use crate::typeset::syntax::interpret;
@@ -53,6 +56,21 @@ use yash_env::system::concurrency::WriteAll;
 /// List of portable options applicable to the readonly built-in
 pub const PORTABLE_OPTIONS: &[OptionSpec<'static>] = &[PRINT_OPTION];
 
+/// List of all options applicable to the readonly built-in
+pub const ALL_OPTIONS: &[OptionSpec<'static>] = &[PRINT_OPTION, HELP_OPTION];
+
+/// Help information of the `readonly` built-in
+pub const HELP: &dyn Help = &TypesetHelp {
+    summary: "make variables read-only",
+    usage: &[
+        "readonly NAME[=VALUE]...",
+        "readonly -p [NAME...]",
+        "readonly",
+    ],
+    options: ALL_OPTIONS,
+    manual_page_name: "readonly",
+};
+
 /// Printing context for the readonly built-in
 pub const PRINT_CONTEXT: PrintContext<'static> = PrintContext {
     builtin_name: "readonly",
@@ -67,9 +85,9 @@ pub async fn main<S>(env: &mut Env<S>, args: Vec<Field>) -> Result
 where
     S: Isatty + WriteAll,
 {
-    match parse(PORTABLE_OPTIONS, Mode::with_env(env), args) {
+    match parse(ALL_OPTIONS, Mode::with_env(env), args) {
         Ok((options, operands)) => match interpret(options, operands, env.options.get(Portable)) {
-            Ok(mut command) => {
+            Ok(WithHelp::Main(mut command)) => {
                 match &mut command {
                     Command::SetVariables(sv) => {
                         sv.attrs.push((VariableAttr::ReadOnly, On));
@@ -87,6 +105,7 @@ where
                     Err(errors) => report_failure(env, merge_reports(&errors).unwrap()).await,
                 }
             }
+            Ok(WithHelp::Help) => print_help_of_current_builtin(env).await,
             Err(error) => report_error(env, &error).await,
         },
         Err(error) => report_error(env, &error).await,
