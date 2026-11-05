@@ -20,12 +20,47 @@
 //!
 //! [`kill` built-in]: https://magicant.github.io/yash-rs/builtins/kill.html
 
+use crate::common::help::{BuiltinHelp, HELP_OPTION, WithHelp, print_help_of_current_builtin};
 use crate::common::report::report_error;
+use crate::common::syntax::OptionSpec;
 use yash_env::Env;
 use yash_env::semantics::Field;
 use yash_env::signal::RawNumber;
 use yash_env::system::concurrency::WriteAll;
 use yash_env::system::{Isatty, SendSignal, Signals};
+
+/// Help information of the `kill` built-in
+///
+/// The built-in parses its arguments without [`OptionSpec`]s because of the
+/// special syntax of the signal-specifying option, so the option list here is
+/// used only for the help and must be kept in sync with the [`syntax`] module.
+pub static HELP: BuiltinHelp = BuiltinHelp {
+    summary: "send a signal to processes",
+    usage: &[
+        "kill [-s SIGNAL|-n SIGNAL|-SIGNAL] TARGET...",
+        "kill -l|-v [SIGNAL|EXIT_STATUS...]",
+    ],
+    options: &[
+        OptionSpec::new()
+            .short('s')
+            .argument("SIGNAL")
+            .description("send SIGNAL instead of TERM"),
+        OptionSpec::new()
+            .short('n')
+            .argument("SIGNAL")
+            .extension(true)
+            .description("same as -s"),
+        OptionSpec::new()
+            .short('l')
+            .description("list signal names"),
+        OptionSpec::new()
+            .short('v')
+            .extension(true)
+            .description("list signal numbers and names"),
+        HELP_OPTION,
+    ],
+    manual_page_name: "kill",
+};
 
 /// Parsed command line arguments
 ///
@@ -100,7 +135,8 @@ where
     S: Isatty + SendSignal + Signals + WriteAll,
 {
     match syntax::parse(env, args) {
-        Ok(command) => command.execute(env).await,
+        Ok(WithHelp::Main(command)) => command.execute(env).await,
+        Ok(WithHelp::Help) => print_help_of_current_builtin(env).await,
         Err(error) => report_error(env, &error).await,
     }
 }

@@ -42,6 +42,8 @@ without the `SIG` prefix.
 
 The **`-v`** option implies and extends the `-l` option by displaying the signal number before each name. The output format for `-v` may be changed in the future to include signal descriptions as well.
 
+(Since 3.6.0) The **`--help`** option prints the [help](index.html#help-option) of the built-in.
+
 ## Operands
 
 Without the `-l` or `-v` option, the built-in takes one or more operands
@@ -154,6 +156,8 @@ non-standard extension.
 
 Specifying a signal number to the `-n` option is a ksh extension. This
 implementation also supports the `-n` option with a signal name.
+
+The `--help` option is a non-standard extension.
 
 [POSIX Utility Argument Syntax](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap12.html#tag_12_01)
 requires a conforming application to write an option argument as a separate

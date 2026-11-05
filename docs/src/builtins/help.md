@@ -14,8 +14,6 @@ The built-in prints the help of the built-ins named by the operands to the stand
 
 Some built-ins print the same help when invoked with the [`--help` option](index.html#help-option).
 
-Not all built-ins have help yet.
-
 If no operand is given, the built-in prints a short description of the shell and a list of the available built-ins with their summaries, sorted by name. A built-in that has no help is listed with `(no help available)` in place of its summary.
 
 ## Options

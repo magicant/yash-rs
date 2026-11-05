@@ -22,6 +22,7 @@
 //! signal-specifying option.
 
 use super::Command;
+use crate::common::help::WithHelp;
 use thiserror::Error;
 use yash_env::Env;
 use yash_env::option::{Portable, State::On};
@@ -49,6 +50,17 @@ pub enum Error {
     /// offending option, and the `Field` is the argument containing it.
     #[error("non-portable option {0:?}")]
     NonPortableOption(char, Field),
+
+    /// A long option is used while the [`Portable`] shell option is on.
+    ///
+    /// The only long option the built-in accepts is `--help`, which POSIX
+    /// does not define.
+    #[error("non-portable option {:?}", .0.value)]
+    NonPortableLongOption(Field),
+
+    /// The `--help` option is used with other options or operands.
+    #[error("option {:?} cannot be used with other options or operands", .0.value)]
+    HelpWithOtherArguments(Field),
 
     /// The signal to send is specified and the `-l` or `-v` option is also
     /// specified.
@@ -165,6 +177,16 @@ impl Error {
                 format!("option `{option}` is not defined in POSIX").into(),
             ),
 
+            Self::NonPortableLongOption(field) => Snippet::with_primary_span(
+                &field.origin,
+                "long options are not defined in POSIX".into(),
+            ),
+
+            Self::HelpWithOtherArguments(field) => Snippet::with_primary_span(
+                &field.origin,
+                "the help option must be the only argument".into(),
+            ),
+
             Self::ConflictingOptions {
                 signal_arg,
                 list_option_name,
@@ -260,6 +282,7 @@ impl Error {
         };
 
         if let Self::NonPortableOption(..)
+        | Self::NonPortableLongOption(..)
         | Self::UnseparatedSignalArgument { .. }
         | Self::NonPortableSignalNumber { .. }
         | Self::NonPortableSignalPrefix { .. }
@@ -479,7 +502,11 @@ fn parse_list_case<I: Iterator<Item = Field>>(
 }
 
 /// Parses command line arguments.
-pub fn parse<S: Signals>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Error> {
+///
+/// This function returns [`WithHelp::Help`] if the arguments consist of
+/// `--help` only, which a separator may follow. Like other built-ins, the
+/// option name may be abbreviated, as in `--h`.
+pub fn parse<S: Signals>(env: &Env<S>, args: Vec<Field>) -> Result<WithHelp<Command>, Error> {
     let portable = env.options.get(Portable) == On;
     // POSIX requires the signal name to be specified without the SIG prefix.
     let allow_sig_prefix = !portable;
@@ -488,15 +515,28 @@ pub fn parse<S: Signals>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Erro
     let mut signal_origin = None;
     let mut list = None;
     let mut verbose = None;
+    let mut help = None;
 
     // Parse options
     while let Some(arg) =
         args.next_if(|arg| arg.value.strip_prefix('-').is_some_and(|s| !s.is_empty()))
     {
         let options = &arg.value[1..];
-        if options == "-" {
-            debug_assert_eq!(arg.value, "--");
-            break;
+        if let Some(long_option) = options.strip_prefix('-') {
+            if long_option.is_empty() {
+                break;
+            }
+            if !"help".starts_with(long_option) {
+                return Err(Error::UnknownOption(arg));
+            }
+            if portable {
+                return Err(Error::NonPortableLongOption(arg));
+            }
+            if help.is_some() {
+                return Err(Error::HelpWithOtherArguments(arg));
+            }
+            help = Some(arg);
+            continue;
         }
 
         // The obsolete `-SIGNAL` syntax takes precedence over option parsing so
@@ -593,6 +633,13 @@ pub fn parse<S: Signals>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Erro
         }
     }
 
+    if let Some(help) = help {
+        if signal_origin.is_some() || list.is_some() || verbose.is_some() || args.peek().is_some() {
+            return Err(Error::HelpWithOtherArguments(help));
+        }
+        return Ok(WithHelp::Help);
+    }
+
     // Parse operands and compute the result
     let command = if let Some(option_location) = verbose {
         parse_list_case(args, signal_origin, 'v', option_location, true)
@@ -616,7 +663,7 @@ pub fn parse<S: Signals>(env: &Env<S>, args: Vec<Field>) -> Result<Command, Erro
         check_portable_list_operands(&env.system, signals)?;
     }
 
-    Ok(command)
+    Ok(WithHelp::Main(command))
 }
 
 #[cfg(test)]
@@ -696,11 +743,11 @@ mod tests {
         let result = parse(&env, Field::dummies([""]));
         assert_eq!(
             result,
-            Ok(Command::Send {
+            Ok(WithHelp::Main(Command::Send {
                 signal: VirtualSystem::SIGTERM.as_raw(),
                 signal_origin: None,
                 targets: Field::dummies([""]),
-            })
+            }))
         )
     }
 
@@ -710,11 +757,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-"]));
         assert_eq!(
             result,
-            Ok(Command::Send {
+            Ok(WithHelp::Main(Command::Send {
                 signal: VirtualSystem::SIGTERM.as_raw(),
                 signal_origin: None,
                 targets: Field::dummies(["-"]),
-            })
+            }))
         );
     }
 
@@ -725,20 +772,20 @@ mod tests {
         let result = parse(&env, Field::dummies(["-s", "INT", "--", "0"]));
         assert_eq!(
             result,
-            Ok(Command::Send {
+            Ok(WithHelp::Main(Command::Send {
                 signal: VirtualSystem::SIGINT.as_raw(),
                 signal_origin: Some(Field::dummy("INT")),
                 targets: Field::dummies(["0"]),
-            })
+            }))
         );
 
         let result = parse(&env, Field::dummies(["-l", "--", "9"]));
         assert_eq!(
             result,
-            Ok(Command::Print {
+            Ok(WithHelp::Main(Command::Print {
                 signals: Field::dummies(["9"]),
                 verbose: false,
-            })
+            }))
         );
     }
 
@@ -748,11 +795,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-s", "QuIt", "1"]));
         assert_eq!(
             result,
-            Ok(Command::Send {
+            Ok(WithHelp::Main(Command::Send {
                 signal: VirtualSystem::SIGQUIT.as_raw(),
                 signal_origin: Some(Field::dummy("QuIt")),
                 targets: Field::dummies(["1"]),
-            })
+            }))
         );
     }
 
@@ -762,11 +809,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-sQuIt", "1"]));
         assert_eq!(
             result,
-            Ok(Command::Send {
+            Ok(WithHelp::Main(Command::Send {
                 signal: VirtualSystem::SIGQUIT.as_raw(),
                 signal_origin: Some(Field::dummy("-sQuIt")),
                 targets: Field::dummies(["1"]),
-            })
+            }))
         );
     }
 
@@ -776,11 +823,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-s", "9", "1"]));
         assert_eq!(
             result,
-            Ok(Command::Send {
+            Ok(WithHelp::Main(Command::Send {
                 signal: 9,
                 signal_origin: Some(Field::dummy("9")),
                 targets: Field::dummies(["1"]),
-            })
+            }))
         );
     }
 
@@ -790,11 +837,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-n", "QuIt", "1"]));
         assert_eq!(
             result,
-            Ok(Command::Send {
+            Ok(WithHelp::Main(Command::Send {
                 signal: VirtualSystem::SIGQUIT.as_raw(),
                 signal_origin: Some(Field::dummy("QuIt")),
                 targets: Field::dummies(["1"]),
-            })
+            }))
         );
     }
 
@@ -804,11 +851,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-KILL", "1"]));
         assert_eq!(
             result,
-            Ok(Command::Send {
+            Ok(WithHelp::Main(Command::Send {
                 signal: VirtualSystem::SIGKILL.as_raw(),
                 signal_origin: Some(Field::dummy("-KILL")),
                 targets: Field::dummies(["1"]),
-            })
+            }))
         );
     }
 
@@ -818,11 +865,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-stop", "1"]));
         assert_eq!(
             result,
-            Ok(Command::Send {
+            Ok(WithHelp::Main(Command::Send {
                 signal: VirtualSystem::SIGSTOP.as_raw(),
                 signal_origin: Some(Field::dummy("-stop")),
                 targets: Field::dummies(["1"]),
-            })
+            }))
         );
     }
 
@@ -832,11 +879,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-vtalrm", "1"]));
         assert_eq!(
             result,
-            Ok(Command::Send {
+            Ok(WithHelp::Main(Command::Send {
                 signal: VirtualSystem::SIGVTALRM.as_raw(),
                 signal_origin: Some(Field::dummy("-vtalrm")),
                 targets: Field::dummies(["1"]),
-            })
+            }))
         );
     }
 
@@ -846,11 +893,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-lost", "1"]));
         assert_eq!(
             result,
-            Ok(Command::Send {
+            Ok(WithHelp::Main(Command::Send {
                 signal: VirtualSystem::SIGLOST.unwrap().as_raw(),
                 signal_origin: Some(Field::dummy("-lost")),
                 targets: Field::dummies(["1"]),
-            })
+            }))
         );
     }
 
@@ -874,11 +921,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-9", "1"]));
         assert_eq!(
             result,
-            Ok(Command::Send {
+            Ok(WithHelp::Main(Command::Send {
                 signal: 9,
                 signal_origin: Some(Field::dummy("-9")),
                 targets: Field::dummies(["1"]),
-            })
+            }))
         );
     }
 
@@ -888,10 +935,10 @@ mod tests {
         let result = parse(&env, Field::dummies(["-l"]));
         assert_eq!(
             result,
-            Ok(Command::Print {
+            Ok(WithHelp::Main(Command::Print {
                 signals: vec![],
                 verbose: false,
-            })
+            }))
         );
     }
 
@@ -901,20 +948,20 @@ mod tests {
         let result = parse(&env, Field::dummies(["-v"]));
         assert_eq!(
             result,
-            Ok(Command::Print {
+            Ok(WithHelp::Main(Command::Print {
                 signals: vec![],
                 verbose: true,
-            })
+            }))
         );
     }
 
     #[test]
     fn option_l_and_v_combined() {
         let env = Env::new_virtual();
-        let expected_result = Ok(Command::Print {
+        let expected_result = Ok(WithHelp::Main(Command::Print {
             signals: vec![],
             verbose: true,
-        });
+        }));
 
         assert_eq!(parse(&env, Field::dummies(["-lv"])), expected_result);
         assert_eq!(parse(&env, Field::dummies(["-vl"])), expected_result);
@@ -928,10 +975,10 @@ mod tests {
         let result = parse(&env, Field::dummies(["-l", "Term", "1"]));
         assert_eq!(
             result,
-            Ok(Command::Print {
+            Ok(WithHelp::Main(Command::Print {
                 signals: Field::dummies(["Term", "1"]),
                 verbose: false,
-            })
+            }))
         );
     }
 
@@ -1199,10 +1246,10 @@ mod tests {
         let result = parse(&env, Field::dummies(["-l"]));
         assert_eq!(
             result,
-            Ok(Command::Print {
+            Ok(WithHelp::Main(Command::Print {
                 signals: vec![],
                 verbose: false,
-            })
+            }))
         );
     }
 
@@ -1244,11 +1291,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-s", "INT", "123"]));
         assert_eq!(
             result,
-            Ok(Command::Send {
+            Ok(WithHelp::Main(Command::Send {
                 signal: VirtualSystem::SIGINT.as_raw(),
                 signal_origin: Some(Field::dummy("INT")),
                 targets: Field::dummies(["123"]),
-            })
+            }))
         );
     }
 
@@ -1258,11 +1305,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-stop", "123"]));
         assert_eq!(
             result,
-            Ok(Command::Send {
+            Ok(WithHelp::Main(Command::Send {
                 signal: VirtualSystem::SIGSTOP.as_raw(),
                 signal_origin: Some(Field::dummy("-stop")),
                 targets: Field::dummies(["123"]),
-            })
+            }))
         );
     }
 
@@ -1272,11 +1319,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-vtalrm", "123"]));
         assert_eq!(
             result,
-            Ok(Command::Send {
+            Ok(WithHelp::Main(Command::Send {
                 signal: VirtualSystem::SIGVTALRM.as_raw(),
                 signal_origin: Some(Field::dummy("-vtalrm")),
                 targets: Field::dummies(["123"]),
-            })
+            }))
         );
     }
 
@@ -1286,11 +1333,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-KILL", "123"]));
         assert_eq!(
             result,
-            Ok(Command::Send {
+            Ok(WithHelp::Main(Command::Send {
                 signal: VirtualSystem::SIGKILL.as_raw(),
                 signal_origin: Some(Field::dummy("-KILL")),
                 targets: Field::dummies(["123"]),
-            })
+            }))
         );
     }
 
@@ -1300,11 +1347,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-9", "123"]));
         assert_eq!(
             result,
-            Ok(Command::Send {
+            Ok(WithHelp::Main(Command::Send {
                 signal: 9,
                 signal_origin: Some(Field::dummy("-9")),
                 targets: Field::dummies(["123"]),
-            })
+            }))
         );
     }
 
@@ -1381,11 +1428,11 @@ mod tests {
         let result = parse(&env, Field::dummies(["-s", "0", "123"]));
         assert_eq!(
             result,
-            Ok(Command::Send {
+            Ok(WithHelp::Main(Command::Send {
                 signal: 0,
                 signal_origin: Some(Field::dummy("0")),
                 targets: Field::dummies(["123"]),
-            })
+            }))
         );
     }
 
@@ -1431,10 +1478,10 @@ mod tests {
         let result = parse(&env, Field::dummies(["-l", "TERM1"]));
         assert_eq!(
             result,
-            Ok(Command::Print {
+            Ok(WithHelp::Main(Command::Print {
                 signals: Field::dummies(["TERM1"]),
                 verbose: false,
-            })
+            }))
         );
     }
 
@@ -1444,10 +1491,10 @@ mod tests {
         let result = parse(&env, Field::dummies(["-l", "9"]));
         assert_eq!(
             result,
-            Ok(Command::Print {
+            Ok(WithHelp::Main(Command::Print {
                 signals: Field::dummies(["9"]),
                 verbose: false,
-            })
+            }))
         );
     }
 
@@ -1458,21 +1505,21 @@ mod tests {
         let result = parse(&env, Field::dummies(["-s", "SIGINT", "123"]));
         assert_eq!(
             result,
-            Ok(Command::Send {
+            Ok(WithHelp::Main(Command::Send {
                 signal: VirtualSystem::SIGINT.as_raw(),
                 signal_origin: Some(Field::dummy("SIGINT")),
                 targets: Field::dummies(["123"]),
-            })
+            }))
         );
 
         let result = parse(&env, Field::dummies(["-SIGINT", "123"]));
         assert_eq!(
             result,
-            Ok(Command::Send {
+            Ok(WithHelp::Main(Command::Send {
                 signal: VirtualSystem::SIGINT.as_raw(),
                 signal_origin: Some(Field::dummy("-SIGINT")),
                 targets: Field::dummies(["123"]),
-            })
+            }))
         );
     }
 
@@ -1578,6 +1625,96 @@ mod tests {
                 field: Field::dummy("-sINT"),
                 argument_index: 2,
             })
+        );
+    }
+
+    #[test]
+    fn help_option() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["--help"]));
+        assert_eq!(result, Ok(WithHelp::Help));
+    }
+
+    #[test]
+    fn help_option_abbreviated() {
+        let env = Env::new_virtual();
+        for arg in ["--h", "--he", "--hel"] {
+            let result = parse(&env, Field::dummies([arg]));
+            assert_eq!(result, Ok(WithHelp::Help), "arg = {arg:?}");
+        }
+    }
+
+    #[test]
+    fn help_option_followed_by_separator() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["--help", "--"]));
+        assert_eq!(result, Ok(WithHelp::Help));
+    }
+
+    #[test]
+    fn unknown_long_option() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["--helpx", "123"]));
+        assert_eq!(result, Err(Error::UnknownOption(Field::dummy("--helpx"))));
+    }
+
+    #[test]
+    fn help_option_with_other_arguments() {
+        let env = Env::new_virtual();
+        for args in [
+            &["--help", "-l"][..],
+            &["-v", "--help"],
+            &["-s", "INT", "--help"],
+            &["-INT", "--help"],
+            &["--help", "123"],
+            &["--help", "--", "123"],
+            &["--help", "--", "--"],
+        ] {
+            let result = parse(&env, Field::dummies(args.iter().copied()));
+            assert_eq!(
+                result,
+                Err(Error::HelpWithOtherArguments(Field::dummy("--help"))),
+                "args = {args:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn help_option_given_twice() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["--help", "--he"]));
+        assert_eq!(
+            result,
+            Err(Error::HelpWithOtherArguments(Field::dummy("--he")))
+        );
+    }
+
+    #[test]
+    fn help_option_as_signal_argument() {
+        let env = Env::new_virtual();
+        let result = parse(&env, Field::dummies(["-s", "--help", "123"]));
+        assert_eq!(result, Err(Error::InvalidSignal(Field::dummy("--help"))));
+    }
+
+    #[test]
+    fn help_option_rejected_under_portable() {
+        let env = portable_env();
+        let result = parse(&env, Field::dummies(["--he"]));
+        assert_eq!(
+            result,
+            Err(Error::NonPortableLongOption(Field::dummy("--he")))
+        );
+    }
+
+    #[test]
+    fn non_portable_long_option_report() {
+        let error = Error::NonPortableLongOption(Field::dummy("--help"));
+        assert_eq!(error.to_string(), "non-portable option \"--help\"");
+        let report = error.to_report();
+        assert_eq!(report.footnotes.len(), 1);
+        assert_eq!(
+            report.footnotes[0].label,
+            "this error is reported because the `portable` shell option is enabled"
         );
     }
 }
