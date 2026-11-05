@@ -21,7 +21,7 @@
 //! [`cd` built-in]: https://magicant.github.io/yash-rs/builtins/cd.html
 
 use crate::Result;
-use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
+use crate::common::help::{BuiltinHelp, Help, WithHelp, print_help_of_current_builtin};
 use crate::common::report::report;
 use yash_env::Env;
 use yash_env::path::Path;
@@ -127,7 +127,7 @@ where
 }
 
 /// Help information of the `cd` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "change the working directory",
     usage: &["cd [-L|-P [-e]] [DIRECTORY]"],
     options: syntax::OPTION_SPECS.get(),

@@ -24,7 +24,7 @@
 //!
 //! The result for the `-P` option is obtained with [`GetCwd::getcwd`].
 
-use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
+use crate::common::help::{BuiltinHelp, Help, WithHelp, print_help_of_current_builtin};
 use crate::common::output;
 use crate::common::report::{report_error, report_failure};
 use yash_env::Env;
@@ -53,7 +53,7 @@ pub mod semantics;
 pub mod syntax;
 
 /// Help information of the `pwd` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "print the working directory path",
     usage: &["pwd [-L|-P]"],
     options: syntax::OPTION_SPECS.get(),

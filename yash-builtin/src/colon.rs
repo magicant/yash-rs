@@ -21,7 +21,7 @@
 //! [`:` built-in]: https://magicant.github.io/yash-rs/builtins/colon.html
 
 use crate::Result;
-use crate::common::help::BuiltinHelp;
+use crate::common::help::{BuiltinHelp, Help};
 use yash_env::Env;
 use yash_env::semantics::Field;
 
@@ -29,7 +29,7 @@ use yash_env::semantics::Field;
 ///
 /// This built-in does not accept the `--help` option, so the help is available
 /// only from the `help` built-in.
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "do nothing",
     usage: &[": [ARGUMENT...]"],
     options: &[],

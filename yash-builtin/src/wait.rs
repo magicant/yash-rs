@@ -28,7 +28,7 @@
 //! in [`Env::any`] to handle trapped signals while waiting for jobs. If there
 //! is no such instance, the built-in will ignore all signals.
 
-use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
+use crate::common::help::{BuiltinHelp, Help, WithHelp, print_help_of_current_builtin};
 use crate::common::report::{
     group_errors_by_kind, merge_reports, report, report_error, report_simple_failure,
 };
@@ -135,7 +135,7 @@ impl Command {
 }
 
 /// Help information of the `wait` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "wait for jobs to finish",
     usage: &["wait [JOB_ID_OR_PROCESS_ID...]"],
     options: syntax::OPTION_SPECS.get(),

@@ -20,7 +20,7 @@
 //!
 //! [`unalias` built-in]: https://magicant.github.io/yash-rs/builtins/unalias.html
 
-use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
+use crate::common::help::{BuiltinHelp, Help, WithHelp, print_help_of_current_builtin};
 use crate::common::report::merge_reports;
 use crate::common::report::report_error;
 use crate::common::report::report_failure;
@@ -42,7 +42,7 @@ pub mod semantics;
 pub mod syntax;
 
 /// Help information of the `unalias` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "remove aliases",
     usage: &["unalias NAME...", "unalias -a"],
     options: syntax::OPTION_SPECS.get(),

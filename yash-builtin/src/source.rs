@@ -34,7 +34,7 @@
 //! [`RunReadEvalLoop`]: yash_env::semantics::RunReadEvalLoop
 
 use crate::Result;
-use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
+use crate::common::help::{BuiltinHelp, Help, WithHelp, print_help_of_current_builtin};
 use yash_env::Env;
 #[cfg(doc)]
 use yash_env::semantics::ExitStatus;
@@ -61,7 +61,7 @@ pub struct Command {
 }
 
 /// Help information of the `.` (`source`) built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "execute commands in a file",
     usage: &[". FILE [ARGUMENT...]", "source FILE [ARGUMENT...]"],
     options: syntax::OPTION_SPECS.get(),

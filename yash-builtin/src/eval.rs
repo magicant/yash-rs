@@ -28,7 +28,7 @@
 
 use crate::Result;
 use crate::common::help::{
-    BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+    BuiltinHelp, HELP_OPTION, Help, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
     print_help_of_current_builtin,
 };
 use crate::common::report::report_error;
@@ -49,7 +49,7 @@ use yash_env::system::concurrency::WriteAll;
 const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION]);
 
 /// Help information of the `eval` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "evaluate arguments as shell commands",
     usage: &["eval [COMMAND...]"],
     options: OPTION_SPECS.get(),

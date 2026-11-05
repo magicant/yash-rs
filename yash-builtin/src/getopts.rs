@@ -28,7 +28,7 @@
 //! invocation.
 
 use crate::common::help::{
-    BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+    BuiltinHelp, HELP_OPTION, Help, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
     print_help_of_current_builtin,
 };
 use crate::common::report::{report_error, report_simple_error};
@@ -68,7 +68,7 @@ fn indexes_to_optind(arg_index: NonZeroUsize, char_index: NonZeroUsize) -> Strin
 const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION]);
 
 /// Help information of the `getopts` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "parse options in shell scripts",
     usage: &["getopts OPTION_SPEC VARIABLE_NAME [ARGUMENT...]"],
     options: OPTION_SPECS.get(),

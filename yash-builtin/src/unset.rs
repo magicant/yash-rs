@@ -22,7 +22,7 @@
 //! [`unset` built-in]: https://magicant.github.io/yash-rs/builtins/unset.html
 
 use crate::Result;
-use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
+use crate::common::help::{BuiltinHelp, Help, WithHelp, print_help_of_current_builtin};
 use crate::common::report::{merge_reports, report_error, report_failure};
 use yash_env::Env;
 use yash_env::semantics::Field;
@@ -56,7 +56,7 @@ pub mod semantics;
 pub mod syntax;
 
 /// Help information of the `unset` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "unset variables or functions",
     usage: &["unset [-f|-v] NAME..."],
     options: syntax::OPTION_SPECS.get(),

@@ -21,7 +21,7 @@
 //!
 //! [`umask` built-in]: https://magicant.github.io/yash-rs/builtins/umask.html
 
-use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
+use crate::common::help::{BuiltinHelp, Help, WithHelp, print_help_of_current_builtin};
 use crate::common::output;
 use crate::common::report::report_error;
 use yash_env::Env;
@@ -93,7 +93,7 @@ impl Command {
 }
 
 /// Help information of the `umask` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "print or set the file mode creation mask",
     usage: &["umask [-S] [MODE]"],
     options: syntax::OPTION_SPECS.get(),

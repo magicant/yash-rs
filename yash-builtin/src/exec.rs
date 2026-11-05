@@ -32,7 +32,7 @@
 //! be made permanent.
 
 use crate::common::help::{
-    BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+    BuiltinHelp, HELP_OPTION, Help, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
     print_help_of_current_builtin,
 };
 use crate::common::report::report_error;
@@ -57,7 +57,7 @@ use yash_env::trap::SignalSystem;
 const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION]);
 
 /// Help information of the `exec` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "replace the shell process with a utility",
     usage: &["exec [NAME [ARGUMENT...]]"],
     options: OPTION_SPECS.get(),
