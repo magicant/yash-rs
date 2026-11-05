@@ -26,7 +26,7 @@
 //! See the source code for [`Resource::as_raw_type`] to see which resources are
 //! supported on which platforms.
 
-use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
+use crate::common::help::{BuiltinHelp, Help, WithHelp, print_help_of_current_builtin};
 use crate::common::output;
 use crate::common::report::{report_error, report_simple_failure};
 use yash_env::Env;
@@ -133,7 +133,7 @@ impl Command {
 }
 
 /// Help information of the `ulimit` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "show or set resource limits",
     usage: &[
         "ulimit [-HS] [RESOURCE_OPTION] [LIMIT]",

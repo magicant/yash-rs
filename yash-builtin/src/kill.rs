@@ -20,7 +20,9 @@
 //!
 //! [`kill` built-in]: https://magicant.github.io/yash-rs/builtins/kill.html
 
-use crate::common::help::{BuiltinHelp, HELP_OPTION, WithHelp, print_help_of_current_builtin};
+use crate::common::help::{
+    BuiltinHelp, HELP_OPTION, Help, WithHelp, print_help_of_current_builtin,
+};
 use crate::common::report::report_error;
 use crate::common::syntax::OptionSpec;
 use yash_env::Env;
@@ -34,7 +36,7 @@ use yash_env::system::{Isatty, SendSignal, Signals};
 /// The built-in parses its arguments without [`OptionSpec`]s because of the
 /// special syntax of the signal-specifying option, so the option list here is
 /// used only for the help and must be kept in sync with the [`syntax`] module.
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "send a signal to processes",
     usage: &[
         "kill [-s SIGNAL|-n SIGNAL|-SIGNAL] TARGET...",

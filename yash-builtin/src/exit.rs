@@ -59,7 +59,7 @@
 //! not consulted by this built-in.
 
 use crate::common::help::{
-    BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+    BuiltinHelp, HELP_OPTION, Help, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
     print_help_of_current_builtin,
 };
 use crate::common::report::{report_error, syntax_error};
@@ -88,7 +88,7 @@ const OPTIONS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
 ]);
 
 /// Help information of the `exit` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "exit the shell",
     usage: &["exit [-f] [EXIT_STATUS]"],
     options: OPTIONS.get(),

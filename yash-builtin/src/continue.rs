@@ -31,7 +31,7 @@
 //! break built-in implementation.
 //! This module re-exports [`super::break::syntax`].
 
-use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
+use crate::common::help::{BuiltinHelp, Help, WithHelp, print_help_of_current_builtin};
 use crate::common::report::{report_error, report_simple_failure};
 use yash_env::Env;
 use yash_env::builtin::Result;
@@ -44,7 +44,7 @@ pub mod semantics;
 pub use super::r#break::syntax;
 
 /// Help information of the `continue` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "resume the next iteration of loops",
     usage: &["continue [N]"],
     options: syntax::OPTION_SPECS.get(),

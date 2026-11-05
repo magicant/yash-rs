@@ -41,7 +41,7 @@ use crate::bg::OperandErrorKind;
 use crate::bg::ResumeError;
 use crate::bg::report_operand_errors;
 use crate::common::help::{
-    BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+    BuiltinHelp, HELP_OPTION, Help, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
     print_help_of_current_builtin,
 };
 use crate::common::report::{report_error, report_simple_failure};
@@ -189,7 +189,7 @@ fn should_interrupt<S: Signals>(env: &Env<S>, result: &ProcessResult) -> bool {
 const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION]);
 
 /// Help information of the `fg` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "resume a job in the foreground",
     usage: &["fg [JOB_ID]"],
     options: OPTION_SPECS.get(),

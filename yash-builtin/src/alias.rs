@@ -21,7 +21,7 @@
 //!
 //! [`alias` built-in]: https://magicant.github.io/yash-rs/builtins/alias.html
 
-use crate::common::help::{BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp};
+use crate::common::help::{BuiltinHelp, HELP_OPTION, Help, OptionSpecsWithHelp, WithHelp};
 use crate::common::help::{parse_arguments_with_help, print_help_of_current_builtin};
 use crate::common::output;
 use crate::common::report::group_errors_by_kind;
@@ -49,7 +49,7 @@ pub mod semantics;
 const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION]);
 
 /// Help information of the `alias` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "define or print aliases",
     usage: &["alias [NAME[=VALUE]...]"],
     options: OPTION_SPECS.get(),

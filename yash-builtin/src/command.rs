@@ -43,7 +43,7 @@
 //! [`RunFunction`]: yash_env::semantics::command::RunFunction
 //! [`type`]: crate::type
 
-use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
+use crate::common::help::{BuiltinHelp, Help, WithHelp, print_help_of_current_builtin};
 use crate::common::report::report_error;
 use enumset::EnumSet;
 use enumset::EnumSetType;
@@ -217,7 +217,7 @@ pub mod search;
 pub mod syntax;
 
 /// Help information of the `command` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "execute or identify a command bypassing functions",
     usage: &["command [-p] NAME [ARGUMENT...]", "command -v|-V [-p] NAME"],
     options: syntax::OPTION_SPECS.get(),

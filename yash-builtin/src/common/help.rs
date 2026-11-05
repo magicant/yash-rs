@@ -42,7 +42,7 @@
 //!
 //! ```
 //! use yash_builtin::common::help::{
-//!     BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+//!     BuiltinHelp, HELP_OPTION, Help, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
 //!     print_help_of_current_builtin,
 //! };
 //! use yash_builtin::common::report::report_error;
@@ -62,7 +62,7 @@
 //! ]);
 //!
 //! // The help lists the same options as the built-in accepts.
-//! static HELP: BuiltinHelp = BuiltinHelp {
+//! const HELP: &dyn Help = &BuiltinHelp {
 //!     summary: "do something with files",
 //!     usage: &["foo [-n] FILE..."],
 //!     options: OPTION_SPECS.get(),
@@ -89,7 +89,7 @@
 //! // When setting up the environment, register the help together with the
 //! // built-in itself.
 //! fn register_foo<S>(env: &mut Env<S>) {
-//!     yash_builtin::help::register(env, "foo", &HELP);
+//!     yash_builtin::help::register(env, "foo", HELP);
 //! }
 //! ```
 

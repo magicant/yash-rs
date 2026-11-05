@@ -21,7 +21,7 @@
 //! [`true` built-in]: https://magicant.github.io/yash-rs/builtins/true.html
 
 use crate::Result;
-use crate::common::help::BuiltinHelp;
+use crate::common::help::{BuiltinHelp, Help};
 use crate::common::no_arg::warn_if_any_argument;
 use yash_env::Env;
 use yash_env::semantics::Field;
@@ -32,7 +32,7 @@ use yash_env::system::concurrency::WriteAll;
 ///
 /// This built-in does not accept the `--help` option, so the help is available
 /// only from the `help` built-in.
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "do nothing, successfully",
     usage: &["true"],
     options: &[],

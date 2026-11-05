@@ -38,7 +38,7 @@
 //!   caller should use the value of `$?` before entering trap.
 
 use crate::common::help::{
-    BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+    BuiltinHelp, HELP_OPTION, Help, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
     print_help_of_current_builtin,
 };
 use crate::common::report::{report_error, syntax_error};
@@ -66,7 +66,7 @@ const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
 ]);
 
 /// Help information of the `return` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "return from a function or script",
     usage: &["return [-n] [EXIT_STATUS]"],
     options: OPTION_SPECS.get(),

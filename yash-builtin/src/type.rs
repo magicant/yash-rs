@@ -24,7 +24,7 @@ use crate::command::Command;
 use crate::command::Identify;
 use crate::command::syntax::interpret;
 use crate::common::help::{
-    BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+    BuiltinHelp, HELP_OPTION, Help, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
     print_help_of_current_builtin,
 };
 use crate::common::report::report_error;
@@ -45,7 +45,7 @@ const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
 ]);
 
 /// Help information of the `type` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "identify the type of commands",
     usage: &["type [NAME...]"],
     options: OPTION_SPECS.get(),

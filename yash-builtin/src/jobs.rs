@@ -21,7 +21,7 @@
 //! [`jobs` built-in]: https://magicant.github.io/yash-rs/builtins/jobs.html
 
 use crate::common::help::{
-    BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+    BuiltinHelp, HELP_OPTION, Help, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
     print_help_of_current_builtin,
 };
 use crate::common::output;
@@ -64,7 +64,7 @@ const OPTIONS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[
 ]);
 
 /// Help information of the `jobs` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "print the status of jobs",
     usage: &["jobs [-l|-p] [JOB_ID...]"],
     options: OPTIONS.get(),

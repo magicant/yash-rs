@@ -30,7 +30,7 @@
 //! be available in the environment's [`any`](yash_env::Env::any) storage. If no
 //! such instance is found, the built-in will **panic**.
 
-use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
+use crate::common::help::{BuiltinHelp, Help, WithHelp, print_help_of_current_builtin};
 use crate::common::report::{merge_reports, report, report_simple};
 use yash_env::Env;
 use yash_env::semantics::ExitStatus;
@@ -58,7 +58,7 @@ pub const EXIT_STATUS_READ_ERROR: ExitStatus = ExitStatus(3);
 pub const EXIT_STATUS_SYNTAX_ERROR: ExitStatus = ExitStatus(4);
 
 /// Help information of the `read` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "read a line into variables",
     usage: &["read [-d DELIMITER] [-r] VARIABLE..."],
     options: syntax::OPTION_SPECS.get(),

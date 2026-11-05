@@ -28,7 +28,7 @@
 //! [`TrapSet::enter_subshell`] and [`TrapSet::set_action`] for details.
 
 use crate::common::help::{
-    BuiltinHelp, WithHelp, parse_arguments_with_help, print_help_of_current_builtin,
+    BuiltinHelp, Help, WithHelp, parse_arguments_with_help, print_help_of_current_builtin,
 };
 use crate::common::report::merge_reports;
 use crate::common::report::report_error;
@@ -275,7 +275,7 @@ impl Command {
 }
 
 /// Help information of the `trap` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "set or print traps",
     usage: &["trap [ACTION] CONDITION...", "trap [-p [CONDITION...]]"],
     options: syntax::OPTION_SPECS.get(),

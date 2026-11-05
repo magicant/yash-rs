@@ -29,7 +29,7 @@
 //!
 //! [`break` built-in]: https://magicant.github.io/yash-rs/builtins/break.html
 
-use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
+use crate::common::help::{BuiltinHelp, Help, WithHelp, print_help_of_current_builtin};
 use crate::common::report::{report_error, report_simple_failure};
 use yash_env::Env;
 use yash_env::builtin::Result;
@@ -42,7 +42,7 @@ pub mod semantics;
 pub mod syntax;
 
 /// Help information of the `break` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "exit from loops",
     usage: &["break [N]"],
     options: syntax::OPTION_SPECS.get(),

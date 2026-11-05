@@ -21,7 +21,7 @@
 //!
 //! [`times` built-in]: https://magicant.github.io/yash-rs/builtins/times.html
 
-use crate::common::help::{BuiltinHelp, WithHelp, print_help_of_current_builtin};
+use crate::common::help::{BuiltinHelp, Help, WithHelp, print_help_of_current_builtin};
 use crate::common::output;
 use crate::common::report::report_error;
 use crate::common::report::report_simple_failure;
@@ -34,7 +34,7 @@ mod format;
 mod syntax;
 
 /// Help information of the `times` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "print accumulated user and system times",
     usage: &["times"],
     options: syntax::OPTION_SPECS.get(),

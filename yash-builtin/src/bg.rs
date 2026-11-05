@@ -35,7 +35,7 @@
 //! [expected state]: yash_env::job::Job::expected_state
 
 use crate::common::help::{
-    BuiltinHelp, HELP_OPTION, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
+    BuiltinHelp, HELP_OPTION, Help, OptionSpecsWithHelp, WithHelp, parse_arguments_with_help,
     print_help_of_current_builtin,
 };
 use crate::common::report::job;
@@ -229,7 +229,7 @@ where
 const OPTION_SPECS: OptionSpecsWithHelp = OptionSpecsWithHelp::new(&[HELP_OPTION]);
 
 /// Help information of the `bg` built-in
-pub static HELP: BuiltinHelp = BuiltinHelp {
+pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "resume jobs in the background",
     usage: &["bg [JOB_ID...]"],
     options: OPTION_SPECS.get(),
