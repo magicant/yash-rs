@@ -32,6 +32,7 @@
 //! differently from all of them.
 
 use self::syntax::OptionSpec;
+use crate::common::help::{WithHelp, print_help_of_current_builtin};
 use crate::common::output;
 use crate::common::report::{merge_reports, report_error, report_failure};
 use crate::common::syntax::Mode;
@@ -49,11 +50,15 @@ use yash_env::system::Isatty;
 use yash_env::system::concurrency::WriteAll;
 use yash_env::variable::{Value, Variable};
 
+mod help;
 mod print_functions;
 mod print_variables;
 mod set_functions;
 mod set_variables;
 pub mod syntax;
+
+pub use self::help::HELP;
+pub(crate) use self::help::TypesetHelp;
 
 /// Attribute that can be set on a variable
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -490,10 +495,11 @@ where
     match syntax::parse(syntax::ALL_OPTIONS, Mode::with_env(env), args) {
         Ok((options, operands)) => {
             match syntax::interpret(options, operands, env.options.get(Portable)) {
-                Ok(command) => match command.execute(env, &PRINT_CONTEXT) {
+                Ok(WithHelp::Main(command)) => match command.execute(env, &PRINT_CONTEXT) {
                     Ok(result) => output(env, &result).await,
                     Err(errors) => report_failure(env, merge_reports(&errors).unwrap()).await,
                 },
+                Ok(WithHelp::Help) => print_help_of_current_builtin(env).await,
                 Err(error) => report_error(env, &error).await,
             }
         }

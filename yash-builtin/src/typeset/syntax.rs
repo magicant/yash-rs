@@ -21,6 +21,7 @@
 //! operands, and the latter interprets them into a [`Command`].
 
 use super::*;
+use crate::common::help::WithHelp;
 use crate::common::syntax::Mode;
 use std::iter::Peekable;
 use thiserror::Error;
@@ -68,56 +69,79 @@ impl TryFrom<Attr> for FunctionAttr {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct OptionSpec<'a> {
     /// Short option name
-    pub short: char,
+    pub short: Option<char>,
     /// Long option name (not including the leading `--`)
     pub long: &'a str,
     /// Attribute specified by this option
+    ///
+    /// An option that has an attribute can be canceled with `+` or `++`.
     pub attr: Option<Attr>,
+    /// Description of the option shown in the help
+    pub description: &'a str,
 }
 
 impl std::fmt::Display for OptionSpec<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "-{}/--{}", self.short, self.long)
+        match self.short {
+            Some(short) => write!(f, "-{}/--{}", short, self.long),
+            None => write!(f, "--{}", self.long),
+        }
     }
 }
 
 /// Specification of the `-f`/`--functions` option
 pub const FUNCTIONS_OPTION: OptionSpec<'static> = OptionSpec {
-    short: 'f',
+    short: Some('f'),
     long: "functions",
     attr: None,
+    description: "operate on functions instead of variables",
 };
 /// Specification of the `-g`/`--global` option
 pub const GLOBAL_OPTION: OptionSpec<'static> = OptionSpec {
-    short: 'g',
+    short: Some('g'),
     long: "global",
     attr: None,
+    description: "operate on global variables instead of local ones",
 };
 /// Specification of the `-p`/`--print` option
 pub const PRINT_OPTION: OptionSpec<'static> = OptionSpec {
-    short: 'p',
+    short: Some('p'),
     long: "print",
     attr: None,
+    description: "print the current definitions",
 };
 /// Specification of the `-r`/`--readonly` option
 pub const READONLY_OPTION: OptionSpec<'static> = OptionSpec {
-    short: 'r',
+    short: Some('r'),
     long: "readonly",
     attr: Some(Attr::ReadOnly),
+    description: "make read-only",
 };
 /// Specification of the `-x`/`--export` option
 pub const EXPORT_OPTION: OptionSpec<'static> = OptionSpec {
-    short: 'x',
+    short: Some('x'),
     long: "export",
     attr: Some(Attr::Export),
+    description: "export to the environment (+x to stop)",
 };
 /// Specification of the `-X`/`--unexport` option
 ///
 /// This option is deprecated.
 pub const UNEXPORT_OPTION: OptionSpec<'static> = OptionSpec {
-    short: 'X',
+    short: Some('X'),
     long: "unexport",
     attr: None,
+    description: "stop exporting (deprecated; use +x)",
+};
+/// Specification of the `--help` option
+///
+/// [`interpret`] returns [`WithHelp::Help`] if this option is the only
+/// argument.
+pub const HELP_OPTION: OptionSpec<'static> = OptionSpec {
+    short: None,
+    long: "help",
+    attr: None,
+    description: crate::common::help::HELP_OPTION.get_description(),
 };
 
 /// List of all option specifications applicable to the typeset built-in
@@ -128,6 +152,7 @@ pub const ALL_OPTIONS: &[OptionSpec<'static>] = &[
     READONLY_OPTION,
     EXPORT_OPTION,
     UNEXPORT_OPTION,
+    HELP_OPTION,
 ];
 
 /// Occurrence of an option
@@ -246,7 +271,7 @@ fn try_parse_short<'a, I: Iterator<Item = Field>>(
 
     let field = args.next().unwrap();
     for c in field.value.chars().skip(1) {
-        let spec = match option_specs.iter().find(|spec| spec.short == c) {
+        let spec = match option_specs.iter().find(|spec| spec.short == Some(c)) {
             Some(spec) => spec,
             None => return Err(ParseError::UnknownShortOption(c, field)),
         };
@@ -381,6 +406,13 @@ pub enum InterpretError<'a> {
         /// This vector is never empty.
         operands: Vec<Field>,
     },
+
+    /// `--help` used with other options or operands
+    ///
+    /// The field value is the canonical option name, and the field origin is
+    /// the location of the option as written in the command line.
+    #[error("option {:?} cannot be used with other options or operands", .0.value)]
+    HelpWithOtherArguments(Field),
 }
 
 impl InterpretError<'_> {
@@ -407,6 +439,11 @@ impl InterpretError<'_> {
                     },
                     &mut report.snippets,
                 );
+            }
+
+            Self::HelpWithOtherArguments(field) => {
+                report.snippets =
+                    Snippet::with_primary_span(&field.origin, field.value.as_str().into());
             }
 
             // There is no operand to annotate, so the report has no snippet of
@@ -461,13 +498,28 @@ impl<'a> From<&'a InterpretError<'a>> for Report<'a> {
 /// [`InterpretError::MissingOperand`] or
 /// [`InterpretError::UnexpectedOperands`].
 ///
+/// If `options` contain [`HELP_OPTION`] only and there are no operands, this
+/// function returns [`WithHelp::Help`]. If `HELP_OPTION` is given with other
+/// options or operands, it returns [`InterpretError::HelpWithOtherArguments`].
+///
 /// If `options` contain an `OptionSpec` that is not contained in
 /// [`ALL_OPTIONS`], this function will panic.
 pub fn interpret(
     options: Vec<OptionOccurrence>,
     operands: Vec<Field>,
     portable: State,
-) -> Result<Command, InterpretError> {
+) -> Result<WithHelp<Command>, InterpretError> {
+    if let Some(help) = options.iter().find(|option| *option.spec == HELP_OPTION) {
+        if options.len() > 1 || !operands.is_empty() {
+            let field = Field {
+                value: help.spec.to_string(),
+                origin: help.location.clone(),
+            };
+            return Err(InterpretError::HelpWithOtherArguments(field));
+        }
+        return Ok(WithHelp::Help);
+    }
+
     let mut functions_option_index = None;
     let mut global_option_index = None;
     let mut print_option_index = None;
@@ -475,13 +527,13 @@ pub fn interpret(
     let mut attrs = Vec::new();
     for (index, option) in options.iter().enumerate() {
         match option.spec.short {
-            'f' => functions_option_index = Some(index),
-            'g' => global_option_index = Some(index),
-            'p' => {
+            Some('f') => functions_option_index = Some(index),
+            Some('g') => global_option_index = Some(index),
+            Some('p') => {
                 print_option_index = Some(index);
                 print = true;
             }
-            'X' => attrs.push((index, Attr::Export, !option.state)),
+            Some('X') => attrs.push((index, Attr::Export, !option.state)),
             _ => attrs.push((index, option.spec.attr.unwrap(), option.state)),
         }
     }
@@ -518,9 +570,9 @@ pub fn interpret(
             })?;
 
         if print {
-            Ok((PrintFunctions { functions, attrs }).into())
+            Ok(WithHelp::Main(PrintFunctions { functions, attrs }.into()))
         } else {
-            Ok((SetFunctions { functions, attrs }).into())
+            Ok(WithHelp::Main(SetFunctions { functions, attrs }.into()))
         }
     } else {
         let variables = operands;
@@ -540,14 +592,14 @@ pub fn interpret(
                 attrs,
                 scope,
             };
-            Ok(pv.into())
+            Ok(WithHelp::Main(pv.into()))
         } else {
             let sv = SetVariables {
                 variables,
                 attrs,
                 scope,
             };
-            Ok(sv.into())
+            Ok(WithHelp::Main(sv.into()))
         }
     }
 }
@@ -722,9 +774,10 @@ mod tests {
     #[test]
     fn parse_ambiguous_long_option() {
         pub const EXPAND_OPTION: OptionSpec<'static> = OptionSpec {
-            short: 'x',
+            short: Some('x'),
             long: "expand",
             attr: None,
+            description: "",
         };
         assert_eq!(
             parse(
@@ -812,7 +865,7 @@ mod tests {
     #[test]
     fn interpret_empty_arguments() {
         let result = interpret(vec![], vec![], State::Off).unwrap();
-        assert_matches!(result, Command::PrintVariables(pv) => {
+        assert_matches!(result, WithHelp::Main(Command::PrintVariables(pv)) => {
             assert_eq!(pv.variables, []);
             assert_eq!(pv.attrs, []);
             assert_eq!(pv.scope, Scope::Local);
@@ -823,7 +876,7 @@ mod tests {
     fn interpret_some_operands_without_options() {
         let vars = Field::dummies(["foo", "bar"]);
         let result = interpret(vec![], vars.clone(), State::Off).unwrap();
-        assert_matches!(result, Command::SetVariables(sv) => {
+        assert_matches!(result, WithHelp::Main(Command::SetVariables(sv)) => {
             assert_eq!(sv.variables, vars);
             assert_eq!(sv.attrs, []);
             assert_eq!(sv.scope, Scope::Local);
@@ -845,7 +898,7 @@ mod tests {
             vec![],
             State::Off,
         );
-        assert_matches!(result, Ok(Command::PrintFunctions(pf)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::PrintFunctions(pf))) => {
             assert_eq!(pf.functions, []);
             assert_eq!(pf.attrs, []);
         });
@@ -859,7 +912,7 @@ mod tests {
             functions.clone(),
             State::Off,
         );
-        assert_matches!(result, Ok(Command::SetFunctions(sf)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::SetFunctions(sf))) => {
             assert_eq!(sf.functions, functions);
             assert_eq!(sf.attrs, []);
         });
@@ -872,7 +925,7 @@ mod tests {
             vec![],
             State::Off,
         );
-        assert_matches!(result, Ok(Command::PrintVariables(pv)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::PrintVariables(pv))) => {
             assert_eq!(pv.variables, []);
             assert_eq!(pv.attrs, []);
             assert_eq!(pv.scope, Scope::Global);
@@ -887,7 +940,7 @@ mod tests {
             vars.clone(),
             State::Off,
         );
-        assert_matches!(result, Ok(Command::SetVariables(sv)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::SetVariables(sv))) => {
             assert_eq!(sv.variables, vars);
             assert_eq!(sv.attrs, []);
             assert_eq!(sv.scope, Scope::Global);
@@ -901,7 +954,7 @@ mod tests {
             vec![],
             State::Off,
         );
-        assert_matches!(result, Ok(Command::PrintVariables(pv)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::PrintVariables(pv))) => {
             assert_eq!(pv.variables, []);
             assert_eq!(pv.attrs, []);
             assert_eq!(pv.scope, Scope::Local);
@@ -916,7 +969,7 @@ mod tests {
             vars.clone(),
             State::Off,
         );
-        assert_matches!(result, Ok(Command::PrintVariables(pv)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::PrintVariables(pv))) => {
             assert_eq!(pv.variables, vars);
             assert_eq!(pv.attrs, []);
             assert_eq!(pv.scope, Scope::Local);
@@ -930,7 +983,7 @@ mod tests {
             vec![],
             State::Off,
         );
-        assert_matches!(result, Ok(Command::PrintVariables(pv)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::PrintVariables(pv))) => {
             assert_eq!(pv.variables, []);
             assert_eq!(pv.attrs, [(VariableAttr::Export, State::Off)]);
             assert_eq!(pv.scope, Scope::Local);
@@ -945,7 +998,7 @@ mod tests {
             vars.clone(),
             State::Off,
         );
-        assert_matches!(result, Ok(Command::SetVariables(sv)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::SetVariables(sv))) => {
             assert_eq!(sv.variables, vars);
             assert_eq!(sv.attrs, [(VariableAttr::Export, State::Off)]);
             assert_eq!(sv.scope, Scope::Local);
@@ -963,7 +1016,7 @@ mod tests {
             functions.clone(),
             State::Off,
         );
-        assert_matches!(result, Ok(Command::PrintFunctions(pf)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::PrintFunctions(pf))) => {
             assert_eq!(pf.functions, functions);
             assert_eq!(pf.attrs, []);
         });
@@ -980,7 +1033,7 @@ mod tests {
             vec![],
             State::Off,
         );
-        assert_matches!(result, Ok(Command::PrintFunctions(pf)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::PrintFunctions(pf))) => {
             assert_eq!(pf.functions, vec![]);
             assert_eq!(pf.attrs, [(FunctionAttr::ReadOnly, State::Off)]);
         });
@@ -997,7 +1050,7 @@ mod tests {
             functions.clone(),
             State::Off,
         );
-        assert_matches!(result, Ok(Command::SetFunctions(sf)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::SetFunctions(sf))) => {
             assert_eq!(sf.functions, functions);
             assert_eq!(sf.attrs, [(FunctionAttr::ReadOnly, State::On)]);
         });
@@ -1038,7 +1091,7 @@ mod tests {
 
         let operands = Field::dummies(["foo", "bar"]);
         let result = interpret(vec![], operands.clone(), State::On);
-        assert_matches!(result, Ok(Command::SetVariables(sv)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::SetVariables(sv))) => {
             assert_eq!(sv.variables, operands);
         });
     }
@@ -1047,7 +1100,7 @@ mod tests {
     fn interpret_portable_operands_with_print_option() {
         let print = dummy_option_occurrence(&PRINT_OPTION, State::On);
         let result = interpret(vec![print.clone()], vec![], State::On);
-        assert_matches!(result, Ok(Command::PrintVariables(pv)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::PrintVariables(pv))) => {
             assert_eq!(pv.variables, []);
         });
 
@@ -1065,14 +1118,14 @@ mod tests {
     #[test]
     fn interpret_non_portable_operands_are_accepted_while_portable_is_off() {
         let result = interpret(vec![], vec![], State::Off);
-        assert_matches!(result, Ok(Command::PrintVariables(pv)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::PrintVariables(pv))) => {
             assert_eq!(pv.variables, []);
         });
 
         let print = dummy_option_occurrence(&PRINT_OPTION, State::On);
         let operands = Field::dummies(["foo"]);
         let result = interpret(vec![print], operands.clone(), State::Off);
-        assert_matches!(result, Ok(Command::PrintVariables(pv)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::PrintVariables(pv))) => {
             assert_eq!(pv.variables, operands);
         });
     }
@@ -1084,10 +1137,51 @@ mod tests {
             vec![],
             State::Off,
         );
-        assert_matches!(result, Ok(Command::PrintVariables(pv)) => {
+        assert_matches!(result, Ok(WithHelp::Main(Command::PrintVariables(pv))) => {
             assert_eq!(pv.variables, vec![]);
             assert_eq!(pv.attrs, [(VariableAttr::Export, State::Off)]);
             assert_eq!(pv.scope, Scope::Local);
+        });
+    }
+
+    #[test]
+    fn parse_help_option() {
+        let args = Field::dummies(["--hel"]);
+        let result = parse(ALL_OPTIONS, Mode::with_extensions(), args).unwrap();
+        assert_matches!(&result.0[..], [option] => {
+            assert_eq!(option.spec, &HELP_OPTION);
+            assert_eq!(option.state, State::On);
+        });
+        assert_eq!(result.1, []);
+    }
+
+    #[test]
+    fn interpret_help_option_only() {
+        let help = dummy_option_occurrence(&HELP_OPTION, State::On);
+        let result = interpret(vec![help], vec![], State::Off);
+        assert_eq!(result, Ok(WithHelp::Help));
+    }
+
+    #[test]
+    fn interpret_help_option_with_another_option() {
+        let help = OptionOccurrence {
+            location: Location::dummy("--hel"),
+            ..dummy_option_occurrence(&HELP_OPTION, State::On)
+        };
+        let print = dummy_option_occurrence(&PRINT_OPTION, State::On);
+        let result = interpret(vec![print, help], vec![], State::Off);
+        assert_matches!(result, Err(InterpretError::HelpWithOtherArguments(field)) => {
+            assert_eq!(field.value, "--help");
+            assert_eq!(field.origin, Location::dummy("--hel"));
+        });
+    }
+
+    #[test]
+    fn interpret_help_option_with_operand() {
+        let help = dummy_option_occurrence(&HELP_OPTION, State::On);
+        let result = interpret(vec![help], Field::dummies(["foo"]), State::Off);
+        assert_matches!(result, Err(InterpretError::HelpWithOtherArguments(field)) => {
+            assert_eq!(field.value, "--help");
         });
     }
 }

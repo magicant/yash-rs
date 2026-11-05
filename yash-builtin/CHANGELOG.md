@@ -41,14 +41,24 @@ A _private dependency_ is used internally and not visible to downstream users.
   `parse_arguments_with_help` if `--help` is given with other options or
   operands.
 - `HELP` in the `alias`, `bg`, `break`, `cd`, `colon`, `command`, `continue`,
-  `eval`, `exec`, `exit`, `false`, `fg`, `getopts`, `jobs`, `pwd`, `read`,
-  `return`, `set`, `shift`, `source`, `times`, `trap`, `true`, `type`,
-  `ulimit`, `umask`, `unalias`, `unset`, and `wait` modules, the help of the
-  respective built-ins.
+  `eval`, `exec`, `exit`, `export`, `false`, `fg`, `getopts`, `jobs`, `pwd`,
+  `read`, `readonly`, `return`, `set`, `shift`, `source`, `times`, `trap`,
+  `true`, `type`, `typeset`, `ulimit`, `umask`, `unalias`, `unset`, and `wait`
+  modules, the help of the respective built-ins.
 - `set::SHELL_OPTIONS_HELP`, a section of a help message that lists shell
   options.
 - `set::syntax::Error::UncancelableLongOption` and
   `set::syntax::Error::HelpWithOtherArguments`.
+- `typeset::syntax::HELP_OPTION`, the option spec of `--help` for the typeset
+  built-in family, which `typeset::syntax::ALL_OPTIONS` now includes.
+- `typeset::syntax::OptionSpec::description`, the description of an option
+  shown in the help.
+- `typeset::syntax::InterpretError::HelpWithOtherArguments`, returned by
+  `typeset::syntax::interpret` if `--help` is given with other options or
+  operands.
+- `export::ALL_OPTIONS` and `readonly::ALL_OPTIONS`, the option specs the
+  respective built-ins parse their arguments with, which include
+  `typeset::syntax::HELP_OPTION` in addition to `PORTABLE_OPTIONS`.
 - `common::syntax::OptionSpec::description` and
   `common::syntax::OptionSpec::get_description` set and get the description of
   an option shown in the help.
@@ -57,10 +67,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - `iter` now includes the `help` built-in as an elective built-in.
 - `main` in the `alias`, `bg`, `break`, `cd`, `command`, `continue`, `eval`,
-  `exec`, `exit`, `fg`, `getopts`, `jobs`, `pwd`, `read`, `return`, `set`,
-  `shift`, `source`, `times`, `trap`, `type`, `ulimit`, `umask`, `unalias`,
-  `unset`, and `wait` modules now prints the help of the respective built-in if
-  `--help` is the only argument.
+  `exec`, `exit`, `export`, `fg`, `getopts`, `jobs`, `pwd`, `read`, `readonly`,
+  `return`, `set`, `shift`, `source`, `times`, `trap`, `type`, `typeset`,
+  `ulimit`, `umask`, `unalias`, `unset`, and `wait` modules now prints the help
+  of the respective built-in if `--help` is the only argument.
 - `parse` in the `break::syntax`, `cd::syntax`, `command::syntax`,
   `pwd::syntax`, `read::syntax`, `set::syntax`, `source::syntax`,
   `ulimit::syntax`, `umask::syntax`, `unalias::syntax`, `unset::syntax`, and
@@ -70,6 +80,10 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `trap::syntax::OPTION_SPECS` and `unalias::syntax::OPTION_SPECS` are now
   `OptionSpecsWithHelp` including `common::help::HELP_OPTION` and have a
   description for each option.
+- `typeset::syntax::interpret` now returns its previous result wrapped in
+  `WithHelp`, returning `WithHelp::Help` if `--help` is the only argument.
+- `typeset::syntax::OptionSpec::short` is now an `Option<char>` so that the
+  spec of `--help` can have no short name.
 - `common::syntax::OptionSpec::argument` and `set_argument` now take the name of
   the option argument, which is shown in the help, and `get_argument` returns
   the name in an `Option`.

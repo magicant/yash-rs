@@ -296,38 +296,61 @@ fn option_name(spec: &OptionSpec) -> String {
     name
 }
 
+/// Appends the "Usage:" section to `message`, followed by an empty line.
+///
+/// Nothing is appended if `usage` is empty.
+pub(crate) fn append_usage(message: &mut String, usage: &[&str]) {
+    if !usage.is_empty() {
+        message.push_str("Usage:\n");
+        for usage in usage {
+            writeln!(message, "  {usage}").unwrap();
+        }
+        message.push('\n');
+    }
+}
+
+/// Appends a table of options to `message`.
+///
+/// Each row consists of the names of an option and its description. The
+/// descriptions are aligned in a column.
+pub(crate) fn append_option_table(message: &mut String, rows: &[(String, &str)]) {
+    let width = rows.iter().map(|(name, _)| name.len()).max().unwrap_or(0);
+    for (name, description) in rows {
+        writeln!(message, "  {name:width$}  {description}").unwrap();
+    }
+}
+
+/// Appends the line linking to the manual page to `message`.
+pub(crate) fn append_manual_link(message: &mut String, manual_page_name: &str) {
+    writeln!(
+        message,
+        "See <{MANUAL_BASE_URL}{manual_page_name}.html> for details."
+    )
+    .unwrap();
+}
+
 impl BuiltinHelp {
     /// Appends the usage and option sections to `message`.
     ///
     /// Each section is followed by an empty line.
     pub(crate) fn append_usage_and_options(&self, message: &mut String) {
-        if !self.usage.is_empty() {
-            message.push_str("Usage:\n");
-            for usage in self.usage {
-                writeln!(message, "  {usage}").unwrap();
-            }
-            message.push('\n');
-        }
+        append_usage(message, self.usage);
 
         if !self.options.is_empty() {
             message.push_str("Options:\n");
-            let names = self.options.iter().map(option_name).collect::<Vec<_>>();
-            let width = names.iter().map(String::len).max().unwrap_or(0);
-            for (name, spec) in names.iter().zip(self.options) {
-                writeln!(message, "  {name:width$}  {}", spec.get_description()).unwrap();
-            }
+            let rows = self
+                .options
+                .iter()
+                .map(|spec| (option_name(spec), spec.get_description()))
+                .collect::<Vec<_>>();
+            append_option_table(message, &rows);
             message.push('\n');
         }
     }
 
     /// Appends the line linking to the manual page to `message`.
     pub(crate) fn append_manual_link(&self, message: &mut String) {
-        writeln!(
-            message,
-            "See <{MANUAL_BASE_URL}{}.html> for details.",
-            self.manual_page_name
-        )
-        .unwrap();
+        append_manual_link(message, self.manual_page_name);
     }
 }
 

@@ -449,3 +449,57 @@ __IN__
 test_OE -e 0 'typeset accepts non-portable variable name without the portable option'
 typeset foo-bar=1
 __IN__
+
+test_oE -e 0 'help option prints help'
+typeset --help
+__IN__
+typeset: define variables and functions with attributes
+
+Usage:
+  typeset [-grx] [+rx] NAME[=VALUE]...
+  typeset -p [-grx] [+rx] [NAME...]
+  typeset [-grx] [+rx]
+  typeset -f [-r] [+r] NAME...
+  typeset -fp [-r] [+r] [NAME...]
+  typeset -f [-r] [+r]
+
+Options:
+  -f, --functions  operate on functions instead of variables
+  -g, --global     operate on global variables instead of local ones
+  -p, --print      print the current definitions
+  -r, --readonly   make read-only
+  -x, --export     export to the environment (+x to stop)
+  -X, --unexport   stop exporting (deprecated; use +x)
+      --help       print this help
+
+See <https://magicant.github.io/yash-rs/builtins/typeset.html> for details.
+__OUT__
+
+test_oE -e 0 'help built-in prints the same help as the help option'
+typeset --help >help_option
+help typeset >help_builtin
+diff help_option help_builtin && echo same
+__IN__
+same
+__OUT__
+
+test_OE -e 0 'help option can be abbreviated and followed by a separator'
+typeset --he >/dev/null &&
+typeset --help -- >/dev/null
+__IN__
+
+test_O -d -e 2 'help option with another option'
+typeset --help -p
+__IN__
+
+test_O -d -e 2 'help option with an operand'
+typeset --help foo
+__IN__
+
+test_O -d -e 2 'help option with an operand after a separator'
+typeset --help -- foo
+__IN__
+
+test_O -d -e 2 'help option cannot be negated'
+typeset ++help
+__IN__

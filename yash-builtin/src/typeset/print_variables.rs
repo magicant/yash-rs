@@ -133,8 +133,9 @@ impl std::fmt::Display for AttributeOption<'_> {
             if let Some(attr) = option.attr
                 && let Ok(attr) = VariableAttr::try_from(attr)
                 && attr.test(self.var).into()
+                && let Some(short) = option.short
             {
-                write!(f, "-{} ", option.short)?;
+                write!(f, "-{short} ")?;
             }
         }
         Ok(())
