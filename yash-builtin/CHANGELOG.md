@@ -41,14 +41,18 @@ A _private dependency_ is used internally and not visible to downstream users.
   `parse_arguments_with_help` if `--help` is given with other options or
   operands.
 - `HELP` in the `alias`, `bg`, `break`, `cd`, `colon`, `command`, `continue`,
-  `eval`, `exec`, `exit`, `export`, `false`, `fg`, `getopts`, `jobs`, `pwd`,
-  `read`, `readonly`, `return`, `set`, `shift`, `source`, `times`, `trap`,
-  `true`, `type`, `typeset`, `ulimit`, `umask`, `unalias`, `unset`, and `wait`
-  modules, the help of the respective built-ins.
+  `eval`, `exec`, `exit`, `export`, `false`, `fg`, `getopts`, `jobs`, `kill`,
+  `pwd`, `read`, `readonly`, `return`, `set`, `shift`, `source`, `times`,
+  `trap`, `true`, `type`, `typeset`, `ulimit`, `umask`, `unalias`, `unset`,
+  and `wait` modules, the help of the respective built-ins.
 - `set::SHELL_OPTIONS_HELP`, a section of a help message that lists shell
   options.
 - `set::syntax::Error::UncancelableLongOption` and
   `set::syntax::Error::HelpWithOtherArguments`.
+- `kill::syntax::Error::NonPortableLongOption`, returned by
+  `kill::syntax::parse` if `--help` is given while the `portable` shell option
+  is on, and `kill::syntax::Error::HelpWithOtherArguments`, returned if
+  `--help` is given with other options or operands.
 - `typeset::syntax::HELP_OPTION`, the option spec of `--help` for the typeset
   built-in family, which `typeset::syntax::ALL_OPTIONS` now includes.
 - `typeset::syntax::OptionSpec::description`, the description of an option
@@ -67,16 +71,16 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - `iter` now includes the `help` built-in as an elective built-in.
 - `main` in the `alias`, `bg`, `break`, `cd`, `command`, `continue`, `eval`,
-  `exec`, `exit`, `export`, `fg`, `getopts`, `jobs`, `pwd`, `read`, `readonly`,
-  `return`, `set`, `shift`, `source`, `times`, `trap`, `type`, `typeset`,
-  `ulimit`, `umask`, `unalias`, `unset`, and `wait` modules now prints the help
-  of the respective built-in if `--help` is the only argument.
+  `exec`, `exit`, `export`, `fg`, `getopts`, `jobs`, `kill`, `pwd`, `read`,
+  `readonly`, `return`, `set`, `shift`, `source`, `times`, `trap`, `type`,
+  `typeset`, `ulimit`, `umask`, `unalias`, `unset`, and `wait` modules now
+  prints the help of the respective built-in if `--help` is the only argument.
 - `parse` in the `break::syntax`, `cd::syntax`, `command::syntax`,
-  `pwd::syntax`, `read::syntax`, `set::syntax`, `source::syntax`,
-  `ulimit::syntax`, `umask::syntax`, `unalias::syntax`, `unset::syntax`, and
-  `wait::syntax` modules now recognizes `--help` and returns its previous result
-  wrapped in `WithHelp`. The `Result` type alias in each of these modules, if
-  any, is changed accordingly.
+  `kill::syntax`, `pwd::syntax`, `read::syntax`, `set::syntax`,
+  `source::syntax`, `ulimit::syntax`, `umask::syntax`, `unalias::syntax`,
+  `unset::syntax`, and `wait::syntax` modules now recognizes `--help` and
+  returns its previous result wrapped in `WithHelp`. The `Result` type alias in
+  each of these modules, if any, is changed accordingly.
 - `trap::syntax::OPTION_SPECS` and `unalias::syntax::OPTION_SPECS` are now
   `OptionSpecsWithHelp` including `common::help::HELP_OPTION` and have a
   description for each option.

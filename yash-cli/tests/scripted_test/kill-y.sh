@@ -208,3 +208,59 @@ kill: 2
 job is stopped
 __OUT__
 )
+
+test_oE -e 0 'help option prints help'
+kill --help
+__IN__
+kill: send a signal to processes
+
+Usage:
+  kill [-s SIGNAL|-n SIGNAL|-SIGNAL] TARGET...
+  kill -l|-v [SIGNAL|EXIT_STATUS...]
+
+Options:
+  -s SIGNAL   send SIGNAL instead of TERM
+  -n SIGNAL   same as -s
+  -l          list signal names
+  -v          list signal numbers and names
+      --help  print this help
+
+See <https://magicant.github.io/yash-rs/builtins/kill.html> for details.
+__OUT__
+
+test_oE -e 0 'help built-in prints the same help as the help option'
+kill --help >help_option
+help kill >help_builtin
+diff help_option help_builtin && echo same
+__IN__
+same
+__OUT__
+
+test_OE -e 0 'help option can be abbreviated and followed by a separator'
+kill --he >/dev/null &&
+kill --help -- >/dev/null
+__IN__
+
+test_O -d -e 2 'help option with another option'
+kill --help -l
+__IN__
+
+test_O -d -e 2 'help option with a signal'
+kill -s CONT --help
+__IN__
+
+test_O -d -e 2 'help option with an operand'
+kill --help $$
+__IN__
+
+test_O -d -e 2 'help option with an operand after a separator'
+kill --help -- $$
+__IN__
+
+test_O -d -e 2 'help option given twice'
+kill --help --help
+__IN__
+
+test_O -d -e 2 'help option is rejected under the portable option' -o portable
+kill --help
+__IN__

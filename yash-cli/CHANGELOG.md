@@ -15,12 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `help` built-in prints the help of built-ins, which summarizes the usage
   and options of each built-in and links to its manual page. Without operands,
-  it lists the available built-ins with their summaries. Not all built-ins have
-  help yet.
+  it lists the available built-ins with their summaries.
 - The `.`, `alias`, `bg`, `break`, `cd`, `command`, `continue`, `eval`, `exec`,
-  `exit`, `export`, `fg`, `getopts`, `help`, `jobs`, `pwd`, `read`, `readonly`,
-  `return`, `set`, `shift`, `source`, `times`, `trap`, `type`, `typeset`,
-  `ulimit`, `umask`, `unalias`, `unset`, and `wait` built-ins print their help
+  `exit`, `export`, `fg`, `getopts`, `help`, `jobs`, `kill`, `pwd`, `read`,
+  `readonly`, `return`, `set`, `shift`, `source`, `times`, `trap`, `type`,
+  `typeset`, `ulimit`, `umask`, `unalias`, `unset`, and `wait` built-ins print their help
   when invoked with the `--help` option as the only argument.
 
 ### Changed
