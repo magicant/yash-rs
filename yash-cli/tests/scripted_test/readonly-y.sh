@@ -187,13 +187,11 @@ See <https://magicant.github.io/yash-rs/builtins/readonly.html> for details.
 0
 __OUT__
 
-test_oE -e 0 'help built-in prints the same help as the help option'
+test_OE -e 0 'help built-in prints the same help as the help option'
 readonly --help >help_option
 help readonly >help_builtin
-diff help_option help_builtin && echo same
+diff help_option help_builtin
 __IN__
-same
-__OUT__
 
 test_OE -e 0 'help option can be abbreviated and followed by a separator'
 readonly --he >/dev/null &&
