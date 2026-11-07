@@ -28,9 +28,12 @@ test_O -d -e 2 'set built-in rejects -o name POSIX does not specify' -o portable
 set -o posixlycorrect
 __IN__
 
-test_O -d -e 2 'set built-in rejects short option POSIX does not specify' -o portable
-set -l
-__IN__
+# Currently, the set built-in accepts no short option that POSIX does not
+# specify. Enable this test case when such an option is added, replacing X
+# with the option.
+#test_O -d -e 2 'set built-in rejects short option POSIX does not specify' -o portable
+#set -X
+#__IN__
 
 test_O -d -e 2 'set built-in rejects - as a separator under the portable option' -o portable
 set - foo
@@ -84,10 +87,13 @@ __IN__
 set -o posixlycorrect
 __OUT__
 
-test_x -e 0 'set built-in accepts non-POSIX short option without the portable option'
-set -l
-echo "$-" | grep -q l
-__IN__
+# Currently, the set built-in accepts no short option that POSIX does not
+# specify. Enable this test case when such an option is added, replacing X
+# with the option.
+#test_x -e 0 'set built-in accepts non-POSIX short option without the portable option'
+#set -X
+#echo "$-" | grep -q X
+#__IN__
 
 test_x -e 0 'set built-in accepts POSIX short options under the portable option' -o portable
 set -e -C +C -x +x
@@ -135,6 +141,14 @@ test_O -d -e 2 'option after enabling the portable option is checked'
 set -o portable --xtrace
 __IN__
 
+test_O -d -e 2 'set built-in rejects -l'
+set -l
+__IN__
+
+test_O -d -e 2 'set built-in rejects -o login'
+set -o login
+__IN__
+
 test_OE -e 0 'set +o output restores options under the portable option' -o portable
 set -o > expected
 saveset=$(set +o)
@@ -145,10 +159,10 @@ set -o | diff expected -
 __IN__
 
 test_OE -e 0 'set +o output restores options without the portable option'
-set -o login -o ignoreeof
+set -o hashondefinition -o ignoreeof
 set -o > expected
 saveset=$(set +o)
-set +o login +o ignoreeof -o posixlycorrect
+set +o hashondefinition +o ignoreeof -o posixlycorrect
 eval "$saveset"
 set -o | diff expected -
 __IN__
@@ -187,7 +201,6 @@ Shell options:
   -h  -o hashondefinition
       -o ignoreeof
       -o log
-  -l  -o login
   -m  -o monitor
   -b  -o notify
       -o pipefail

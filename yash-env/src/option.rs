@@ -150,7 +150,7 @@ impl Option {
     /// Unmodifiable options can be set only on shell startup.
     #[must_use]
     pub const fn is_modifiable(self) -> bool {
-        !matches!(self, CmdLine | Interactive | Stdin)
+        !matches!(self, CmdLine | Interactive | Login | Stdin)
     }
 
     /// Returns the single-character option name.
@@ -586,6 +586,15 @@ impl Extend<Option> for OptionSet {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unmodifiable_options() {
+        let unmodifiable = EnumSet::<Option>::all()
+            .iter()
+            .filter(|option| !option.is_modifiable())
+            .collect::<EnumSet<_>>();
+        assert_eq!(unmodifiable, CmdLine | Interactive | Login | Stdin);
+    }
 
     #[test]
     fn short_name_round_trip() {

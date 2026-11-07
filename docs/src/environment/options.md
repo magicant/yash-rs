@@ -130,7 +130,7 @@ set +o hashondefinition
 set +o ignoreeof
 #set +o interactive
 set -o log
-set +o login
+#set +o login
 set +o monitor
 set +o notify
 set +o pipefail

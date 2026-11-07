@@ -91,6 +91,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `common::syntax::OptionSpec::argument` and `set_argument` now take the name of
   the option argument, which is shown in the help, and `get_argument` returns
   the name in an `Option`.
+- Public dependency versions:
+    - yash-env 0.17.1 → 0.17.2
 
 ### Removed
 

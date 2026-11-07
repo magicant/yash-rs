@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The help message printed by the `--help` option now lists the startup options
   in line with the manual.
 
+### Fixed
+
+- The `set` built-in now rejects `-l`, `-o login`, and the other forms that
+  modify the `login` option, which can be set only on startup. `set +o` prints
+  the option as a comment, as it does for `cmdline`, `interactive`, and `stdin`.
+
 ## [3.5.0] - 2026-10-06
 
 ### Added
