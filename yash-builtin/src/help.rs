@@ -235,6 +235,7 @@ mod tests {
     use super::*;
     use futures_util::FutureExt as _;
     use std::borrow::Cow;
+    use std::collections::BTreeSet;
     use std::rc::Rc;
     use yash_env::VirtualSystem;
     use yash_env::semantics::ExitStatus;
@@ -261,13 +262,15 @@ mod tests {
     }
 
     #[test]
-    fn default_table_has_help_only_for_builtins_in_iter() {
-        let names: Vec<&str> = crate::iter::<Rc<Concurrent<VirtualSystem>>>()
+    fn default_table_has_help_for_exactly_builtins_in_iter() {
+        let builtin_names: BTreeSet<&str> = crate::iter::<Rc<Concurrent<VirtualSystem>>>()
             .map(|(name, _)| name)
             .collect();
-        for name in HelpTable::default().0.keys() {
-            assert!(names.contains(name), "{name:?} should be in crate::iter");
-        }
+        let help_names: BTreeSet<&str> = HelpTable::default().0.into_keys().collect();
+        assert_eq!(
+            help_names, builtin_names,
+            "the default help table should cover the built-ins in crate::iter and no others"
+        );
     }
 
     fn dummy_builtin() -> yash_env::builtin::Builtin<Rc<Concurrent<VirtualSystem>>> {

@@ -305,7 +305,7 @@ Options:
 See <https://magicant.github.io/yash-rs/builtins/pwd.html> for details.
 ```
 
-The `--help` option cannot be combined with other options or operands. Like other long options, it can be abbreviated if unambiguous, as in `pwd --h`.
+The `--help` option cannot be combined with other options or operands. Like other long options, it can be abbreviated if unambiguous, as in `pwd --h`, and it is rejected when the [`portable` option](../environment/options.md#portable) is set.
 
 The pages of the built-ins that accept the `--help` option list it in their Options sections.
 
