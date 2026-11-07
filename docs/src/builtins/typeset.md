@@ -221,7 +221,7 @@ The `-g` (`--global`) option has no effect if the built-in is used outside a fun
 
 The `typeset` built-in is not specified by POSIX, and many shells implement it differently. This implementation is based on common characteristics found in other shells, but it is not fully compatible with any of them.
 
-POSIX only specifies variable names consisting of ASCII letters, digits, and underscores that do not start with a digit. (Since 3.3.3) When the [`portable` option](../environment/options.md#portable) is set, it is an error to create or update a variable whose name contains any other character or starts with a digit.
+The `typeset` built-in is an [elective built-in](index.html#elective-built-ins). (Since 3.3.4) When the [`portable` option](../environment/options.md#portable) is set, executing it is rejected with an error.
 
 Some implementations allow operating on variables and functions at the same time. This implementation does not.
 
