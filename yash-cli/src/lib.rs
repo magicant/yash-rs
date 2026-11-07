@@ -59,6 +59,7 @@ Startup options:
   -c, --cmdline
   -s, --stdin
   -i, --interactive
+  -l, --login
       --profile=FILE
       --noprofile
       --rcfile=FILE

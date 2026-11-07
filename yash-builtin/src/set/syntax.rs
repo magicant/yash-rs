@@ -1064,22 +1064,25 @@ mod tests {
         assert_portable_options(&["-ex"], &[(ErrExit, On), (XTrace, On)]);
     }
 
-    #[test]
-    fn portable_rejects_short_option_posix_does_not_specify() {
-        assert_matches!(
-            parse(Field::dummies(["-l"]), On),
-            Err(Error::NonPortableShortOption('l', field)) => {
-                assert_eq!(field.value, "-l");
-            }
-        );
-
-        assert_matches!(
-            parse(Field::dummies(["+l"]), On),
-            Err(Error::NonPortableShortOption('l', field)) => {
-                assert_eq!(field.value, "+l");
-            }
-        );
-    }
+    // Currently, the set built-in accepts no short option that POSIX does not
+    // specify. Enable this test when such an option is added, replacing X with
+    // the option.
+    // #[test]
+    // fn portable_rejects_short_option_posix_does_not_specify() {
+    //     assert_matches!(
+    //         parse(Field::dummies(["-X"]), On),
+    //         Err(Error::NonPortableShortOption('X', field)) => {
+    //             assert_eq!(field.value, "-X");
+    //         }
+    //     );
+    //
+    //     assert_matches!(
+    //         parse(Field::dummies(["+X"]), On),
+    //         Err(Error::NonPortableShortOption('X', field)) => {
+    //             assert_eq!(field.value, "+X");
+    //         }
+    //     );
+    // }
 
     #[test]
     fn portable_accepts_posix_o_names() {
@@ -1136,7 +1139,7 @@ mod tests {
 
     #[test]
     fn portable_rejects_o_name_posix_does_not_specify() {
-        for name in ["hashondefinition", "login", "posixlycorrect"] {
+        for name in ["hashondefinition", "posixlycorrect"] {
             assert_matches!(
                 parse(Field::dummies(["-o", name]), On),
                 Err(Error::NonPortableLongOption(field, _)) => {
@@ -1197,20 +1200,23 @@ mod tests {
             }
         );
 
-        assert_matches!(
-            parse(Field::dummies(["-o", "portable", "-l"]), Off),
-            Err(Error::NonPortableShortOption('l', field)) => {
-                assert_eq!(field.value, "-l");
-            }
-        );
+        // Currently, the set built-in accepts no short option that POSIX does
+        // not specify. Enable this assertion when such an option is added,
+        // replacing X with the option.
+        // assert_matches!(
+        //     parse(Field::dummies(["-o", "portable", "-X"]), Off),
+        //     Err(Error::NonPortableShortOption('X', field)) => {
+        //         assert_eq!(field.value, "-X");
+        //     }
+        // );
     }
 
     #[test]
     fn disabling_portable_affects_only_following_options() {
         assert_matches!(
-            parse(Field::dummies(["-l", "+o", "portable"]), On),
-            Err(Error::NonPortableShortOption('l', field)) => {
-                assert_eq!(field.value, "-l");
+            parse(Field::dummies(["-o", "posixlycorrect", "+o", "portable"]), On),
+            Err(Error::NonPortableLongOption(field, _)) => {
+                assert_eq!(field.value, "posixlycorrect");
             }
         );
     }
@@ -1248,9 +1254,9 @@ mod tests {
 
     #[test]
     fn non_portable_error_reports_the_reason() {
-        let error = parse(Field::dummies(["-l"]), On).unwrap_err();
+        let error = parse(Field::dummies(["-o", "posixlycorrect"]), On).unwrap_err();
         let report = error.to_report();
-        assert_eq!(report.title, "non-portable option 'l'");
+        assert_eq!(report.title, "non-portable option name \"posixlycorrect\"");
         assert_eq!(report.footnotes.len(), 1);
         assert_eq!(
             report.footnotes[0].label,
@@ -1318,7 +1324,7 @@ mod tests {
 
     #[test]
     fn non_portable_error_omits_suggestion_when_posix_has_no_name() {
-        let error = parse(Field::dummies(["--login"]), On).unwrap_err();
+        let error = parse(Field::dummies(["--posixlycorrect"]), On).unwrap_err();
         assert_eq!(error.to_report().footnotes.len(), 1);
     }
 

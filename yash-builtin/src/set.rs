@@ -101,7 +101,6 @@ Shell options:
   -h  -o hashondefinition
       -o ignoreeof
       -o log
-  -l  -o login
   -m  -o monitor
   -b  -o notify
       -o pipefail

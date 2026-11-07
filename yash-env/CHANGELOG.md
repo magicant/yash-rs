@@ -13,6 +13,13 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.17.2] - Unreleased
+
+### Fixed
+
+- `Option::is_modifiable` now returns `false` for `Login`, so that the `set`
+  built-in rejects the option. The option can be set only on shell startup.
+
 ## [0.17.1] - 2026-10-06
 
 ### Added
@@ -1514,6 +1521,7 @@ This version has been yanked due to an issue that prevents the crate from buildi
 
 - Initial implementation of the `yash-env` crate
 
+[0.17.2]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.17.2
 [0.17.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.17.1
 [0.17.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.17.0
 [0.16.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.16.1
