@@ -19,11 +19,11 @@ jobs:
     permissions:
       contents: read
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@v7.0.1
     - uses: dtolnay/rust-toolchain@stable
       with:
         components: clippy, rustfmt
-    - uses: Swatinem/rust-cache@v2
+    - uses: Swatinem/rust-cache@v2.9.3
     # Building tests and docs before running ./check.sh is redundant but it
     # allows us to measure the build times for these steps separately.
     - name: Build tests
@@ -40,12 +40,12 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@v7.0.1
     - uses: dtolnay/rust-toolchain@stable
       with:
         components: clippy
-    - uses: Swatinem/rust-cache@v2
-    - uses: giraffate/clippy-action@v1
+    - uses: Swatinem/rust-cache@v2.9.3
+    - uses: giraffate/clippy-action@v1.0.1
       with:
         reporter: github-pr-review
   extra:
@@ -55,9 +55,9 @@ jobs:
     permissions:
       contents: read
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@v7.0.1
     - uses: dtolnay/rust-toolchain@stable
-    - uses: Swatinem/rust-cache@v2
+    - uses: Swatinem/rust-cache@v2.9.3
     - name: Run extra tests
       run: ./check-extra.sh -v
   release-build:
@@ -67,9 +67,9 @@ jobs:
     permissions:
       contents: read
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@v7.0.1
     - uses: dtolnay/rust-toolchain@stable
-    - uses: Swatinem/rust-cache@v2
+    - uses: Swatinem/rust-cache@v2.9.3
     - name: Run release build checks
       run: ./check-release-build.sh
   semver:
@@ -77,9 +77,9 @@ jobs:
     permissions:
       contents: read
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@v7.0.1
     - uses: dtolnay/rust-toolchain@stable
-    - uses: Swatinem/rust-cache@v2
+    - uses: Swatinem/rust-cache@v2.9.3
     - uses: taiki-e/install-action@cargo-semver-checks
     - name: Run semver checks
       run: ./check-semver.sh
@@ -92,10 +92,10 @@ jobs:
     permissions:
       contents: read
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@v7.0.1
     - uses: dtolnay/rust-toolchain@nightly
     - uses: dtolnay/rust-toolchain@1.96.0
-    - uses: Swatinem/rust-cache@v2
+    - uses: Swatinem/rust-cache@v2.9.3
     - uses: taiki-e/install-action@cargo-hack
     - uses: taiki-e/install-action@cargo-minimal-versions
     - name: Run tests with MSRV
@@ -107,9 +107,9 @@ jobs:
     permissions:
       contents: read
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@v7.0.1
     - uses: dtolnay/rust-toolchain@stable
-    - uses: Swatinem/rust-cache@v2
+    - uses: Swatinem/rust-cache@v2.9.3
     - name: Test yash-arith
       run: cargo test --all-features --package yash-arith
     - name: Test yash-executor
@@ -133,18 +133,32 @@ jobs:
     permissions:
       contents: read
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@v7.0.1
     - uses: dtolnay/rust-toolchain@stable
-    - uses: Swatinem/rust-cache@v2
+    - uses: Swatinem/rust-cache@v2.9.3
     - name: Install mdBook
       run: cargo install mdbook --no-default-features --features search --version "^0.5" --locked
     - name: Build and test docs
       run: ./check-docs.sh
+  lockfile:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@v7.0.1
+      with:
+        persist-credentials: false
+    - name: Install gh-actions-lock
+      run: gh extension install github/gh-actions-lock
+    - name: Verify actions.lock
+      run: gh actions-lock --verify
   summarize:
     runs-on: ubuntu-latest
-    needs: [check, clippy, extra, release-build, semver, msrv, windows, docs]
+    needs: [check, clippy, extra, release-build, semver, msrv, windows, docs, lockfile]
     permissions:
       actions: read
     if: ${{ always() }}
     steps:
-    - uses: Kesin11/actions-timeline@v3
+    - uses: Kesin11/actions-timeline@v3.2.1
