@@ -21,18 +21,18 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
       - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2.9.3
       - name: Install mdBook
         run: cargo install mdbook --no-default-features --features search --version "^0.5" --locked
       - name: Setup Pages
         id: pages
-        uses: actions/configure-pages@v6
+        uses: actions/configure-pages@v6.0.0
       - name: Build with mdBook
         run: mdbook build docs
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v5
+        uses: actions/upload-pages-artifact@v5.0.0
         with:
           path: docs/book
 
@@ -49,7 +49,7 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@v5.0.1
 
   # Summarization job
   summarize:
@@ -59,4 +59,4 @@ jobs:
       actions: read
     if: ${{ always() }}
     steps:
-    - uses: Kesin11/actions-timeline@v3
+    - uses: Kesin11/actions-timeline@v3.2.1
