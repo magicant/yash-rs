@@ -20,8 +20,9 @@ jobs:
       contents: read
     steps:
     - uses: actions/checkout@v7.0.1
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@master
       with:
+        toolchain: stable
         components: clippy, rustfmt
     - uses: Swatinem/rust-cache@v2.9.3
     # Building tests and docs before running ./check.sh is redundant but it
@@ -41,8 +42,9 @@ jobs:
       pull-requests: write
     steps:
     - uses: actions/checkout@v7.0.1
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@master
       with:
+        toolchain: stable
         components: clippy
     - uses: Swatinem/rust-cache@v2.9.3
     - uses: giraffate/clippy-action@v1.0.1
@@ -56,7 +58,9 @@ jobs:
       contents: read
     steps:
     - uses: actions/checkout@v7.0.1
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
     - uses: Swatinem/rust-cache@v2.9.3
     - name: Run extra tests
       run: ./check-extra.sh -v
@@ -68,7 +72,9 @@ jobs:
       contents: read
     steps:
     - uses: actions/checkout@v7.0.1
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
     - uses: Swatinem/rust-cache@v2.9.3
     - name: Run release build checks
       run: ./check-release-build.sh
@@ -78,9 +84,13 @@ jobs:
       contents: read
     steps:
     - uses: actions/checkout@v7.0.1
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
     - uses: Swatinem/rust-cache@v2.9.3
-    - uses: taiki-e/install-action@cargo-semver-checks
+    - uses: taiki-e/install-action@v2.90.4
+      with:
+        tool: cargo-semver-checks
     - name: Run semver checks
       run: ./check-semver.sh
   msrv:
@@ -93,11 +103,16 @@ jobs:
       contents: read
     steps:
     - uses: actions/checkout@v7.0.1
-    - uses: dtolnay/rust-toolchain@nightly
-    - uses: dtolnay/rust-toolchain@1.96.0
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: nightly
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: 1.96.0
     - uses: Swatinem/rust-cache@v2.9.3
-    - uses: taiki-e/install-action@cargo-hack
-    - uses: taiki-e/install-action@cargo-minimal-versions
+    - uses: taiki-e/install-action@v2.90.4
+      with:
+        tool: cargo-hack,cargo-minimal-versions
     - name: Run tests with MSRV
       run: ./check-msrv.sh -v
   windows:
@@ -108,7 +123,9 @@ jobs:
       contents: read
     steps:
     - uses: actions/checkout@v7.0.1
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
     - uses: Swatinem/rust-cache@v2.9.3
     - name: Test yash-arith
       run: cargo test --all-features --package yash-arith
@@ -134,7 +151,9 @@ jobs:
       contents: read
     steps:
     - uses: actions/checkout@v7.0.1
-    - uses: dtolnay/rust-toolchain@stable
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: stable
     - uses: Swatinem/rust-cache@v2.9.3
     - name: Install mdBook
       run: cargo install mdbook --no-default-features --features search --version "^0.5" --locked
