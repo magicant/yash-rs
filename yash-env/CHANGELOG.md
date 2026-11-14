@@ -13,6 +13,13 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.17.3] - Unreleased
+
+### Changed
+
+- Private dependency versions:
+    - tempfile is now a dependency only on Unix platforms.
+
 ## [0.17.2] - 2026-11-07
 
 ### Fixed
@@ -1521,6 +1528,7 @@ This version has been yanked due to an issue that prevents the crate from buildi
 
 - Initial implementation of the `yash-env` crate
 
+[0.17.3]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.17.3
 [0.17.2]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.17.2
 [0.17.1]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.17.1
 [0.17.0]: https://github.com/magicant/yash-rs/releases/tag/yash-env-0.17.0

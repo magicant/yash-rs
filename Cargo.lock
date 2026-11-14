@@ -520,7 +520,7 @@ dependencies = [
 
 [[package]]
 name = "yash-builtin"
-version = "0.26.0"
+version = "0.26.1"
 dependencies = [
  "assert_matches",
  "either",
@@ -555,7 +555,7 @@ dependencies = [
 
 [[package]]
 name = "yash-env"
-version = "0.17.2"
+version = "0.17.3"
 dependencies = [
  "annotate-snippets",
  "assert_matches",
