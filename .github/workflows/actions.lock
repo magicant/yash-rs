@@ -5,9 +5,7 @@ version: 'v0.0.3'
 workflows:
     '.github/workflows/ci.yml':
         - 'actions/checkout@v7.0.1'
-        - 'dtolnay/rust-toolchain@1.96.0'
-        - 'dtolnay/rust-toolchain@nightly'
-        - 'dtolnay/rust-toolchain@stable'
+        - 'dtolnay/rust-toolchain@master'
         - 'giraffate/clippy-action@v1.0.1'
         - 'kesin11/actions-timeline@v3.2.1'
         - 'swatinem/rust-cache@v2.9.3'
@@ -17,13 +15,13 @@ workflows:
         - 'actions/configure-pages@v6.0.0'
         - 'actions/deploy-pages@v5.0.1'
         - 'actions/upload-pages-artifact@v5.0.0'
-        - 'dtolnay/rust-toolchain@stable'
+        - 'dtolnay/rust-toolchain@master'
         - 'kesin11/actions-timeline@v3.2.1'
         - 'swatinem/rust-cache@v2.9.3'
     '.github/workflows/release.yml':
         - 'actions/attest@v4.2.2'
         - 'actions/checkout@v7.0.1'
-        - 'dtolnay/rust-toolchain@stable'
+        - 'dtolnay/rust-toolchain@master'
         - 'taiki-e/create-gh-release-action@v1.12.0'
         - 'taiki-e/upload-rust-binary-action@v1.30.2'
 dependencies:
@@ -59,19 +57,9 @@ dependencies:
         repo_id: 496012378
         uses:
             - 'actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f'
-    'dtolnay/rust-toolchain@1.96.0':
-        ref: '1.96.0'
-        commit: 'sha1-d86e0fa8f147d6539442c26a61ebba8becc19489'
-        owner_id: 1940490
-        repo_id: 260749683
-    'dtolnay/rust-toolchain@nightly':
-        ref: 'nightly'
-        commit: 'sha1-2c76c034f9e32a5d6e2c104dc4df23a22476db04'
-        owner_id: 1940490
-        repo_id: 260749683
-    'dtolnay/rust-toolchain@stable':
-        ref: 'stable'
-        commit: 'sha1-b725eda525362e7cf34af9a7243cac1e3f01a7ec'
+    'dtolnay/rust-toolchain@master':
+        ref: 'master'
+        commit: 'sha1-683b588c487a69d01f6c6ddf40f036ff682cc2c8'
         owner_id: 1940490
         repo_id: 260749683
     'giraffate/clippy-action@v1.0.1':
