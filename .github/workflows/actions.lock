@@ -11,9 +11,7 @@ workflows:
         - 'giraffate/clippy-action@v1.0.1'
         - 'kesin11/actions-timeline@v3.2.1'
         - 'swatinem/rust-cache@v2.9.3'
-        - 'taiki-e/install-action@cargo-hack'
-        - 'taiki-e/install-action@cargo-minimal-versions'
-        - 'taiki-e/install-action@cargo-semver-checks'
+        - 'taiki-e/install-action@v2.90.4'
     '.github/workflows/mdbook.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/configure-pages@v6.0.0'
@@ -96,19 +94,9 @@ dependencies:
         commit: 'sha1-045e5c0ed9c50cc1f96de7e891a09ad3daea245f'
         owner_id: 43724913
         repo_id: 335611917
-    'taiki-e/install-action@cargo-hack':
-        ref: 'cargo-hack'
-        commit: 'sha1-961e5c37a36cf6b0ff4e0b62ef05edd1fe9fe767'
-        owner_id: 43724913
-        repo_id: 442947557
-    'taiki-e/install-action@cargo-minimal-versions':
-        ref: 'cargo-minimal-versions'
-        commit: 'sha1-ff12da44162b219666df8c57cad682746185c6ac'
-        owner_id: 43724913
-        repo_id: 442947557
-    'taiki-e/install-action@cargo-semver-checks':
-        ref: 'cargo-semver-checks'
-        commit: 'sha1-d55e9c7356e09d76cdb1f74f44b843c2920f47ee'
+    'taiki-e/install-action@v2.90.4':
+        ref: 'v2.90.4'
+        commit: 'sha1-4a76afe23f9e08d2d9550fb56e556444e8611d21'
         owner_id: 43724913
         repo_id: 442947557
     'taiki-e/upload-rust-binary-action@v1.30.2':
