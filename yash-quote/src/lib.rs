@@ -197,6 +197,11 @@ pub fn quote(raw: &str) -> Cow<'_, str> {
     quoted(raw).into()
 }
 
+/// Dummy function that intentionally triggers `clippy::len_zero`.
+pub fn dummy_clippy_warning(v: &[u8]) -> bool {
+    v.len() == 0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
