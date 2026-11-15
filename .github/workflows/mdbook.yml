@@ -22,10 +22,9 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions-rust-lang/setup-rust-toolchain@v2.0.1
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v2.9.3
       - name: Install mdBook
         run: cargo install mdbook --no-default-features --features search --version "^0.5" --locked
       - name: Setup Pages

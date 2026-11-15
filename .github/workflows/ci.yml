@@ -14,17 +14,14 @@ jobs:
   check:
     # TODO Return to ubuntu-latest when #896 is fixed
     runs-on: ubuntu-24.04
-    env:
-      CARGO_BUILD_WARNINGS: deny
     permissions:
       contents: read
     steps:
     - uses: actions/checkout@v7.0.1
-    - uses: dtolnay/rust-toolchain@master
+    - uses: actions-rust-lang/setup-rust-toolchain@v2.0.1
       with:
         toolchain: stable
         components: clippy, rustfmt
-    - uses: Swatinem/rust-cache@v2.9.3
     # Building tests and docs before running ./check.sh is redundant but it
     # allows us to measure the build times for these steps separately.
     - name: Build tests
@@ -42,40 +39,37 @@ jobs:
       pull-requests: write
     steps:
     - uses: actions/checkout@v7.0.1
-    - uses: dtolnay/rust-toolchain@master
+    - uses: actions-rust-lang/setup-rust-toolchain@v2.0.1
       with:
         toolchain: stable
         components: clippy
-    - uses: Swatinem/rust-cache@v2.9.3
+        # Denying warnings would stop Cargo from checking the crates that
+        # depend on a crate with warnings, so fewer warnings would be
+        # reported as review comments. The check job denies them instead.
+        build-warnings: warn
     - uses: giraffate/clippy-action@v1.0.1
       with:
         reporter: github-pr-review
   extra:
     runs-on: ubuntu-latest
-    env:
-      CARGO_BUILD_WARNINGS: deny
     permissions:
       contents: read
     steps:
     - uses: actions/checkout@v7.0.1
-    - uses: dtolnay/rust-toolchain@master
+    - uses: actions-rust-lang/setup-rust-toolchain@v2.0.1
       with:
         toolchain: stable
-    - uses: Swatinem/rust-cache@v2.9.3
     - name: Run extra tests
       run: ./check-extra.sh -v
   release-build:
     runs-on: ubuntu-latest
-    env:
-      CARGO_BUILD_WARNINGS: deny
     permissions:
       contents: read
     steps:
     - uses: actions/checkout@v7.0.1
-    - uses: dtolnay/rust-toolchain@master
+    - uses: actions-rust-lang/setup-rust-toolchain@v2.0.1
       with:
         toolchain: stable
-    - uses: Swatinem/rust-cache@v2.9.3
     - name: Run release build checks
       run: ./check-release-build.sh
   semver:
@@ -84,10 +78,9 @@ jobs:
       contents: read
     steps:
     - uses: actions/checkout@v7.0.1
-    - uses: dtolnay/rust-toolchain@master
+    - uses: actions-rust-lang/setup-rust-toolchain@v2.0.1
       with:
         toolchain: stable
-    - uses: Swatinem/rust-cache@v2.9.3
     - uses: taiki-e/install-action@v2.90.4
       with:
         tool: cargo-semver-checks
@@ -103,13 +96,15 @@ jobs:
       contents: read
     steps:
     - uses: actions/checkout@v7.0.1
-    - uses: dtolnay/rust-toolchain@master
+    - uses: actions-rust-lang/setup-rust-toolchain@v2.0.1
       with:
-        toolchain: nightly
-    - uses: dtolnay/rust-toolchain@master
-      with:
-        toolchain: 1.96.0
-    - uses: Swatinem/rust-cache@v2.9.3
+        toolchain: nightly, 1.96.0
+        # Warnings are checked by the jobs using the stable toolchain. Older
+        # compilers may emit spurious warnings that later versions fixed, so
+        # this job does not deny them. Cargo 1.96 ignores this setting, but
+        # it is set explicitly so that raising the MSRV does not start
+        # denying warnings.
+        build-warnings: warn
     - uses: taiki-e/install-action@v2.90.4
       with:
         tool: cargo-hack,cargo-minimal-versions
@@ -117,16 +112,13 @@ jobs:
       run: ./check-msrv.sh -v
   windows:
     runs-on: windows-latest
-    env:
-      CARGO_BUILD_WARNINGS: deny
     permissions:
       contents: read
     steps:
     - uses: actions/checkout@v7.0.1
-    - uses: dtolnay/rust-toolchain@master
+    - uses: actions-rust-lang/setup-rust-toolchain@v2.0.1
       with:
         toolchain: stable
-    - uses: Swatinem/rust-cache@v2.9.3
     - name: Test yash-arith
       run: cargo test --all-features --package yash-arith
     - name: Test yash-executor
@@ -151,10 +143,9 @@ jobs:
       contents: read
     steps:
     - uses: actions/checkout@v7.0.1
-    - uses: dtolnay/rust-toolchain@master
+    - uses: actions-rust-lang/setup-rust-toolchain@v2.0.1
       with:
         toolchain: stable
-    - uses: Swatinem/rust-cache@v2.9.3
     - name: Install mdBook
       run: cargo install mdbook --no-default-features --features search --version "^0.5" --locked
     - name: Build and test docs

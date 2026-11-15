@@ -44,9 +44,15 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions-rust-lang/setup-rust-toolchain@v2.0.1
         with:
           toolchain: stable
+          # A new lint in the latest stable toolchain should not break a
+          # release. The release-build job in ci.yml denies warnings instead.
+          build-warnings: warn
+          # Restoring a cache into a release build would let a poisoned cache
+          # affect the released binaries.
+          cache: false
       - id: build
         name: Build and upload Rust binary to GitHub Release
         uses: taiki-e/upload-rust-binary-action@v1.30.2
