@@ -35,6 +35,9 @@ yash-quote = { path = "yash-quote", version = "1.1.1" }
 yash-semantics = { path = "yash-semantics", version = "0.21.0" }
 yash-syntax = { path = "yash-syntax", version = "0.25.0" }
 
+[workspace.lints.cargo]
+unused_dependencies = "warn"
+
 [workspace.lints.clippy]
 allow_attributes_without_reason = "warn"
 assigning_clones = "warn"
