@@ -10,12 +10,12 @@ workflows:
         - 'kesin11/actions-timeline@v3.2.1'
         - 'taiki-e/install-action@v2.90.4'
     '.github/workflows/mdbook.yml':
-        - 'actions-rust-lang/setup-rust-toolchain@v2.0.1'
         - 'actions/checkout@v7.0.1'
         - 'actions/configure-pages@v6.0.0'
         - 'actions/deploy-pages@v5.0.1'
         - 'actions/upload-pages-artifact@v5.0.0'
         - 'kesin11/actions-timeline@v3.2.1'
+        - 'taiki-e/install-action@v2.90.4'
     '.github/workflows/release.yml':
         - 'actions-rust-lang/setup-rust-toolchain@v2.0.1'
         - 'actions/attest@v4.2.2'

@@ -22,11 +22,9 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: actions-rust-lang/setup-rust-toolchain@v2.0.1
+      - uses: taiki-e/install-action@v2.90.4
         with:
-          toolchain: stable
-      - name: Install mdBook
-        run: cargo install mdbook --no-default-features --features search --version "^0.5" --locked
+          tool: mdbook@0.5
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v6.0.0
