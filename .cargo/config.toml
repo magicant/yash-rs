@@ -1,0 +1,7 @@
+[registry]
+# Ignore versions published within this period so that a compromised release
+# is likely to be noticed and yanked before we pick it up. Keep this in sync
+# with the cooldown in .github/dependabot.yml. To pick up a newer version
+# urgently, for example a security fix, run:
+#   CARGO_RESOLVER_INCOMPATIBLE_PUBLISH_AGE=allow cargo update <crate> --precise <version>
+global-min-publish-age = "3 days"
