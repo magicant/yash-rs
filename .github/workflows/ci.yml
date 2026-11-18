@@ -146,8 +146,9 @@ jobs:
     - uses: actions-rust-lang/setup-rust-toolchain@v2.0.1
       with:
         toolchain: stable
-    - name: Install mdBook
-      run: cargo install mdbook --no-default-features --features search --version "^0.5" --locked
+    - uses: taiki-e/install-action@v2.90.4
+      with:
+        tool: mdbook@0.5
     - name: Build and test docs
       run: ./check-docs.sh
   lockfile:
