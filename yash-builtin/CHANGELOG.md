@@ -15,6 +15,14 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ## [0.26.1] - Unreleased
 
+### Added
+
+- The `echo` module, which implements the `echo` built-in. The `Style` enum,
+  selected by the `ECHO_STYLE` variable, determines which options the built-in
+  accepts and whether it interprets escape sequences. While the `portable`
+  shell option is on, the built-in rejects arguments whose result POSIX leaves
+  implementation-defined.
+
 ### Changed
 
 - The `common::output` function now accepts any `AsRef<[u8]>` content, so it

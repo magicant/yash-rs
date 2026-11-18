@@ -57,6 +57,7 @@
     - [cd](builtins/cd.md)
     - [command](builtins/command.md)
     - [continue](builtins/continue.md)
+    - [echo](builtins/echo.md)
     - [eval](builtins/eval.md)
     - [exec](builtins/exec.md)
     - [exit](builtins/exit.md)

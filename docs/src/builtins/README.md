@@ -95,6 +95,7 @@ Substitutive built-ins behave like external utilities: they are located during [
 
 Yash-rs implements these substitutive built-ins:
 
+- [`echo`](echo.md)
 - [`false`](false.md)
 - [`pwd`](pwd.md)
 - [`true`](true.md)

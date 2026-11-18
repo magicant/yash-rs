@@ -69,6 +69,7 @@ pub mod colon;
 pub mod command;
 pub mod common;
 pub mod r#continue;
+pub mod echo;
 pub mod eval;
 pub mod exec;
 pub mod exit;
@@ -200,6 +201,10 @@ where
         (
             "continue",
             Builtin::new(Special, |env, args| Box::pin(r#continue::main(env, args))),
+        ),
+        (
+            "echo",
+            Builtin::new(Substitutive, |env, args| Box::pin(echo::main(env, args))),
         ),
         ("eval", {
             let mut builtin = Builtin::new(Special, |env, args| Box::pin(eval::main(env, args)));
