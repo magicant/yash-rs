@@ -17,6 +17,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- The `common::output` function now accepts any `AsRef<[u8]>` content, so it
+  can print bytes that are not valid UTF-8.
 - Public dependency versions:
     - yash-env 0.17.2 → 0.17.3
 
