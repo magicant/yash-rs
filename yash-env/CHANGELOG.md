@@ -641,6 +641,7 @@ This version has been yanked due to an issue that prevents the crate from buildi
         - This dependency is now public.
 - Private dependency versions:
     - derive_more 2.0.1 → 2.1.0
+    - strum 0.27.0 → 0.28.0
 
 ### Deprecated
 
@@ -1049,7 +1050,7 @@ This version has been yanked due to an issue that prevents the crate from buildi
 ### Changed
 
 - Public dependency versions:
-    - yash-syntax 0.15.0 → 0.16.0
+    - yash-syntax 0.15.2 → 0.16.0
 - Private dependency versions:
     - annotate-snippets 0.11.4 → 0.12.4
 
@@ -1428,6 +1429,7 @@ This version has been yanked due to an issue that prevents the crate from buildi
     - yash-syntax 0.9.0 → 0.10.0
 - Private dependency versions:
     - annotate-snippets 0.10.0 → 0.11.4
+    - itertools 0.11.0 → 0.13.0
 - All inherent methods of `SharedSystem` now take `&self` instead of `&mut self`:
     - `SharedSystem::read_async`
     - `SharedSystem::write_all`
@@ -1464,6 +1466,8 @@ This version has been yanked due to an issue that prevents the crate from buildi
 - `trap::SignalSystem::signal_name_from_number`
 - `trap::SignalSystem::signal_number_from_name`
 - `ExitStatus::to_signal_number`
+- Private dependencies
+    - strum 0.26.2
 
 ### Changed
 

@@ -18,7 +18,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 ### Changed
 
 - Public dependency versions:
-    - yash-env 0.17.0 → 0.17.3
+    - yash-env 0.17.0 → 0.17.2
 
 ## [0.25.0] - 2026-09-06
 
@@ -155,9 +155,14 @@ A _private dependency_ is used internally and not visible to downstream users.
 - The `yash_env::source::pretty::Report` returned by `parser::Error::to_report`
   now includes footnotes from `parser::ErrorCause::footnotes`.
 - Public dependency versions:
-    - yash-env 0.15.0 → 0.15.3
+    - yash-env 0.15.2 → 0.15.3
 
 ## [0.22.1] - 2026-07-05
+
+### Changed
+
+- Public dependency versions:
+    - yash-env 0.15.0 → 0.15.2
 
 ### Fixed
 
@@ -571,6 +576,8 @@ more flexible and readable configurations.
 - Public dependency versions:
     - Rust 1.70.0 → 1.77.0
     - annotate-snippets 0.10.0 → 0.11.4
+- Private dependency versions:
+    - itertools 0.11.0 → 0.13.0
 - `source::Code::source` is now `Rc<Source>` instead of `Source`.
     - This change is made to avoid cloning the `Source` object when the `Lexer`
       flushes its buffer and creates a new `Code` object sharing the same
@@ -650,6 +657,8 @@ platforms, where `RawFd` falls back to `i32`.
 - `<syntax::AndOr as TryFrom<parser::lex::Operator>>::Error` from `()` to `TryFromOperatorError`
 - `<syntax::RedirOp as FromStr>::Err` from `()` to `ParseOperatorError`
 - `<syntax::RedirOp as TryFrom<parser::lex::Operator>>::Error` from `()` to `TryFromOperatorError`
+- Public dependency versions
+    - annotate-snippets 0.9.1 → 0.10.0
 
 ### Removed
 
@@ -660,12 +669,18 @@ platforms, where `RawFd` falls back to `i32`.
 ### Added
 
 - `impl Default for Text`
+- Private dependencies
+    - thiserror 1.0.47
 
 ### Changed
 
 - Type of `HereDoc::content` from `RefCell<Text>` to `OnceCell<Text>`
 - Public dependency versions
     - Rust 1.67.0 → 1.70.0
+- Private dependency versions
+    - async-trait 0.1.66 → 0.1.73
+    - futures-util 0.3.27 → 0.3.28
+    - itertools 0.10.5 → 0.11.0
 
 ## [0.6.1] - 2023-05-01
 
@@ -681,12 +696,11 @@ platforms, where `RawFd` falls back to `i32`.
   `SyntaxError` instead of `InvalidCommandToken` depending on the type of
   erroneous tokens.
 - Public dependency versions
-    - Rust 1.58.0 → 1.67.0
+    - Rust 1.56.0 → 1.67.0
 - Private dependency versions
-    - async-trait 0.1.56 → 0.1.73
-    - futures-util 0.3.23 → 0.3.28
-    - itertools 0.10.3 → 0.11.0
-    - thiserror 1.0.43 → 1.0.47
+    - async-trait 0.1.56 → 0.1.66
+    - futures-util 0.3.23 → 0.3.27
+    - itertools 0.10.3 → 0.10.5
 
 ## [0.6.0] - 2022-10-01
 
@@ -750,6 +764,8 @@ range of source code characters rather than a single character.
     - `parser::lex::Lexer::arithmetic_expansion`
     - `parser::lex::Lexer::raw_param`
     - `parser::lex::WordLexer::braced_param`
+- Private dependency versions
+    - futures-util 0.3.19 → 0.3.21
 
 ### Removed
 

@@ -62,6 +62,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - `TokenError`, `SyntaxError`, `EvalError`, `ErrorCause`, and `Error` now
   implement `std::error::Error`.
+- Private dependencies
+    - thiserror 1.0.47
 
 ### Changed
 
@@ -74,8 +76,6 @@ A _private dependency_ is used internally and not visible to downstream users.
     - Changed the return type of `eval` from
       `Result<Value, Error<E::AssignVariableError>>` to
       `Result<Value, Error<E::GetVariableError, E::AssignVariableError>>`.
-- Private dependency versions
-    - thiserror 1.0.43 → 1.0.47
 
 ## [0.1.0] - 2022-10-01
 
