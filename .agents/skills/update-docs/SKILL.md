@@ -31,7 +31,8 @@ the book buildable.
 Follow these project-specific conventions when writing or editing pages. Match the style of
 the surrounding pages — read a nearby page first if unsure.
 [docs/README.md](../../../docs/README.md) is the canonical statement of the writing rules;
-the sections below summarize it and add conventions not recorded there.
+the sections below summarize it and add conventions not recorded there. The summary does not
+cover every rule, so read docs/README.md in full before editing.
 
 ### Linking
 
@@ -50,6 +51,12 @@ correct links in the final HTML** — do not "fix" these links to satisfy the li
 Reference-style links are common in these pages (e.g. `[variable]` with a
 `[variable]: ../language/parameters/variables.md` definition at the bottom of the file). Reuse
 existing definitions where a page already has them.
+
+### Synopses
+
+Follow the synopsis rule in [docs/README.md](../../../docs/README.md): write parameters in
+upper case in a synopsis and in inline code that quotes a command line
+(`source FILE [ARGUMENT…]`), but keep them in lower case in prose.
 
 ### Version tags for new features
 
@@ -116,11 +123,13 @@ For `shell` blocks that should not be run as-is, attach attributes after the lan
 
 ## Workflow
 
-1. Identify the affected page(s) under `docs/src`. For a new page, add it to `SUMMARY.md`.
-2. Edit the Markdown, applying the conventions above (linking, `(Since x.y.z)` tags, bold
-   keyword introductions, `topic_index.md` entries, `portable` option placement, and the
-   right code-block language/flags).
-3. Run `./check-docs.sh` from the repository root and confirm it finishes with **no errors
+1. Read [docs/README.md](../../../docs/README.md) in full.
+2. Identify the affected page(s) under `docs/src`. For a new page, add it to `SUMMARY.md`.
+3. Edit the Markdown, applying the rules in docs/README.md and the conventions above
+   (linking, `(Since x.y.z)` tags, bold keyword introductions, `topic_index.md` entries,
+   synopsis parameters, `portable` option placement, and the right code-block
+   language/flags).
+4. Run `./check-docs.sh` from the repository root and confirm it finishes with **no errors
    and no warnings**. This builds the book with mdBook, runs `docs/doctest.sh` on the
    examples, and verifies the index sort order.
-4. Fix any reported failures and re-run until clean before committing.
+5. Fix any reported failures and re-run until clean before committing.

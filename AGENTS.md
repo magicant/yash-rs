@@ -29,6 +29,7 @@ Run from repository root.
 ## Code style
 
 - Do not write a comment that only restates what the code plainly does. Reserve comments for what the code cannot say: a non-obvious reason, a specification reference, or a caveat.
+- Doc comments (`///` and `//!`) describe what an item does for its users. Put the reasons for its internal design, such as why it is built the way it is, in regular `//` comments.
 - Where a function runs through many consecutive blocks, a short comment naming what a block does (for example, `// Check portability of - and --`) helps the reader scan. Keep it a label, not an explanation.
 
 ## Refactoring
