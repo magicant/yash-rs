@@ -81,7 +81,7 @@ jobs:
     - uses: actions-rust-lang/setup-rust-toolchain@v2.0.1
       with:
         toolchain: stable
-    - uses: taiki-e/install-action@v2.90.4
+    - uses: taiki-e/install-action@v2.90.5
       with:
         tool: cargo-semver-checks
     - name: Run semver checks
@@ -105,7 +105,7 @@ jobs:
         # it is set explicitly so that raising the MSRV does not start
         # denying warnings.
         build-warnings: warn
-    - uses: taiki-e/install-action@v2.90.4
+    - uses: taiki-e/install-action@v2.90.5
       with:
         tool: cargo-hack,cargo-minimal-versions
     - name: Run tests with MSRV
@@ -146,7 +146,7 @@ jobs:
     - uses: actions-rust-lang/setup-rust-toolchain@v2.0.1
       with:
         toolchain: stable
-    - uses: taiki-e/install-action@v2.90.4
+    - uses: taiki-e/install-action@v2.90.5
       with:
         tool: mdbook@0.5
     - name: Build and test docs
