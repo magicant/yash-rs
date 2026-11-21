@@ -18,8 +18,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 ### Changed
 
 - Public dependency versions:
-    - yash-env 0.17.0 → 0.17.3
-    - yash-syntax 0.25.0 → 0.25.1
+    - yash-env 0.17.0 → 0.17.2
 
 ## [0.16.0] - 2026-09-06
 
@@ -108,7 +107,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 - `expand_posix` now requires an `ExpandText` function injected through the
   environment's `any` storage to perform text expansion.
 - Public dependency versions:
-    - yash-env 0.9.0 → 0.10.0
+    - yash-env 0.9.2 → 0.10.0
 - yash-syntax is now a private dependency.
 - Private dependency versions:
     - yash-syntax 0.16.0 → 0.17.0
@@ -122,6 +121,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- Public dependency versions:
+    - yash-env 0.9.0 → 0.9.2
 - Private dependency versions:
     - yash-semantics 0.10.0 → 0.11.0
 
@@ -131,7 +132,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - Public dependency versions:
     - yash-syntax 0.15.2 → 0.16.0
-    - yash-env 0.8.0 → 0.9.0
+    - yash-env 0.8.1 → 0.9.0
 - Private dependency versions:
     - yash-semantics 0.9.0 → 0.10.0
 
@@ -140,6 +141,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 ### Changed
 
 - Public dependency versions:
+    - yash-env 0.8.0 → 0.8.1
     - yash-syntax 0.15.0 → 0.15.2
 - Private dependency versions:
     - yash-semantics 0.8.0 → 0.9.0

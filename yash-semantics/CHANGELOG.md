@@ -18,8 +18,7 @@ A _private dependency_ is used internally and not visible to downstream users.
 ### Changed
 
 - Public dependency versions:
-    - yash-env 0.17.0 → 0.17.3
-    - yash-syntax 0.25.0 → 0.25.1
+    - yash-env 0.17.0 → 0.17.2
 
 ## [0.21.0] - 2026-09-06
 
@@ -509,6 +508,8 @@ A _private dependency_ is used internally and not visible to downstream users.
     - The `initial::NonassignableErrorCause` enum is a successor to the previous
       `NonassignableError` enum. The new `NotVariable` variant has a `param:
       Param` field.
+- Private dependencies:
+    - enumset 1.1.2
 
 ### Changed
 
@@ -547,6 +548,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 - Public dependency versions:
     - Rust 1.75.0 → 1.77.0
     - yash-syntax 0.9.0 → 0.10.0
+- Private dependency versions:
+    - itertools 0.11.0 → 0.13.0
 
 ### Deprecated
 
