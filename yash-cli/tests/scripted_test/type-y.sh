@@ -68,8 +68,7 @@ __IN__
 array: extension built-in
 __OUT__
 
-# TODO echo built-in is not yet implemented
-test_OE -f 'describing substitutive built-in echo'
+test_OE 'describing substitutive built-in echo'
 type echo | grep -v "^echo: substitutive built-in "
 __IN__
 

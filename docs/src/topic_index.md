@@ -39,6 +39,8 @@
 - [delimiter](language/redirections/here_documents.md#syntax) (here-document)
 - [dollar single quote](language/words/quoting.md#dollar-single-quotes)
 - [double quote](language/words/quoting.md#double-quotes)
+- [`echo` built-in](builtins/echo.md)
+- [`ECHO_STYLE` variable](language/parameters/variables.md#echo_style)
 - [elective built-in](builtins/index.html#elective-built-ins)
 - [empty field removal](language/words/field_splitting.md#empty-field-removal)
 - [`ENV` variable](language/parameters/variables.md#env)

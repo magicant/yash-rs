@@ -36,18 +36,28 @@ pub mod syntax;
 /// the standard error and the returned result has
 /// [`ExitStatus::FAILURE`](yash_env::semantics::ExitStatus::FAILURE). Any
 /// errors that occur while printing the error message are ignored.
-pub async fn output<S>(env: &mut Env<S>, content: &str) -> yash_env::builtin::Result
+///
+/// The content may be any bytes, including ones that are not valid UTF-8.
+pub async fn output<S>(env: &mut Env<S>, content: impl AsRef<[u8]>) -> yash_env::builtin::Result
 where
     S: Isatty + WriteAll,
 {
-    match env.system.write_all(Fd::STDOUT, content.as_bytes()).await {
-        Ok(_) => Default::default(),
-        Err(errno) => {
-            report::report_simple_failure(
-                env,
-                &format!("error printing results to stdout: {errno}"),
-            )
-            .await
+    // Delegating to a non-generic function avoids instantiating the whole
+    // future for each content type.
+    async fn inner<S: Isatty + WriteAll>(
+        env: &mut Env<S>,
+        content: &[u8],
+    ) -> yash_env::builtin::Result {
+        match env.system.write_all(Fd::STDOUT, content).await {
+            Ok(_) => Default::default(),
+            Err(errno) => {
+                report::report_simple_failure(
+                    env,
+                    &format!("error printing results to stdout: {errno}"),
+                )
+                .await
+            }
         }
     }
+    inner(env, content.as_ref()).await
 }

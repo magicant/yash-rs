@@ -153,6 +153,9 @@ Some variable names are reserved for special purposes. These variables may affec
 **`CDPATH`**
 : A colon-separated list of directories to search in the [`cd` built-in]
 
+**`ECHO_STYLE`**
+: (Since 3.7.0) The behavior of the [`echo` built-in](../../builtins/echo.md#echo-style)
+
 **`ENV`**
 : The name of a file to be sourced when [starting](../../startup.md) an [interactive shell](../../interactive/index.html)
 

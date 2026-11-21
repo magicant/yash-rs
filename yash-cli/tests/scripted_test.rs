@@ -232,6 +232,16 @@ fn declaration_utilities_ex() {
 }
 
 #[test]
+fn echo_builtin() {
+    run("echo-p.sh")
+}
+
+#[test]
+fn echo_builtin_ex() {
+    run("echo-y.sh")
+}
+
+#[test]
 fn errexit_option() {
     run("errexit-p.sh")
 }

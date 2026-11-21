@@ -81,6 +81,7 @@ impl Default for HelpTable {
             ("cd", crate::cd::HELP),
             ("command", crate::command::HELP),
             ("continue", crate::r#continue::HELP),
+            ("echo", crate::echo::HELP),
             ("eval", crate::eval::HELP),
             ("exec", crate::exec::HELP),
             ("exit", crate::exit::HELP),

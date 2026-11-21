@@ -32,16 +32,15 @@ use yash_env::system::concurrency::WriteAll;
 use yash_env::system::{Isatty, SendSignal, Signals};
 
 /// Help information of the `kill` built-in
-///
-/// The built-in parses its arguments without [`OptionSpec`]s because of the
-/// special syntax of the signal-specifying option, so the option list here is
-/// used only for the help and must be kept in sync with the [`syntax`] module.
 pub const HELP: &dyn Help = &BuiltinHelp {
     summary: "send a signal to processes",
     usage: &[
         "kill [-s SIGNAL|-n SIGNAL|-SIGNAL] TARGET...",
         "kill -l|-v [SIGNAL|EXIT_STATUS...]",
     ],
+    // The built-in parses its arguments without these specs because of the
+    // special syntax of the signal-specifying option, so they are used only
+    // for the help and must be kept in sync with the `syntax` module.
     options: &[
         OptionSpec::new()
             .short('s')
