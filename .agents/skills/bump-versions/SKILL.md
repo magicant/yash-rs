@@ -51,9 +51,9 @@ The procedure below is written as an algorithm. **Run it as written**: execute
 `MAIN` top to bottom, call each subroutine where `MAIN` calls it, and do not
 substitute a one-pass reading of the diff for the fan-out loop in Phase 2. The
 most common failure of this skill is a *missed* bump, and it always has the same
-cause: a crate that became affected only because *another* crate's version
-changed, so it never appeared in the diff you started from. Phase 2 exists
-solely to find those crates, and it is a loop, not a single pass.
+cause: a crate that became affected only because the root requirement for
+*another* crate was raised, so it never appeared in the diff you started from.
+Phase 2 exists solely to find those crates, and it is a loop, not a single pass.
 
 Severity ordering used throughout:
 
@@ -75,11 +75,13 @@ Maintain these tables explicitly (write them down; `VALIDATE` checks them):
 ```
 severity   : crate -> BREAKING | COMPATIBLE | PATCH    # highest accumulated this cycle
 version    : crate -> forecast version string          # output of FORECAST
-dep_events : crate -> set of workspace crates whose new version it must record
+dep_events : crate -> set of workspace crates whose raised root requirement it must record
              # an unlisted crate reads as the EMPTY SET, never as undefined
-worklist   : queue of crates whose severity rose and whose dependents are not yet fanned out
-root_before: crate -> its root requirement as it stood before Phase 3
-root_raised: crate -> whether Phase 3 raised that requirement
+worklist   : queue of crates whose bookkeeping changed and that Phase 2 must revisit
+root_before: crate -> its root requirement as it stood before this run touched it
+root_raised: crate -> whether SYNC_ROOT raised that requirement
+             # an unlisted crate reads as false
+asked      : crate -> the maintainer's answer to SYNC_ROOT case 4, once asked
 cli_sources: set of crates other than yash-cli whose own change in the diff
              implements a shell-observable behavior change
 cli_needs  : set of crates whose new version yash-cli must require   # see CLI_PATH
@@ -91,15 +93,15 @@ crate must *record in its changelog* is not the same event as a bump that raises
 its *severity*, and a crate already at the propagated severity still has to
 record the dependency. `dep_events` stores crate names, not version strings, so a
 later re-raise of an upstream crate cannot leave a stale version behind —
-`WRITE_CHANGELOG` reads `version[X]` when it writes, after the fixpoint.
+`WRITE_CHANGELOG` reads the root requirement when it writes, after the fixpoint.
 
 ### MAIN
 
 ```
 MAIN(diff):
     severity := {} ; version := {} ; dep_events := {} ; worklist := []
-    root_before := {} ; root_raised := {} ; cli_sources := {} ; cli_needs := {}
-    log := []
+    root_before := {} ; root_raised := {} ; asked := {}
+    cli_sources := {} ; cli_needs := {} ; log := []
 
     # ---- Phase 1: seed from the diff --------------------------------------
     for each crate C that has a changed file in diff:
@@ -111,28 +113,42 @@ MAIN(diff):
         RAISE("yash-cli", CLASSIFY("yash-cli", diff),
               "shell behavior changed")            # even if yash-cli itself was untouched
 
+    for each crate S in cli_sources:
+        cli_needs += CLI_PATH(S)                   # before Phase 2: SYNC_ROOT case 2 reads it
+
     # ---- Phase 2: fan out to dependents until the tables stop changing ----
     while worklist is not empty:
         X := pop(worklist)
         version[X] := FORECAST(X, severity[X])
+        if X == "yash-cli":  continue              # no root entry, no dependents
+        if X not in root_before:
+            root_before[X] := current root requirement for X
+        root_raised[X] := SYNC_ROOT(X)             # re-run whenever X is revisited
+        if not root_raised[X]:
+            continue                               # dependents still require the old
+                                                   # version: nothing for them to record
         for each D in DEPENDENTS(X):               # ALWAYS recompute; never trust the diff
+            new_event := X not in dep_events[D]
             dep_events[D] += X                     # record FIRST: RAISE may dedup below,
                                                    # but D must record X either way
-            RAISE(D, PROPAGATED_SEVERITY(X, D), "records new " + X)
-    # Loop invariant: on exit, every dependent of every bumped crate is itself
-    # in `severity` (or was returned NONE by PROPAGATED_SEVERITY). Phase 2 ends
-    # only at that fixpoint — a single pass over the diff never reaches it,
-    # because a crate bumped in Phase 2 has dependents of its own.
+            RAISE(D, PROPAGATED_SEVERITY(X, D), "requires new " + X)
+            if new_event and D != "yash-cli":      # yash-cli has no root entry and
+                                                   # records no dependencies
+                push D onto worklist               # the new entry may move D's own
+                                                   # SYNC_ROOT into a different case;
+                                                   # if RAISE already queued D, the
+                                                   # duplicate is harmless: a revisit
+                                                   # recomputes the same values
+    # Loop invariant: on exit, every dependent of every crate whose root
+    # requirement was raised is itself in `severity` (or was returned NONE by
+    # PROPAGATED_SEVERITY). Phase 2 ends only at that fixpoint — a single pass
+    # over the diff never reaches it, because a crate bumped in Phase 2 has
+    # dependents of its own.
 
     # ---- Phase 3: write the files ----------------------------------------
     for each crate C in severity:
         set `version` in C/Cargo.toml to version[C]
-        WRITE_CHANGELOG(C)                         # changelog before SYNC_ROOT: case 3 reads it
-    for each crate S in cli_sources:
-        cli_needs += CLI_PATH(S)                   # before SYNC_ROOT: case 2 reads it
-    for each crate X in severity:
-        root_before[X] := current root requirement for X
-        root_raised[X] := SYNC_ROOT(X)             # ask the maintainer at most once
+        WRITE_CHANGELOG(C)
 
     # ---- Phase 4 ----------------------------------------------------------
     VALIDATE()
@@ -161,25 +177,32 @@ RAISE(C, s, reason):
 
 ```
 DEPENDENTS(X):
-    hits := shell: grep -l '^X = ' */Cargo.toml          # e.g. `yash-env = { workspace = true }`
+    # only [dependencies] and [target.'cfg(...)'.dependencies] count
+    hits := shell: awk -v x=X 'FNR == 1 { s = "" } /^\[/ { s = $0 }
+                       $1 == x && s ~ /^\[(target\..*\.)?dependencies\]$/ { print FILENAME }' \
+                   */Cargo.toml                  # e.g. `yash-env = { workspace = true }`
     return { crate(h) for h in hits } \ { X }
 ```
 
-A version bump of `yash-env`, say, potentially affects *every* crate with
+Raising the root requirement for `yash-env`, say, affects *every* crate with
 `yash-env = { workspace = true }`, not just the one crate whose source you were
-asked to change. Run the grep for **each** crate whose version changed and add
-every hit — this is the step most easily skipped, because the code diff usually
-only touches one dependent directly.
+asked to change. Run the command for **each** crate whose root requirement was
+raised and add every hit — this is the step most easily skipped, because the
+code diff usually only touches one dependent directly.
 
 Notes:
 
 - A crate counts as a dependent whether the dependency is **public or private**.
-- `[dependencies]` is what matters for published-crate compatibility; also check
-  `[dev-dependencies]` for completeness, though those don't affect it.
+- `[dev-dependencies]` do not count. They name workspace crates by `path` only,
+  without a version requirement, and do not affect published-crate
+  compatibility, so a raised root requirement changes nothing for them. This is
+  why a plain `grep '^X = '` is not enough: it also matches `[dev-dependencies]`
+  entries, and `[features]` entries such as `yash-semantics =
+  ["dep:yash-semantics"]`.
 - Entering the tables only means the crate *needs attention*; `PROPAGATED_SEVERITY`
-  and `FORECAST` decide the severity. Do **not** assume a dependency bump alone
-  skips the version bump — public vs. private changes only *severity* and
-  *root-requirement* handling, never whether a bump happens at all.
+  and `FORECAST` decide the severity. Do **not** assume a raised requirement
+  alone skips the version bump — public vs. private changes only the severity,
+  never whether a bump happens at all.
 
 ### CLASSIFY — change category of a crate's own change
 
@@ -292,16 +315,18 @@ PROPAGATED_SEVERITY(X, D):
     return PATCH                   # "normally" — see the note below
 ```
 
-For every crate that depends on X, recording X's new version is itself a
+Phase 2 calls this only when `SYNC_ROOT` has raised the root requirement for X.
+For every crate that depends on X, the raised requirement changes what the
+dependent would require if it were published now, so recording it is itself a
 changelog-worthy change and — per the `APPLY_BUMP` table, where *compatible* and
 *patch-level* both bump `z` by exactly the same amount in 0.x — **normally earns
 the dependent its own patch-level (`z`) version bump, regardless of whether the
 dependency is public or private.** This holds even when X's bump was itself only
 patch-level, and even when nothing else about the dependent changed (real
-precedent: `yash-fnmatch` 1.1.1 → 1.1.2 solely for a *private* `thiserror` patch
-bump; `yash-syntax`, `yash-semantics`, and `yash-prompt` have each released
-solely for a *public* `yash-env` bump). Public vs. private changes two things
-only:
+precedent: `yash-fnmatch` 1.1.1 → 1.1.2 solely for raising its requirement on
+the *private* `thiserror`; `yash-syntax`, `yash-semantics`, and `yash-prompt`
+have each released solely for a raised requirement on the *public* `yash-env`).
+Public vs. private changes two things only:
 
 - **Which changelog list the entry goes in** — "Public dependency versions" vs
   "Private dependency versions" (`WRITE_CHANGELOG`).
@@ -313,12 +338,13 @@ only:
   capped at patch-level even when X's own bump was breaking, since nothing in the
   dependent's own public API changed.
 
-Whether the *root* requirement for X itself gets raised is a separate question,
-decided by `SYNC_ROOT` — do not conflate "does the root requirement rise" with
-"does this dependent get a changelog entry and version bump." The two are
-independent: a crate can (and often does) get a patch bump purely to record a
-dependency note even while the root requirement for that dependency stays put
-(`SYNC_ROOT` case 3).
+A new release of X alone does not propagate. When `SYNC_ROOT` leaves the root
+requirement for X unchanged (case 3, or case 4 without confirmation), the
+dependents would be published with the same requirement on X as before, so they
+get neither a changelog entry nor a version bump on X's account. Example:
+`yash-env` 0.17.3 changed only how it depends on the private `tempfile`, so the
+root requirement stayed at `0.17.2`, and the `yash-builtin` 0.26.1 changelog
+records no `yash-env` version change.
 
 ### IS_PUBLIC_DEP — trust the changelog history
 
@@ -351,9 +377,10 @@ The workspace dependency table in the root
 lines) holds, for each workspace crate, the **single workspace-wide minimum
 version requirement** that all dependents inherit via `workspace = true`. This
 table is the **driver**: when you raise a requirement here, every dependent's
-required version rises at once, and `WRITE_CHANGELOG` then records that bump in
-each affected dependent's changelog mechanically. Decide the root here first;
-never let a changelog entry drive the root value (that would be circular).
+required version rises at once, Phase 2 fans the change out to those
+dependents, and `WRITE_CHANGELOG` then records that bump in each affected
+dependent's changelog mechanically. Decide the root here first; never let a
+changelog entry drive the root value (that would be circular).
 
 The `version` in the table is a Cargo **caret** requirement (`"0.2.3"` means
 `>=0.2.3, <0.3.0`), and it is intentionally kept at the *lowest* version that all
@@ -362,6 +389,16 @@ crate released a new version.
 
 ```
 SYNC_ROOT(X) -> raised?:             # returns whether it raised the requirement
+    # X's unreleased changes below means the entries already under its
+    # Unreleased heading plus what this run will add: the change in the diff
+    # and the requirements in dep_events[X]
+
+    # case 0 — Already raised in this run or by an earlier commit in the same
+    # unreleased cycle: follow the latest forecast
+    if root_raised[X] or root[X] is newer than X's latest release:
+        root[X] := version[X]            # the forecast may have risen since
+        return true
+
     # case 1 — Forced: X's bump is breaking (0.x: a minor bump; 1.x: a major bump)
     if severity[X] == BREAKING:
         root[X] := version[X]            # mechanical; no confirmation needed
@@ -374,22 +411,33 @@ SYNC_ROOT(X) -> raised?:             # returns whether it raised the requirement
         return true
 
     # case 3 — Internal-only compatible bump: leave the requirement unchanged
-    if X's Unreleased changelog entries consist ONLY of
+    if X's unreleased changes consist ONLY of
            - a Rust / MSRV version bump, and/or
            - internal fixes that do not touch the public API, and/or
-           - private-dependency version bumps:
+           - private-dependency version bumps, and/or
+           - non-breaking public-dependency version bumps:
         return false                     # mechanical; no confirmation needed
 
     # case 4 — Public-API compatible bump: ask the maintainer (default: leave)
-    if X's Unreleased changelog includes any public-API addition or change:
-        if ASK_MAINTAINER("Does any dependent now require the new " + X +
-                          ", so the workspace requirement should be raised?"):
+    if X's unreleased changes include any public-API addition or change:
+        if X not in asked:               # ask at most once per crate
+            asked[X] := ASK_MAINTAINER("Does any dependent now require the new " +
+                          X + ", so the workspace requirement should be raised?")
+                                         # an unconfirmed answer counts as no
+        if asked[X]:
             root[X] := version[X]
             return true
         else:
             return false                 # default to leaving it unchanged if unconfirmed
 ```
 
+- Case 0 rationale: a root requirement newer than the latest release names an
+  unreleased forecast, so an earlier commit in this cycle has already raised it.
+  If a later change raises the forecast again, a requirement left at the old
+  forecast names a version that will never be published. Example: with
+  `yash-fnmatch` 1.1.1 released and the root already raised to the forecast
+  `1.1.2`, a compatible API addition moves the forecast to `1.2.0`, and the root
+  must follow it even if the maintainer declines case 4.
 - Case 1 rationale: the old caret requirement excludes the new version, so
   dependents cannot build against it. **Always raise.**
 - Case 2 rationale: a shell behavior change that `yash-cli/CHANGELOG.md` records
@@ -407,7 +455,13 @@ SYNC_ROOT(X) -> raised?:             # returns whether it raised the requirement
   versions"** — what matters is that it adds no adoptable API. Example:
   `yash-arith 0.2.4`, whose only Unreleased change is a Rust version bump listed
   under *Public dependency versions*, still leaves the root requirement correctly
-  at `0.2.3`.)
+  at `0.2.3`.) A non-breaking public-dependency bump stays in this case too: a
+  dependent that wants the dependency's new API depends on it directly and gets
+  the new version through that dependency's own root requirement, and a breaking
+  one makes X itself BREAKING, which case 1 handles. Example: `yash-semantics`
+  0.18.1, whose only changes were raising its requirements on the public
+  `yash-env` (0.15.3 → 0.15.4) and the private `itertools`, left the root
+  requirement at `0.18.0`.
 - Case 4 rationale: a dependent *could* now adopt the addition, but this skill
   cannot reliably tell from the diff whether one actually did.
 
@@ -445,9 +499,11 @@ WRITE_CHANGELOG(C):
     ensure it has an entry describing the change
 
     # Dependency notes come from dep_events, NOT from reading C/Cargo.toml:
-    # a workspace crate's bump usually leaves `X = { workspace = true }` untouched,
+    # a raised root requirement leaves `X = { workspace = true }` untouched,
     # so the manifest shows nothing even though the entry is required.
-    deps := { (X, version[X]) for X in dep_events[C] }   # empty set if C had none
+    # Each note records the requirement C would be published with now, i.e. the
+    # root requirement, which is version[X] only because SYNC_ROOT raised it.
+    deps := { (X, root[X]) for X in dep_events[C] }   # empty set if C had none
           + any dependency added, removed, or updated in C/Cargo.toml itself
     if deps is non-empty:
         if C == "yash-cli":  skip the dependency entry        # exception, see below
@@ -486,14 +542,18 @@ comment, not "fix it up locally".
 ```
 VALIDATE():
     # A. Was the Phase 2 fixpoint really reached? Re-derive it from scratch.
-    for each crate X in severity:
+    for each crate X in severity except yash-cli:
         for each D in DEPENDENTS(X):
+            if not root_raised[X]:
+                assert X not in dep_events[D]        # D still requires the old version;
+                continue                             # recording X would claim a change
+                                                     # that did not happen
             p := PROPAGATED_SEVERITY(X, D)
             if p == NONE:  continue                  # only yash-cli
             assert D in severity and severity[D] >= p
                    # membership alone is NOT enough: a public dependent of a
                    # BREAKING X sitting at PATCH is under-bumped and must fail here
-            assert X in dep_events[D]                # D must record X's new version
+            assert X in dep_events[D]                # D must record the raised requirement
             # a failure here is THE missed-bump bug: go back to Phase 2
 
     # B. Per-crate consistency
@@ -509,10 +569,10 @@ VALIDATE():
                # diff — neither is an invented entry
 
     # C. Root table — a gap here is often CORRECT
-    for each crate X in severity:                    # read the Phase 3 outcome;
+    for each crate X in severity except yash-cli:    # read the Phase 2 outcome;
         if root_raised[X]:                           # never call SYNC_ROOT again —
-            assert root entry for X == version[X]    # it is side-effecting and case 4
-        else:                                        # would re-prompt the maintainer
+            assert root entry for X == version[X]    # it is side-effecting
+        else:
             assert root entry for X == root_before[X]
             # the root deliberately stays at the lower caret minimum;
             # do NOT "fix" that gap (e.g. yash-arith crate 0.2.4 with root

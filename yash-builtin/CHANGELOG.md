@@ -27,8 +27,6 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 - The `common::output` function now accepts any `AsRef<[u8]>` content, so it
   can print bytes that are not valid UTF-8.
-- Public dependency versions:
-    - yash-env 0.17.2 → 0.17.3
 
 ## [0.26.0] - 2026-11-07
 
@@ -138,7 +136,6 @@ A _private dependency_ is used internally and not visible to downstream users.
   to `kill::print::print`, which rejected it as an unrecognized operand.
 - Public dependency versions:
     - yash-env 0.17.0 → 0.17.1
-    - yash-semantics (optional) 0.21.0 → 0.21.1
 
 ## [0.24.3] - 2026-09-23
 
@@ -1301,6 +1298,8 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
     - Rust 1.75.0 → 1.77.0
     - yash-semantics 0.2.0 → 0.3.0
     - yash-syntax 0.9.0 → 0.10.0
+- Private dependency versions:
+    - itertools 0.11.0 → 0.13.0
 
 ### Fixed
 
