@@ -149,7 +149,11 @@ while [ $# -gt 0 ]; do
         esac
     done
 
-    cargo publish --package "$package"
+    # The min-publish-age in .cargo/config.toml would reject the workspace
+    # packages we have just published in this loop. Lifting it here does not
+    # let in any third-party package that the checks above have not seen,
+    # because packaging keeps the versions locked in Cargo.lock.
+    CARGO_RESOLVER_INCOMPATIBLE_PUBLISH_AGE=allow cargo publish --package "$package"
 
     version=$(cargo metadata --format-version=1 --no-deps --all-features |
         jq -r '.packages[] | select(.name == "'"$package"'") | .version')

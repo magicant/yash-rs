@@ -1,6 +1,11 @@
 set -Ceux
 
 # Make sure next releases have correct semantic versions.
+
+# The baseline is the latest published version, which the min-publish-age in
+# .cargo/config.toml would reject for a while after each release.
+export CARGO_RESOLVER_INCOMPATIBLE_PUBLISH_AGE=allow
+
 cargo semver-checks --package 'yash-arith'
 cargo semver-checks --package 'yash-builtin'
 cargo semver-checks --package 'yash-env'
