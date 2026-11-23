@@ -22,7 +22,7 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: taiki-e/install-action@v2.90.5
+      - uses: taiki-e/install-action@v2.90.6
         with:
           tool: mdbook@0.5
       - name: Setup Pages
