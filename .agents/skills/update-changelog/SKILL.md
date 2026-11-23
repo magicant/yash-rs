@@ -46,7 +46,9 @@ Produce changelog updates that:
 4. Classify each change.
    Map each change to exactly one primary category:
    - Added: New feature or capability
-   - Changed: Behavior change that is not purely a bug fix
+   - Changed: Behavior change that is not purely a bug fix. This includes a change
+     in what an existing item does or returns, even when it comes with a new item;
+     for example, an existing function that now lists a newly added built-in.
    - Deprecated: Still available but planned for removal
    - Removed: Deleted behavior or API
    - Fixed: Bug correction
@@ -56,6 +58,10 @@ Produce changelog updates that:
    State what changed, concretely. Avoid internal-only jargon unless the crate is developer-facing.
    For `yash-cli/CHANGELOG.md`, keep entries focused on user-visible behavior and
    avoid implementation details aimed at crate developers.
+   For the other crates, which are libraries, write for developers who use the
+   crate: describe the public items and what they let a developer do, not the
+   shell-level behavior of the built-in or feature they implement. That behavior
+   belongs in `yash-cli/CHANGELOG.md` and the manual.
    Order bullets by importance first, then by relatedness within a category.
 
    **Keep each bullet minimal, but do state the value.** Say what changed, and say
