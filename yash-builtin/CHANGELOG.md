@@ -25,6 +25,8 @@ A _private dependency_ is used internally and not visible to downstream users.
 
 ### Changed
 
+- The `iter` function now includes the `echo` built-in, so a shell that
+  registers the built-ins from `iter` gets `echo` without extra setup.
 - The `common::output` function now accepts any `AsRef<[u8]>` content, so it
   can print bytes that are not valid UTF-8.
 
