@@ -27,10 +27,17 @@ driven by [scripted_test.rs](../../../yash-cli/tests/scripted_test.rs). Read
 
 - Test files live in
   [yash-cli/tests/scripted_test](../../../yash-cli/tests/scripted_test/) and are
-  named after the feature they cover.
+  named after the feature they cover. Do not add an editor modeline such as
+  `# vim: set ...` to them.
 - A `-p.sh` file tests behavior any POSIX-compliant shell must have. It sets
   `posix="true"` near the top, which makes the harness invoke the testee as
   `sh`. Do not put yash extensions in these files.
+  Every test case in a `-p.sh` file must pass on any POSIX-compliant shell, and
+  other shells may extend POSIX. So, unless POSIX forbids the extension, do not
+  expect an error from a command that POSIX leaves unspecified or that a shell
+  may accept as an extension, such as a missing operand. Likewise, do not
+  assume implementation limits such as 64-bit integers. Such cases belong in the
+  `-y.sh` file.
 - A `-y.sh` file tests yash-specific behavior, including behavior POSIX leaves
   unspecified and options yash adds.
 - Add to the existing file for the feature. A new file needs a corresponding
