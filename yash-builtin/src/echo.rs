@@ -264,14 +264,14 @@ fn find_non_portable(args: &[Field]) -> Option<(&Field, &'static str)> {
     let option_like = args.first().filter(|arg| is_option(arg, "neE")).map(|arg| {
         (
             arg,
-            "the result of a first operand like this is implementation-defined",
+            "the result of a first operand like this may differ in other shells",
         )
     });
     option_like.or_else(|| {
         args.iter().find(|arg| arg.value.contains('\\')).map(|arg| {
             (
                 arg,
-                "the result of an operand containing a backslash is implementation-defined",
+                "the result of an operand containing a backslash may differ in other shells",
             )
         })
     })
