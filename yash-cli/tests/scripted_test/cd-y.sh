@@ -231,5 +231,3 @@ __OUT__
 test_O -d -e 5 'help option with another option'
 cd --help -P
 __IN__
-
-# vim: set ft=sh ts=8 sts=4 sw=4 et:

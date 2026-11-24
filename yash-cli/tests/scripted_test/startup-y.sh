@@ -665,5 +665,3 @@ __ERR__
 
 test_O -d -e 2 'ambiguous option' --p
 __IN__
-
-# vim: set ft=sh ts=8 sts=4 sw=4 et:
