@@ -80,6 +80,10 @@ __OUT__
 - The `-d` option requires the standard error to be non-empty without comparing
   it. Use it for a case that must print a diagnostic whose exact wording is not
   the point; it overrides the alias's standard error check.
+- Do not compare a diagnostic that the shell renders from a `Report` in
+  `__ERR__`. Its layout comes from the annotate-snippets crate and may change
+  whenever that crate does, so use `-d` instead, and check the error's content
+  in unit tests of the code that builds the report.
 - The `-f` option inverts the result, for a case that documents an unfixed bug
   or an unimplemented feature.
 
