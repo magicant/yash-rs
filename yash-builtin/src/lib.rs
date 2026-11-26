@@ -80,6 +80,7 @@ pub mod getopts;
 pub mod help;
 pub mod jobs;
 pub mod kill;
+pub mod printf;
 pub mod pwd;
 pub mod read;
 pub mod readonly;
@@ -248,6 +249,10 @@ where
         (
             "kill",
             Builtin::new(Mandatory, |env, args| Box::pin(kill::main(env, args))),
+        ),
+        (
+            "printf",
+            Builtin::new(Substitutive, |env, args| Box::pin(printf::main(env, args))),
         ),
         (
             "pwd",

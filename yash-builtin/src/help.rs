@@ -92,6 +92,7 @@ impl Default for HelpTable {
             ("help", HELP),
             ("jobs", crate::jobs::HELP),
             ("kill", crate::kill::HELP),
+            ("printf", crate::printf::HELP),
             ("pwd", crate::pwd::HELP),
             ("read", crate::read::HELP),
             ("readonly", crate::readonly::HELP),

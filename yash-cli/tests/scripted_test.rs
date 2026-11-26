@@ -478,6 +478,16 @@ fn ppid_variable() {
 }
 
 #[test]
+fn printf_builtin() {
+    run("printf-p.sh")
+}
+
+#[test]
+fn printf_builtin_ex() {
+    run("printf-y.sh")
+}
+
+#[test]
 fn pwd_builtin_ex() {
     run("pwd-y.sh")
 }

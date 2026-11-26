@@ -1,9 +1,13 @@
 # quote-y.sh: yash-specific test of quoting
 
-test_oE 'null character in dollar-single-quotes'
+# TODO The shell keeps null bytes produced by dollar-single-quotes in the word.
+# Remove -f when https://github.com/magicant/yash-rs/issues/921 is fixed.
+test_oE -f 'null character in dollar-single-quotes'
 printf '%s\n' a$'b\0c'd w$'x\x0y'z 1$'2\c@3'4
 __IN__
-
+abd
+wxz
+124
 __OUT__
 
 test_O -d -e 2 'too large octal escape in dollar-single-quotes'

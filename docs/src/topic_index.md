@@ -142,6 +142,7 @@
 - [`posixlycorrect` shell option](environment/options.md#posixlycorrect)
 - [`PPID` variable](language/parameters/variables.md#ppid)
 - [previous job](interactive/job_control.md#current-and-previous-jobs)
+- [`printf` built-in](builtins/printf.md)
 - [process](interactive/job_control.md#job-control-concepts)
 - [process group](interactive/job_control.md#job-control-concepts)
 - [prompt](interactive/prompt.md)

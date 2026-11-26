@@ -90,6 +90,7 @@ The shell reports an error and does not run the construct:
 - (Since 3.7.0) A first operand that is `-` followed by one or more of `e`, `E`, and `n`, or an operand containing a backslash, given to the [`echo` built-in](builtins/echo.md).
 - (Since 3.4.1) An operand without the leading `%` given to the [`jobs` built-in](builtins/jobs.md).
 - (Since 3.3.5) A non-portable way of specifying a signal or listing signals with the [`kill` built-in](builtins/kill.md).
+- (Since 3.8.0) The `-v` option, a floating-point or `q` conversion, `*` for a field width or precision, or an escape sequence POSIX does not specify, given to the [`printf` built-in](builtins/printf.md).
 - (Since 3.3.3) Making the `PWD`, `OLDPWD`, `OPTIND`, `OPTARG`, or `LINENO` [variable](language/parameters/variables.md#reserved-variable-names) read-only with the [`readonly` built-in](builtins/readonly.md).
 - (Since 3.4.1) A `-` used as an option-operand separator with the [`set` built-in](builtins/set.md) (for example, `set - foo`).
 - (Since 3.3.4) Executing the [`.` built-in](builtins/source.md) under the name `source`.
