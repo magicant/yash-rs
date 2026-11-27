@@ -172,4 +172,4 @@ jobs:
       actions: read
     if: ${{ always() }}
     steps:
-    - uses: Kesin11/actions-timeline@v3.2.1
+    - uses: Kesin11/actions-timeline@v4.0.0
