@@ -7,14 +7,14 @@ workflows:
         - 'actions-rust-lang/setup-rust-toolchain@v2.0.1'
         - 'actions/checkout@v7.0.1'
         - 'giraffate/clippy-action@v1.0.1'
-        - 'kesin11/actions-timeline@v3.2.1'
+        - 'kesin11/actions-timeline@v4.0.0'
         - 'taiki-e/install-action@v2.90.8'
     '.github/workflows/mdbook.yml':
         - 'actions/checkout@v7.0.1'
         - 'actions/configure-pages@v6.0.0'
         - 'actions/deploy-pages@v5.0.1'
         - 'actions/upload-pages-artifact@v5.0.0'
-        - 'kesin11/actions-timeline@v3.2.1'
+        - 'kesin11/actions-timeline@v4.0.0'
         - 'taiki-e/install-action@v2.90.8'
     '.github/workflows/release.yml':
         - 'actions-rust-lang/setup-rust-toolchain@v2.0.1'
@@ -67,9 +67,9 @@ dependencies:
         commit: 'sha1-13b9d32482f25d29ead141b79e7e04e7900281e0'
         owner_id: 17407489
         repo_id: 560300269
-    'kesin11/actions-timeline@v3.2.1':
-        ref: 'v3.2.1'
-        commit: 'sha1-460b1f8a750077029ad3589824d371b200e91dcf'
+    'kesin11/actions-timeline@v4.0.0':
+        ref: 'v4.0.0'
+        commit: 'sha1-d547cc51bd6e8016ac50219eeb29a9eb385a2546'
         owner_id: 1324862
         repo_id: 681708168
     'swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0':
