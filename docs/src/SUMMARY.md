@@ -68,6 +68,7 @@
     - [help](builtins/help.md)
     - [jobs](builtins/jobs.md)
     - [kill](builtins/kill.md)
+    - [printf](builtins/printf.md)
     - [pwd](builtins/pwd.md)
     - [read](builtins/read.md)
     - [readonly](builtins/readonly.md)

@@ -353,7 +353,7 @@ test_nonspecial_builtin_syntax "$LINENO" jobs
 test_nonspecial_builtin_syntax "$LINENO" kill
 # Non-standard built-in popd skipped
 # test_nonspecial_builtin_syntax "$LINENO" popd
-# TODO not implemented: test_nonspecial_builtin_syntax "$LINENO" printf
+test_nonspecial_builtin_syntax "$LINENO" printf
 # Non-standard built-in pushd skipped
 # test_nonspecial_builtin_syntax "$LINENO" pushd
 test_nonspecial_builtin_syntax "$LINENO" pwd
@@ -496,7 +496,7 @@ test_nonspecial_builtin_syntax "$LINENO" getopts
 test_nonspecial_builtin_syntax "$LINENO" jobs
 test_nonspecial_builtin_syntax "$LINENO" kill
 # TODO not implemented: test_nonspecial_builtin_syntax "$LINENO" popd
-# TODO not implemented: test_nonspecial_builtin_syntax "$LINENO" printf
+test_nonspecial_builtin_syntax "$LINENO" printf
 # TODO not implemented: test_nonspecial_builtin_syntax "$LINENO" pushd
 test_nonspecial_builtin_syntax "$LINENO" pwd
 test_nonspecial_builtin_syntax "$LINENO" read

@@ -97,6 +97,7 @@ Yash-rs implements these substitutive built-ins:
 
 - [`echo`](echo.md)
 - [`false`](false.md)
+- [`printf`](printf.md)
 - [`pwd`](pwd.md)
 - [`true`](true.md)
 

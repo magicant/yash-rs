@@ -202,7 +202,7 @@ fn parse_options(style: Style, args: &[Field]) -> (Settings, &[Field]) {
 ///
 /// Returns `Break` if the operand contains `\c`, after which nothing more
 /// should be printed.
-fn append_escaped(out: &mut Vec<u8>, operand: &str) -> ControlFlow<()> {
+pub(crate) fn append_escaped(out: &mut Vec<u8>, operand: &str) -> ControlFlow<()> {
     // Operating on bytes is safe because no byte of a multibyte UTF-8
     // character equals an ASCII character.
     let mut bytes = operand.bytes().peekable();

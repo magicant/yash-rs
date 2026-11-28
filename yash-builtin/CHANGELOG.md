@@ -13,6 +13,19 @@ Terminology: A _public dependency_ is one that’s exposed through this crate’
 public API (e.g., re-exported types).
 A _private dependency_ is used internally and not visible to downstream users.
 
+## [0.26.2] - Unreleased
+
+### Added
+
+- The `printf` module, which implements the `printf` built-in. Its `main`
+  function runs the built-in, and its `HELP` constant describes the built-in
+  for the `help` built-in.
+
+### Changed
+
+- The `iter` function now includes the `printf` built-in, so a shell that
+  registers the built-ins from `iter` gets `printf` without extra setup.
+
 ## [0.26.1] - 2026-11-22
 
 ### Added
@@ -1368,6 +1381,7 @@ The `wait` built-in no longer treats suspended jobs as terminated jobs.
 
 - Initial implementation of the `yash-builtin` crate
 
+[0.26.2]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.26.2
 [0.26.1]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.26.1
 [0.26.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.26.0
 [0.25.0]: https://github.com/magicant/yash-rs/releases/tag/yash-builtin-0.25.0

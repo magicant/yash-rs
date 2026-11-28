@@ -91,8 +91,7 @@ no newline\n
 
 ## Compatibility
 
-The `echo` utility is specified by POSIX.1-2024. POSIX leaves the results implementation-defined if the first operand is `-` followed by one or more of `e`, `E`, and `n`, or if any operand contains a backslash. The behavior of the `SYSV` style is what POSIX requires on XSI-conformant systems, except for the `\e` escape sequence, which is an extension. Implementations of `echo` in other shells differ widely in these cases, so use the `printf` utility instead for portable output.
-<!-- TODO: Link to the printf built-in page when it is implemented -->
+The `echo` utility is specified by POSIX.1-2024. POSIX leaves the results implementation-defined if the first operand is `-` followed by one or more of `e`, `E`, and `n`, or if any operand contains a backslash. The behavior of the `SYSV` style is what POSIX requires on XSI-conformant systems, except for the `\e` escape sequence, which is an extension. Implementations of `echo` in other shells differ widely in these cases, so use the [`printf` built-in](printf.md) instead for portable output.
 
 The `ECHO_STYLE` variable is an extension inherited from yash 2. Many of its values are named after other shells, but the built-in does not exactly mimic them.
 
